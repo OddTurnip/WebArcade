@@ -151,9 +151,44 @@
             line-height: 1.8;
         }
         .difficulty-info strong { color: #888; }
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 26, 46, 0.95);
+            z-index: 1000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #loadingOverlay.visible { display: flex; }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #3a3a5a;
+            border-top-color: #4ecdc4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #4ecdc4;
+            font-size: 18px;
+        }
     </style>
 </head>
 <body>
+    <div id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Generating puzzle...</div>
+    </div>
+
     <h1>Sudoku</h1>
 
     <div id="titleScreen">
@@ -257,6 +292,7 @@
         const titleScreen = document.getElementById('titleScreen');
         const statusDisplay = document.getElementById('statusDisplay');
         const configPanel = document.getElementById('configPanel');
+        const loadingOverlay = document.getElementById('loadingOverlay');
 
         // ============================================
         // GAME STATE
@@ -541,11 +577,11 @@
 
             // Target number of clues based on difficulty
             const targetClues = {
-                1: 45,  // Easy - more clues
-                2: 36,
-                3: 32,
-                4: 28,
-                5: 24   // Hard - fewer clues
+                1: 36,  // Easy - naked singles
+                2: 30,  // Medium - hidden singles
+                3: 26,  // Hard - X-wing/Y-wing
+                4: 24,  // Expert - forcing chains
+                5: 22   // Evil - trial and error
             };
 
             let currentClues = 81;
@@ -644,18 +680,29 @@
             currentDifficulty = difficulty;
 
             if (difficulty === 0) {
-                // Blank grid
+                // Blank grid - no loading needed
                 grid = Array(9).fill(null).map(() => Array(9).fill(0));
                 fixedCells = Array(9).fill(null).map(() => Array(9).fill(false));
                 solution = null;
+                finishStartGame();
             } else {
-                // Generate puzzle
-                const { puzzle, solution: sol } = generatePuzzle(difficulty);
-                grid = puzzle.map(row => [...row]);
-                solution = sol;
-                fixedCells = puzzle.map(row => row.map(cell => cell !== 0));
-            }
+                // Show loading overlay, then generate puzzle asynchronously
+                titleScreen.style.display = 'none';
+                loadingOverlay.classList.add('visible');
 
+                // Use setTimeout to allow the loading overlay to render before heavy computation
+                setTimeout(() => {
+                    const { puzzle, solution: sol } = generatePuzzle(difficulty);
+                    grid = puzzle.map(row => [...row]);
+                    solution = sol;
+                    fixedCells = puzzle.map(row => row.map(cell => cell !== 0));
+                    loadingOverlay.classList.remove('visible');
+                    finishStartGame();
+                }, 50);
+            }
+        }
+
+        function finishStartGame() {
             selectedCell = { x: -1, y: -1 };
             gameWon = false;
             clearInterval(timerInterval);
