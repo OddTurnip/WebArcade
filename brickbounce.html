@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brick Bounce</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+        }
+        h1 {
+            margin-bottom: 10px;
+            color: #ff6b6b;
+        }
+        #gameContainer {
+            position: relative;
+        }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            display: block;
+        }
+        #scoreDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            font-size: 18px;
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+        .score-item {
+            text-align: center;
+        }
+        .score-label {
+            font-size: 12px;
+            color: #888;
+        }
+        .score-value {
+            font-size: 24px;
+            color: #4ecdc4;
+        }
+        .high-score .score-value {
+            color: #ffe66d;
+        }
+        .lives .score-value {
+            color: #ff6b6b;
+        }
+        #controls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+        #rules {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #666;
+        }
+        #audioControls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        #audioControls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #4ecdc4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Brick Bounce</h1>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="640" height="480"></canvas>
+    </div>
+    <div id="scoreDisplay">
+        <div class="score-item lives">
+            <div class="score-label">Lives</div>
+            <div class="score-value" id="livesDisplay">3</div>
+        </div>
+        <div class="score-item">
+            <div class="score-label">Score</div>
+            <div class="score-value" id="currentScore">0</div>
+        </div>
+        <div class="score-item high-score">
+            <div class="score-label">High Score</div>
+            <div class="score-value" id="highScore">0</div>
+        </div>
+    </div>
+    <div id="controls">Left/Right or D-Pad to move paddle | Start to pause | A = speed up | B = slow down</div>
+    <div id="rules">Break all bricks to advance! Ball speeds up each level. 1 point per brick + level bonus.</div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+
+    <script src="controller.js"></script>
+    <script src="audio.js"></script>
+    <script src="storage.js"></script>
+    <script>
+        // ============================================
+        // GAME CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            WIDTH: 640,
+            HEIGHT: 480,
+            PADDLE_WIDTH: 120,
+            BORDER_SIZE: 8,
+            PADDLE_HEIGHT: 12,
+            PADDLE_SPEED: 7,
+            PADDLE_Y: 450,
+            BALL_SIZE: 10,
+            BALL_SPEED_INITIAL: 5,
+            BALL_SPEED_PER_LEVEL: 0.5,
+            BALL_MAX_SPEED: 10,
+            BRICK_ROWS: 5,
+            BRICK_COLS: 10,
+            BRICK_WIDTH: 58,
+            BRICK_HEIGHT: 20,
+            BRICK_PADDING: 4,
+            BRICK_TOP_OFFSET: 60,
+            BRICK_LEFT_OFFSET: 12,
+            INITIAL_LIVES: 3,
+            COLORS: {
+                background: '#000000',
+                paddle: '#4ecdc4',
+                ball: '#ffffff',
+                deathZone: '#ff6b6b',
+                text: '#ffffff',
+                textHighlight: '#ffe66d',
+                brickColors: ['#ff6b6b', '#ffe66d', '#4ecdc4', '#4a9eff', '#9b59b6']
+            }
+        };
+
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        const GAME_ID = 'brickbounce';
+        let gameData = GameStorage.load(GAME_ID, GameStorage.defaults.levelBased());
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        const GameState = {
+            DIFFICULTY_SELECT: 'difficulty_select',
+            TITLE: 'title',
+            PLAYING: 'playing',
+            PAUSED: 'paused',
+            LEVEL_COMPLETE: 'level_complete',
+            GAME_OVER: 'game_over',
+            VICTORY: 'victory'
+        };
+
+        // Difficulty settings
+        const DIFFICULTIES = {
+            EASY: { name: 'Easy', width: 120, color: '#3a7bd5', colorLight: '#5a9bf5', colorDark: '#2a5ba5' },
+            MEDIUM: { name: 'Medium', width: 80, color: '#4ecdc4', colorLight: '#6ee7de', colorDark: '#2a7a72' },
+            HARD: { name: 'Hard', width: 40, color: '#8b3a62', colorLight: '#ab5a82', colorDark: '#5b1a32' }
+        };
+        const DIFFICULTY_ORDER = ['EASY', 'MEDIUM', 'HARD'];
+        let selectedDifficulty = 1; // Default to Medium (index 1)
+        let currentDifficulty = DIFFICULTIES.MEDIUM;
+
+        let state = GameState.DIFFICULTY_SELECT;
+        let score = 0;
+        let lives = CONFIG.INITIAL_LIVES;
+        let level = 1;
+        let isNewHighScore = false;
+        let pauseTime = 0;
+        const UNPAUSE_DELAY = 250;
+
+        // Cheat code tracking
+        let cheatHoldStart = 0;
+        const CHEAT_HOLD_TIME = 1000; // 1 second
+
+        // Ball speed control (A = fast, B = slow)
+        let speedMultiplier = 1.0;
+        const SPEED_ACCEL_RATE = 0.08;  // How fast multiplier changes
+        const SPEED_MAX_MULT = 2.0;     // Max speed when holding A
+        const SPEED_MIN_MULT = 0.5;     // Min speed when holding B
+
+        const paddle = {
+            x: CONFIG.WIDTH / 2 - CONFIG.PADDLE_WIDTH / 2,
+            y: CONFIG.PADDLE_Y,
+            width: CONFIG.PADDLE_WIDTH,
+            height: CONFIG.PADDLE_HEIGHT
+        };
+
+        const ball = {
+            x: CONFIG.WIDTH / 2,
+            y: CONFIG.HEIGHT / 2,
+            vx: 0,
+            vy: 0,
+            size: CONFIG.BALL_SIZE,
+            speed: CONFIG.BALL_SPEED_INITIAL
+        };
+
+        let bricks = [];
+
+        // ============================================
+        // CANVAS SETUP
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const currentScoreEl = document.getElementById('currentScore');
+        const highScoreEl = document.getElementById('highScore');
+        const livesDisplayEl = document.getElementById('livesDisplay');
+
+        // Initialize displays and audio preferences
+        highScoreEl.textContent = gameData.highScore;
+        AudioSystem.musicEnabled = gameData.musicEnabled;
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        document.getElementById('musicToggle').checked = gameData.musicEnabled;
+        document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+
+        // ============================================
+        // BRICK FUNCTIONS
+        // ============================================
+        function createBricks() {
+            bricks = [];
+            for (let row = 0; row < CONFIG.BRICK_ROWS; row++) {
+                for (let col = 0; col < CONFIG.BRICK_COLS; col++) {
+                    bricks.push({
+                        x: CONFIG.BRICK_LEFT_OFFSET + col * (CONFIG.BRICK_WIDTH + CONFIG.BRICK_PADDING),
+                        y: CONFIG.BRICK_TOP_OFFSET + row * (CONFIG.BRICK_HEIGHT + CONFIG.BRICK_PADDING),
+                        width: CONFIG.BRICK_WIDTH,
+                        height: CONFIG.BRICK_HEIGHT,
+                        color: CONFIG.COLORS.brickColors[row % CONFIG.COLORS.brickColors.length],
+                        alive: true
+                    });
+                }
+            }
+        }
+
+        function countAliveBricks() {
+            return bricks.filter(b => b.alive).length;
+        }
+
+        // ============================================
+        // GAME FUNCTIONS
+        // ============================================
+        function resetBall() {
+            ball.x = CONFIG.WIDTH / 2;
+            ball.y = CONFIG.HEIGHT - 100;
+            ball.speed = Math.min(CONFIG.BALL_SPEED_INITIAL + (level - 1) * CONFIG.BALL_SPEED_PER_LEVEL, CONFIG.BALL_MAX_SPEED);
+            speedMultiplier = 1.0;  // Reset speed control
+
+            // Random angle upward
+            const angle = (Math.random() * 60 + 60) * Math.PI / 180; // 60-120 degrees
+            ball.vx = Math.cos(angle) * ball.speed * (Math.random() > 0.5 ? 1 : -1);
+            ball.vy = -Math.abs(Math.sin(angle) * ball.speed);
+        }
+
+        function resetPaddle() {
+            paddle.width = currentDifficulty.width;
+            paddle.x = CONFIG.WIDTH / 2 - paddle.width / 2;
+        }
+
+        function resetGame() {
+            score = 0;
+            lives = CONFIG.INITIAL_LIVES;
+            level = 1;
+            isNewHighScore = false;
+            createBricks();
+            resetPaddle();
+            resetBall();
+            updateDisplays();
+        }
+
+        function startGame() {
+            // Apply selected difficulty
+            currentDifficulty = DIFFICULTIES[DIFFICULTY_ORDER[selectedDifficulty]];
+            resetGame();
+            state = GameState.PLAYING;
+            AudioSystem.music.start('breakout');
+        }
+
+        function nextLevel() {
+            // Bonus points for completing level (before incrementing)
+            score += level * 5;
+            level++;
+            createBricks();
+            resetPaddle();
+            resetBall();
+            updateDisplays();
+            state = GameState.PLAYING;
+        }
+
+        function loseLife() {
+            lives--;
+            updateDisplays();
+            AudioSystem.sfx.death();
+            if (lives <= 0) {
+                endGame();
+            } else {
+                resetBall();
+                resetPaddle();
+            }
+        }
+
+        function endGame() {
+            if (score > gameData.highScore) {
+                gameData.highScore = score;
+                isNewHighScore = gameData.gamesPlayed > 0;
+                highScoreEl.textContent = gameData.highScore;
+            }
+            gameData.gamesPlayed++;
+            if (level > gameData.highestLevel) {
+                gameData.highestLevel = level;
+            }
+            saveGameData();
+            state = GameState.GAME_OVER;
+            AudioSystem.music.stop();
+            AudioSystem.sfx.gameOver();
+        }
+
+        function updateDisplays() {
+            currentScoreEl.textContent = score;
+            livesDisplayEl.textContent = lives;
+        }
+
+        // ============================================
+        // UPDATE FUNCTIONS
+        // ============================================
+        function updateDifficultySelect() {
+            const prevSelection = selectedDifficulty;
+
+            // Left/right to change selection
+            if (GameController.justPressed('left') || GameController.direction.left && !GameController._prevDirection?.left) {
+                selectedDifficulty = Math.max(0, selectedDifficulty - 1);
+            }
+            if (GameController.justPressed('right') || GameController.direction.right && !GameController._prevDirection?.right) {
+                selectedDifficulty = Math.min(DIFFICULTY_ORDER.length - 1, selectedDifficulty + 1);
+            }
+
+            // Play select sound on change
+            if (selectedDifficulty !== prevSelection) {
+                AudioSystem.sfx.select();
+            }
+
+            // Store previous direction state for edge detection
+            GameController._prevDirection = { ...GameController.direction };
+
+            // Any non-directional button to confirm
+            if (GameController.justPressed('a') || GameController.justPressed('b') ||
+                GameController.justPressed('x') || GameController.justPressed('y') ||
+                GameController.justPressed('start')) {
+                AudioSystem.sfx.select();
+                startGame();
+            }
+        }
+
+        function updateTitle() {
+            if (GameController.anyButtonJustPressed()) {
+                state = GameState.DIFFICULTY_SELECT;
+                selectedDifficulty = 1; // Reset to Medium
+            }
+        }
+
+        function updatePlaying() {
+            // Check for pause
+            if (GameController.justPressed('start')) {
+                pauseTime = Date.now();
+                state = GameState.PAUSED;
+                AudioSystem.music.stop();
+                return;
+            }
+
+            // Cheat code: hold LB + RB for 1 second to skip level
+            if (GameController.buttons.lb && GameController.buttons.rb) {
+                if (cheatHoldStart === 0) {
+                    cheatHoldStart = Date.now();
+                } else if (Date.now() - cheatHoldStart >= CHEAT_HOLD_TIME) {
+                    cheatHoldStart = 0;
+                    state = GameState.LEVEL_COMPLETE;
+                    AudioSystem.sfx.levelComplete();
+                    return;
+                }
+            } else {
+                cheatHoldStart = 0;
+            }
+
+            // Move paddle
+            if (GameController.direction.left) {
+                paddle.x -= CONFIG.PADDLE_SPEED;
+            }
+            if (GameController.direction.right) {
+                paddle.x += CONFIG.PADDLE_SPEED;
+            }
+            paddle.x = Math.max(CONFIG.BORDER_SIZE, Math.min(CONFIG.WIDTH - CONFIG.BORDER_SIZE - paddle.width, paddle.x));
+
+            // Ball speed control: A = speed up, B = slow down
+            let targetMultiplier = 1.0;
+            if (GameController.buttons.a) {
+                targetMultiplier = SPEED_MAX_MULT;
+            } else if (GameController.buttons.b) {
+                targetMultiplier = SPEED_MIN_MULT;
+            }
+            // Smoothly interpolate toward target
+            if (speedMultiplier < targetMultiplier) {
+                speedMultiplier = Math.min(speedMultiplier + SPEED_ACCEL_RATE, targetMultiplier);
+            } else if (speedMultiplier > targetMultiplier) {
+                speedMultiplier = Math.max(speedMultiplier - SPEED_ACCEL_RATE, targetMultiplier);
+            }
+
+            // Move ball (with speed multiplier)
+            ball.x += ball.vx * speedMultiplier;
+            ball.y += ball.vy * speedMultiplier;
+
+            // Ball collision with walls (accounting for border)
+            if (ball.x - ball.size / 2 <= CONFIG.BORDER_SIZE) {
+                ball.x = CONFIG.BORDER_SIZE + ball.size / 2;
+                ball.vx = Math.abs(ball.vx);
+                AudioSystem.sfx.wallHit();
+            }
+            if (ball.x + ball.size / 2 >= CONFIG.WIDTH - CONFIG.BORDER_SIZE) {
+                ball.x = CONFIG.WIDTH - CONFIG.BORDER_SIZE - ball.size / 2;
+                ball.vx = -Math.abs(ball.vx);
+                AudioSystem.sfx.wallHit();
+            }
+            if (ball.y - ball.size / 2 <= CONFIG.BORDER_SIZE) {
+                ball.y = CONFIG.BORDER_SIZE + ball.size / 2;
+                ball.vy = Math.abs(ball.vy);
+                AudioSystem.sfx.wallHit();
+            }
+
+            // Ball collision with paddle
+            if (ball.vy > 0 &&
+                ball.y + ball.size / 2 >= paddle.y &&
+                ball.y - ball.size / 2 <= paddle.y + paddle.height &&
+                ball.x >= paddle.x &&
+                ball.x <= paddle.x + paddle.width) {
+
+                ball.y = paddle.y - ball.size / 2;
+                const hitPos = (ball.x - paddle.x) / paddle.width;
+                const angle = (hitPos - 0.5) * Math.PI * 0.7;
+                ball.vx = Math.sin(angle) * ball.speed;
+                ball.vy = -Math.cos(angle) * ball.speed;
+                AudioSystem.sfx.paddleHit();
+            }
+
+            // Ball collision with bricks
+            for (const brick of bricks) {
+                if (!brick.alive) continue;
+
+                if (ball.x + ball.size / 2 >= brick.x &&
+                    ball.x - ball.size / 2 <= brick.x + brick.width &&
+                    ball.y + ball.size / 2 >= brick.y &&
+                    ball.y - ball.size / 2 <= brick.y + brick.height) {
+
+                    brick.alive = false;
+                    score += 1;
+                    updateDisplays();
+                    AudioSystem.sfx.brickHit();
+
+                    // Determine bounce direction
+                    const overlapLeft = (ball.x + ball.size / 2) - brick.x;
+                    const overlapRight = (brick.x + brick.width) - (ball.x - ball.size / 2);
+                    const overlapTop = (ball.y + ball.size / 2) - brick.y;
+                    const overlapBottom = (brick.y + brick.height) - (ball.y - ball.size / 2);
+
+                    const minOverlapX = Math.min(overlapLeft, overlapRight);
+                    const minOverlapY = Math.min(overlapTop, overlapBottom);
+
+                    if (minOverlapX < minOverlapY) {
+                        ball.vx = -ball.vx;
+                    } else {
+                        ball.vy = -ball.vy;
+                    }
+
+                    break; // Only hit one brick per frame
+                }
+            }
+
+            // Check for level complete
+            if (countAliveBricks() === 0) {
+                state = GameState.LEVEL_COMPLETE;
+                AudioSystem.sfx.levelComplete();
+                return;
+            }
+
+            // Ball falls off bottom
+            if (ball.y - ball.size / 2 > CONFIG.HEIGHT) {
+                loseLife();
+            }
+        }
+
+        function updatePaused() {
+            const timeSincePause = Date.now() - pauseTime;
+            if (timeSincePause >= UNPAUSE_DELAY && GameController.justPressed('start')) {
+                state = GameState.PLAYING;
+                AudioSystem.music.start('breakout');
+            }
+        }
+
+        function updateLevelComplete() {
+            if (GameController.anyButtonJustPressed()) {
+                nextLevel();
+            }
+        }
+
+        function updateGameOver() {
+            if (GameController.anyButtonJustPressed()) {
+                state = GameState.DIFFICULTY_SELECT;
+            }
+        }
+
+        // ============================================
+        // RENDER FUNCTIONS
+        // ============================================
+        let lavaFrame = 0;
+
+        function renderBackground() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            // Stone brick pattern for sides and top
+            const stoneColors = ['#4a4a5a', '#3a3a4a', '#5a5a6a', '#454555'];
+            const brickW = 16;
+            const brickH = 8;
+
+            // Top border
+            for (let x = 0; x < CONFIG.WIDTH; x += brickW) {
+                const colorIdx = (Math.floor(x / brickW)) % stoneColors.length;
+                ctx.fillStyle = stoneColors[colorIdx];
+                ctx.fillRect(x, 0, brickW - 1, CONFIG.BORDER_SIZE);
+                // Highlight
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.fillRect(x, 0, brickW - 1, 2);
+            }
+
+            // Left border
+            for (let y = CONFIG.BORDER_SIZE; y < CONFIG.HEIGHT - 12; y += brickH) {
+                const colorIdx = (Math.floor(y / brickH)) % stoneColors.length;
+                ctx.fillStyle = stoneColors[(colorIdx + 1) % stoneColors.length];
+                ctx.fillRect(0, y, CONFIG.BORDER_SIZE, brickH - 1);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.fillRect(0, y, 2, brickH - 1);
+            }
+
+            // Right border
+            for (let y = CONFIG.BORDER_SIZE; y < CONFIG.HEIGHT - 12; y += brickH) {
+                const colorIdx = (Math.floor(y / brickH)) % stoneColors.length;
+                ctx.fillStyle = stoneColors[(colorIdx + 2) % stoneColors.length];
+                ctx.fillRect(CONFIG.WIDTH - CONFIG.BORDER_SIZE, y, CONFIG.BORDER_SIZE, brickH - 1);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.fillRect(CONFIG.WIDTH - CONFIG.BORDER_SIZE, y, 2, brickH - 1);
+            }
+
+            // Lava at bottom
+            lavaFrame += 0.1;
+            const lavaHeight = 12;
+
+            // Solid background behind lava to fill gaps at bottom only
+            ctx.fillStyle = '#FF0000';
+            ctx.fillRect(0, CONFIG.HEIGHT - 9, CONFIG.WIDTH, 12);
+
+            for (let x = 0; x < CONFIG.WIDTH; x += 4) {
+                // Multiple wave sources that pulse vertically, not scroll horizontally
+                // Use x as a seed for phase offset, but time drives vertical motion
+                const phase1 = (x * 7) % 17;  // Pseudo-random per column
+                const phase2 = (x * 13) % 23;
+                const phase3 = (x * 19) % 31;
+
+                // Vertical bobbing at different frequencies
+                const bob1 = Math.sin(lavaFrame * 1.2 + phase1) * 2;
+                const bob2 = Math.sin(lavaFrame * 0.8 + phase2) * 1.5;
+                const bob3 = Math.sin(lavaFrame * 1.5 + phase3) * 1;
+
+                const totalBob = bob1 + bob2 * 0.5 + bob3 * 0.3;
+
+                // Base lava (dark red)
+                ctx.fillStyle = '#8b0000';
+                ctx.fillRect(x, CONFIG.HEIGHT - lavaHeight + totalBob, 4, lavaHeight);
+
+                // Middle layer (bright orange-red) - bobs slightly differently
+                const midBob = bob1 * 0.7 + bob2;
+                ctx.fillStyle = '#ff4500';
+                ctx.fillRect(x, CONFIG.HEIGHT - lavaHeight + 4 + midBob, 4, lavaHeight - 4);
+
+                // Top glow (yellow-orange) - pulses intensity based on height
+                const glowIntensity = 0.3 + Math.abs(totalBob) * 0.15;
+                ctx.fillStyle = `rgba(255, 200, 0, ${glowIntensity})`;
+                ctx.fillRect(x, CONFIG.HEIGHT - lavaHeight + 2 + totalBob, 4, 4);
+            }
+
+            // Subtle glow above lava
+            const gradient = ctx.createLinearGradient(0, CONFIG.HEIGHT - 40, 0, CONFIG.HEIGHT - lavaHeight);
+            gradient.addColorStop(0, 'rgba(255, 100, 0, 0)');
+            gradient.addColorStop(1, 'rgba(255, 100, 0, 0.15)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, CONFIG.HEIGHT - 40, CONFIG.WIDTH, 28);
+        }
+
+        function renderPaddle() {
+            const cornerRadius = 6;
+
+            // Glow effect using current difficulty color
+            ctx.shadowColor = currentDifficulty.color;
+            ctx.shadowBlur = 12;
+
+            // Draw rounded paddle shape
+            ctx.beginPath();
+            ctx.moveTo(paddle.x + cornerRadius, paddle.y);
+            ctx.lineTo(paddle.x + paddle.width - cornerRadius, paddle.y);
+            ctx.arcTo(paddle.x + paddle.width, paddle.y, paddle.x + paddle.width, paddle.y + cornerRadius, cornerRadius);
+            ctx.lineTo(paddle.x + paddle.width, paddle.y + paddle.height - cornerRadius);
+            ctx.arcTo(paddle.x + paddle.width, paddle.y + paddle.height, paddle.x + paddle.width - cornerRadius, paddle.y + paddle.height, cornerRadius);
+            ctx.lineTo(paddle.x + cornerRadius, paddle.y + paddle.height);
+            ctx.arcTo(paddle.x, paddle.y + paddle.height, paddle.x, paddle.y + paddle.height - cornerRadius, cornerRadius);
+            ctx.lineTo(paddle.x, paddle.y + cornerRadius);
+            ctx.arcTo(paddle.x, paddle.y, paddle.x + cornerRadius, paddle.y, cornerRadius);
+            ctx.closePath();
+
+            // Gradient fill for metallic look using difficulty colors
+            const gradient = ctx.createLinearGradient(paddle.x, paddle.y, paddle.x, paddle.y + paddle.height);
+            gradient.addColorStop(0, currentDifficulty.colorLight);
+            gradient.addColorStop(0.3, currentDifficulty.color);
+            gradient.addColorStop(0.7, currentDifficulty.color);
+            gradient.addColorStop(1, currentDifficulty.colorDark);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+
+            // Top highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(paddle.x + 4, paddle.y + 2, paddle.width - 8, 3);
+        }
+
+        function renderBall() {
+            ctx.fillStyle = CONFIG.COLORS.ball;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.shadowColor = CONFIG.COLORS.ball;
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function renderBricks() {
+            for (const brick of bricks) {
+                if (!brick.alive) continue;
+
+                ctx.fillStyle = brick.color;
+                ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+
+                // Brick highlight
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillRect(brick.x, brick.y, brick.width, brick.height / 3);
+
+                // Brick border
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
+            }
+        }
+
+        function renderLevel() {
+            ctx.fillStyle = CONFIG.COLORS.text + '44';
+            ctx.font = '14px "Courier New", monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Level ${level}`, CONFIG.WIDTH - 20, 30);
+        }
+
+        function renderDifficultySelect() {
+            renderBackground();
+            createBricks();
+            renderBricks();
+
+            // Draw preview paddle with selected difficulty
+            const previewDiff = DIFFICULTIES[DIFFICULTY_ORDER[selectedDifficulty]];
+            const previewPaddle = {
+                x: CONFIG.WIDTH / 2 - previewDiff.width / 2,
+                y: CONFIG.PADDLE_Y,
+                width: previewDiff.width,
+                height: CONFIG.PADDLE_HEIGHT
+            };
+
+            // Draw paddle preview with difficulty color
+            const cornerRadius = 6;
+            ctx.shadowColor = previewDiff.color;
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.moveTo(previewPaddle.x + cornerRadius, previewPaddle.y);
+            ctx.lineTo(previewPaddle.x + previewPaddle.width - cornerRadius, previewPaddle.y);
+            ctx.arcTo(previewPaddle.x + previewPaddle.width, previewPaddle.y, previewPaddle.x + previewPaddle.width, previewPaddle.y + cornerRadius, cornerRadius);
+            ctx.lineTo(previewPaddle.x + previewPaddle.width, previewPaddle.y + previewPaddle.height - cornerRadius);
+            ctx.arcTo(previewPaddle.x + previewPaddle.width, previewPaddle.y + previewPaddle.height, previewPaddle.x + previewPaddle.width - cornerRadius, previewPaddle.y + previewPaddle.height, cornerRadius);
+            ctx.lineTo(previewPaddle.x + cornerRadius, previewPaddle.y + previewPaddle.height);
+            ctx.arcTo(previewPaddle.x, previewPaddle.y + previewPaddle.height, previewPaddle.x, previewPaddle.y + previewPaddle.height - cornerRadius, cornerRadius);
+            ctx.lineTo(previewPaddle.x, previewPaddle.y + cornerRadius);
+            ctx.arcTo(previewPaddle.x, previewPaddle.y, previewPaddle.x + cornerRadius, previewPaddle.y, cornerRadius);
+            ctx.closePath();
+            const gradient = ctx.createLinearGradient(previewPaddle.x, previewPaddle.y, previewPaddle.x, previewPaddle.y + previewPaddle.height);
+            gradient.addColorStop(0, previewDiff.colorLight);
+            gradient.addColorStop(0.3, previewDiff.color);
+            gradient.addColorStop(0.7, previewDiff.color);
+            gradient.addColorStop(1, previewDiff.colorDark);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(previewPaddle.x + 4, previewPaddle.y + 2, previewPaddle.width - 8, 3);
+
+            // Title
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = 'bold 36px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('BRICK BOUNCE', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 40);
+
+            // Difficulty label
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.fillText('Select Difficulty', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 10);
+
+            // Difficulty options
+            const optionY = CONFIG.HEIGHT / 2 + 50;
+            const optionSpacing = 120;
+            const startX = CONFIG.WIDTH / 2 - optionSpacing;
+
+            for (let i = 0; i < DIFFICULTY_ORDER.length; i++) {
+                const diff = DIFFICULTIES[DIFFICULTY_ORDER[i]];
+                const x = startX + i * optionSpacing;
+                const isSelected = i === selectedDifficulty;
+
+                // Draw selection indicator
+                if (isSelected) {
+                    ctx.fillStyle = diff.color + '44';
+                    ctx.fillRect(x - 45, optionY - 18, 90, 36);
+                    ctx.strokeStyle = diff.color;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x - 45, optionY - 18, 90, 36);
+                }
+
+                // Draw option text
+                ctx.font = isSelected ? 'bold 20px "Courier New", monospace' : '18px "Courier New", monospace';
+                ctx.fillStyle = isSelected ? diff.color : CONFIG.COLORS.text + '88';
+                ctx.fillText(diff.name, x, optionY + 6);
+            }
+
+            // Instructions
+            ctx.font = '14px "Courier New", monospace';
+            ctx.fillStyle = CONFIG.COLORS.text + 'aa';
+            ctx.fillText('← →  to select, then press any button', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 110);
+        }
+
+        function renderTitle() {
+            // This state is now unused - go straight to difficulty select
+            renderDifficultySelect();
+        }
+
+        function renderPlaying() {
+            renderBackground();
+            renderBricks();
+            renderPaddle();
+            renderBall();
+            renderLevel();
+        }
+
+        function renderPaused() {
+            renderBackground();
+            renderBricks();
+            renderPaddle();
+            renderBall();
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.fillText('PAUSED', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 20);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillText('Press Start to Resume', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 30);
+        }
+
+        function renderLevelComplete() {
+            renderBackground();
+            renderPaddle();
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.fillText(`LEVEL ${level} COMPLETE!`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 40);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '24px "Courier New", monospace';
+            ctx.fillText(`Bonus: +${level * 5} points`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 10);
+
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillText('Press Any Button for Next Level', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
+        }
+
+        function renderGameOver() {
+            renderBackground();
+            renderPaddle();
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.textAlign = 'center';
+
+            ctx.fillStyle = CONFIG.COLORS.deathZone;
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.fillText('GAME OVER', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 60);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '24px "Courier New", monospace';
+            ctx.fillText(`Final Score: ${score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 10);
+            ctx.fillText(`Reached Level: ${level}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 25);
+
+            if (isNewHighScore) {
+                ctx.fillStyle = CONFIG.COLORS.textHighlight;
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.fillText('NEW HIGH SCORE!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 70);
+            }
+
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = '18px "Courier New", monospace';
+            const continueY = isNewHighScore ? CONFIG.HEIGHT / 2 + 120 : CONFIG.HEIGHT / 2 + 80;
+            ctx.fillText('Press Any Button to Continue', CONFIG.WIDTH / 2, continueY);
+        }
+
+        // ============================================
+        // GAME LOOP
+        // ============================================
+        function update() {
+            GameController.poll();
+
+            switch (state) {
+                case GameState.DIFFICULTY_SELECT:
+                    updateDifficultySelect();
+                    break;
+                case GameState.TITLE:
+                    updateTitle();
+                    break;
+                case GameState.PLAYING:
+                    updatePlaying();
+                    break;
+                case GameState.PAUSED:
+                    updatePaused();
+                    break;
+                case GameState.LEVEL_COMPLETE:
+                    updateLevelComplete();
+                    break;
+                case GameState.GAME_OVER:
+                    updateGameOver();
+                    break;
+            }
+        }
+
+        function render() {
+            switch (state) {
+                case GameState.DIFFICULTY_SELECT:
+                    renderDifficultySelect();
+                    break;
+                case GameState.TITLE:
+                    renderTitle();
+                    break;
+                case GameState.PLAYING:
+                    renderPlaying();
+                    break;
+                case GameState.PAUSED:
+                    renderPaused();
+                    break;
+                case GameState.LEVEL_COMPLETE:
+                    renderLevelComplete();
+                    break;
+                case GameState.GAME_OVER:
+                    renderGameOver();
+                    break;
+            }
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Audio toggle controls
+        document.getElementById('musicToggle').addEventListener('change', (e) => {
+            AudioSystem.musicEnabled = e.target.checked;
+            gameData.musicEnabled = e.target.checked;
+            saveGameData();
+            if (!e.target.checked) {
+                AudioSystem.music.stop();
+            } else if (state === GameState.PLAYING) {
+                AudioSystem.music.start('breakout');
+            }
+        });
+
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        // Start
+        console.log('Brick Bounce initialized');
+        createBricks();
+        gameLoop();
+    </script>
+</body>
+</html>

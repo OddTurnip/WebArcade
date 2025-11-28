@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controller Test</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+        }
+        h1 {
+            margin-bottom: 10px;
+            color: #ff6b6b;
+        }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+        }
+        #status {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        #inputDisplay {
+            margin-top: 15px;
+            padding: 15px 25px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 500px;
+        }
+        .input-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            align-items: center;
+        }
+        .input-label {
+            font-size: 12px;
+            color: #888;
+            min-width: 80px;
+            text-align: right;
+        }
+        .input-value {
+            font-size: 14px;
+            min-width: 120px;
+        }
+        .button-display {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 0 3px;
+            opacity: 0.3;
+            transition: opacity 0.1s;
+        }
+        .button-display.active {
+            opacity: 1;
+        }
+        .btn-a { background: #4ecdc4; color: #000; }
+        .btn-b { background: #ff6b6b; color: #fff; }
+        .btn-x { background: #4a9eff; color: #fff; }
+        .btn-y { background: #ffe66d; color: #000; }
+        .btn-shoulder { background: #666; color: #fff; }
+        .btn-trigger { background: #888; color: #fff; }
+        .btn-menu { background: #444; color: #fff; font-size: 11px; }
+        .movement-source {
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            background: #333;
+        }
+        .movement-source.active {
+            background: #4ecdc4;
+            color: #000;
+        }
+        #controls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+        .connected {
+            color: #4ecdc4 !important;
+        }
+        .disconnected {
+            color: #ff6b6b !important;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebArcade - Controller Test</h1>
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <div id="status">No controller detected - use keyboard or connect a gamepad</div>
+
+    <div id="inputDisplay">
+        <div class="input-row">
+            <span class="input-label">Movement:</span>
+            <span id="movementSource" class="input-value">
+                <span class="movement-source" id="srcKeyboard">Keyboard</span>
+                <span class="movement-source" id="srcDpad">D-Pad</span>
+                <span class="movement-source" id="srcLStick">L-Stick</span>
+                <span class="movement-source" id="srcRStick">R-Stick</span>
+            </span>
+        </div>
+        <div class="input-row">
+            <span class="input-label">Face Buttons:</span>
+            <span class="input-value">
+                <span class="button-display btn-a" id="btnA">A</span>
+                <span class="button-display btn-b" id="btnB">B</span>
+                <span class="button-display btn-x" id="btnX">X</span>
+                <span class="button-display btn-y" id="btnY">Y</span>
+            </span>
+        </div>
+        <div class="input-row">
+            <span class="input-label">Shoulders:</span>
+            <span class="input-value">
+                <span class="button-display btn-shoulder" id="btnLB">LB</span>
+                <span class="button-display btn-trigger" id="btnLT">LT</span>
+                <span class="button-display btn-trigger" id="btnRT">RT</span>
+                <span class="button-display btn-shoulder" id="btnRB">RB</span>
+            </span>
+        </div>
+        <div class="input-row">
+            <span class="input-label">Menu:</span>
+            <span class="input-value">
+                <span class="button-display btn-menu" id="btnBack">Back/Select</span>
+                <span class="button-display btn-menu" id="btnStart">Start</span>
+            </span>
+        </div>
+    </div>
+
+    <div id="debugPanel" style="margin-top: 15px; padding: 10px 20px; background: #1a1a3a; border-radius: 4px; font-size: 11px; color: #888; max-width: 640px;">
+        <div><strong>Debug:</strong> <span id="debugMapping">-</span></div>
+        <div>Buttons pressed: <span id="debugButtons" style="color: #4ecdc4;">none</span></div>
+        <div>Axes: <span id="debugAxes" style="color: #ffe66d;">-</span></div>
+    </div>
+
+    <div id="controls">WASD / Arrow Keys / D-Pad / Left Stick to move</div>
+
+    <script>
+        // ============================================
+        // GAME CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            ARENA_WIDTH: 640,
+            ARENA_HEIGHT: 480,
+            PLAYER_SIZE: 32,
+            PLAYER_SPEED: 5,
+            PLAYER_COLOR: '#ff4444',
+            ARENA_COLOR: '#000000',
+            DEADZONE: 0.15
+        };
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        const player = {
+            x: CONFIG.ARENA_WIDTH / 2 - CONFIG.PLAYER_SIZE / 2,
+            y: CONFIG.ARENA_HEIGHT / 2 - CONFIG.PLAYER_SIZE / 2,
+            vx: 0,
+            vy: 0,
+            color: CONFIG.PLAYER_COLOR
+        };
+
+        const input = {
+            up: false,
+            down: false,
+            left: false,
+            right: false
+        };
+
+        // Track which input sources are active
+        const inputSources = {
+            keyboard: false,
+            dpad: false,
+            leftStick: false,
+            rightStick: false
+        };
+
+        // Track button states
+        const buttons = {
+            a: false, b: false, x: false, y: false,
+            lb: false, rb: false, lt: false, rt: false,
+            back: false, start: false
+        };
+
+        let connectedGamepads = {};
+
+        // ============================================
+        // CANVAS SETUP
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+
+        // UI Elements
+        const srcKeyboard = document.getElementById('srcKeyboard');
+        const srcDpad = document.getElementById('srcDpad');
+        const srcLStick = document.getElementById('srcLStick');
+        const srcRStick = document.getElementById('srcRStick');
+        const btnA = document.getElementById('btnA');
+        const btnB = document.getElementById('btnB');
+        const btnX = document.getElementById('btnX');
+        const btnY = document.getElementById('btnY');
+        const btnLB = document.getElementById('btnLB');
+        const btnRB = document.getElementById('btnRB');
+        const btnLT = document.getElementById('btnLT');
+        const btnRT = document.getElementById('btnRT');
+        const btnBack = document.getElementById('btnBack');
+        const btnStart = document.getElementById('btnStart');
+
+        // ============================================
+        // KEYBOARD INPUT
+        // ============================================
+        const keyMap = {
+            'ArrowUp': 'up', 'KeyW': 'up',
+            'ArrowDown': 'down', 'KeyS': 'down',
+            'ArrowLeft': 'left', 'KeyA': 'left',
+            'ArrowRight': 'right', 'KeyD': 'right'
+        };
+
+        window.addEventListener('keydown', (e) => {
+            const direction = keyMap[e.code];
+            if (direction) {
+                input[direction] = true;
+                inputSources.keyboard = true;
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const direction = keyMap[e.code];
+            if (direction) {
+                input[direction] = false;
+                // Check if any keyboard direction is still held
+                if (!input.up && !input.down && !input.left && !input.right) {
+                    inputSources.keyboard = false;
+                }
+                e.preventDefault();
+            }
+        });
+
+        // ============================================
+        // GAMEPAD INPUT
+        // ============================================
+        window.addEventListener('gamepadconnected', (e) => {
+            console.log('Gamepad connected:', e.gamepad.id);
+            console.log('Mapping:', e.gamepad.mapping);
+            console.log('Buttons:', e.gamepad.buttons.length);
+            console.log('Axes:', e.gamepad.axes.length);
+            connectedGamepads[e.gamepad.index] = e.gamepad;
+            updateStatus();
+        });
+
+        window.addEventListener('gamepaddisconnected', (e) => {
+            console.log('Gamepad disconnected:', e.gamepad.id);
+            delete connectedGamepads[e.gamepad.index];
+            updateStatus();
+        });
+
+        function updateStatus() {
+            const gamepads = navigator.getGamepads();
+            const connected = Array.from(gamepads).filter(g => g !== null);
+
+            if (connected.length > 0) {
+                const names = connected.map(g => g.id.substring(0, 40)).join(', ');
+                statusEl.innerHTML = `<span class="connected">Controller connected:</span> ${names}`;
+            } else {
+                statusEl.innerHTML = '<span class="disconnected">No controller detected</span> - use keyboard or connect a gamepad';
+            }
+        }
+
+        // Debug elements
+        const debugMapping = document.getElementById('debugMapping');
+        const debugButtons = document.getElementById('debugButtons');
+        const debugAxes = document.getElementById('debugAxes');
+
+        function pollGamepads() {
+            const gamepadInput = { up: false, down: false, left: false, right: false };
+
+            // Reset sources and buttons
+            inputSources.dpad = false;
+            inputSources.leftStick = false;
+            inputSources.rightStick = false;
+            buttons.a = false;
+            buttons.b = false;
+            buttons.x = false;
+            buttons.y = false;
+            buttons.lb = false;
+            buttons.rb = false;
+            buttons.lt = false;
+            buttons.rt = false;
+            buttons.back = false;
+            buttons.start = false;
+
+            const gamepads = navigator.getGamepads();
+
+            // Debug info
+            let debugInfo = { mapping: '-', buttons: [], axes: [] };
+
+            for (const gamepad of gamepads) {
+                if (!gamepad) continue;
+
+                const isStandard = gamepad.mapping === 'standard';
+
+                // Detect SNES-style controllers that report as "standard" but have swapped buttons
+                // SNES layout: B=0, A=1, Y=2, X=3 (instead of Xbox: A=0, B=1, X=2, Y=3)
+                const isSNESStyle = gamepad.id.includes('0079-0011') || gamepad.id.includes('USB Gamepad');
+
+                // Collect debug info
+                debugInfo.mapping = `"${gamepad.mapping}" (${isStandard ? 'STANDARD' : 'NON-STANDARD'}) - ${gamepad.id.substring(0, 50)}`;
+                for (let i = 0; i < gamepad.buttons.length; i++) {
+                    if (gamepad.buttons[i]?.pressed) {
+                        debugInfo.buttons.push(i);
+                    }
+                }
+                debugInfo.axes = gamepad.axes.map((v, i) => Math.abs(v) > 0.1 ? `${i}:${v.toFixed(2)}` : null).filter(Boolean);
+
+                // ---- LEFT ANALOG STICK ----
+                if (gamepad.axes.length >= 2) {
+                    const lx = gamepad.axes[0];
+                    const ly = gamepad.axes[1];
+
+                    if (Math.abs(lx) > CONFIG.DEADZONE || Math.abs(ly) > CONFIG.DEADZONE) {
+                        inputSources.leftStick = true;
+                    }
+                    if (lx < -CONFIG.DEADZONE) gamepadInput.left = true;
+                    if (lx > CONFIG.DEADZONE) gamepadInput.right = true;
+                    if (ly < -CONFIG.DEADZONE) gamepadInput.up = true;
+                    if (ly > CONFIG.DEADZONE) gamepadInput.down = true;
+                }
+
+                // ---- RIGHT ANALOG STICK ----
+                if (gamepad.axes.length >= 4) {
+                    const rx = gamepad.axes[2];
+                    const ry = gamepad.axes[3];
+
+                    if (Math.abs(rx) > CONFIG.DEADZONE || Math.abs(ry) > CONFIG.DEADZONE) {
+                        inputSources.rightStick = true;
+                    }
+                    if (rx < -CONFIG.DEADZONE) gamepadInput.left = true;
+                    if (rx > CONFIG.DEADZONE) gamepadInput.right = true;
+                    if (ry < -CONFIG.DEADZONE) gamepadInput.up = true;
+                    if (ry > CONFIG.DEADZONE) gamepadInput.down = true;
+                }
+
+                // ---- STANDARD MAPPING (Xbox, modern controllers) ----
+                if (isStandard) {
+                    // D-Pad: buttons 12-15
+                    if (gamepad.buttons[12]?.pressed) { gamepadInput.up = true; inputSources.dpad = true; }
+                    if (gamepad.buttons[13]?.pressed) { gamepadInput.down = true; inputSources.dpad = true; }
+                    if (gamepad.buttons[14]?.pressed) { gamepadInput.left = true; inputSources.dpad = true; }
+                    if (gamepad.buttons[15]?.pressed) { gamepadInput.right = true; inputSources.dpad = true; }
+
+                    // Face buttons - check for SNES-style swap
+                    if (isSNESStyle) {
+                        // SNES: B=0, A=1, Y=2, X=3 → map to correct labels
+                        buttons.b = gamepad.buttons[0]?.pressed || false;
+                        buttons.a = gamepad.buttons[1]?.pressed || false;
+                        buttons.y = gamepad.buttons[2]?.pressed || false;
+                        buttons.x = gamepad.buttons[3]?.pressed || false;
+                    } else {
+                        // Xbox standard: A=0, B=1, X=2, Y=3
+                        buttons.a = gamepad.buttons[0]?.pressed || false;
+                        buttons.b = gamepad.buttons[1]?.pressed || false;
+                        buttons.x = gamepad.buttons[2]?.pressed || false;
+                        buttons.y = gamepad.buttons[3]?.pressed || false;
+                    }
+
+                    // Shoulders: LB=4, RB=5, LT=6, RT=7
+                    buttons.lb = gamepad.buttons[4]?.pressed || false;
+                    buttons.rb = gamepad.buttons[5]?.pressed || false;
+                    buttons.lt = gamepad.buttons[6]?.pressed || gamepad.buttons[6]?.value > 0.5 || false;
+                    buttons.rt = gamepad.buttons[7]?.pressed || gamepad.buttons[7]?.value > 0.5 || false;
+
+                    // Menu: Back=8, Start=9
+                    buttons.back = gamepad.buttons[8]?.pressed || false;
+                    buttons.start = gamepad.buttons[9]?.pressed || false;
+                } else {
+                    // ---- NON-STANDARD MAPPING (SNES, generic) ----
+                    // Try various button mappings common on SNES-style controllers
+
+                    // Many SNES adapters use buttons 0-3 for face buttons
+                    // SNES layout vs Xbox layout (physical positions differ):
+                    //   SNES:  X        Xbox:  Y
+                    //        Y   A           X   B
+                    //          B               A
+                    // Map by button LABEL, not position
+                    if (gamepad.buttons.length >= 4) {
+                        // Typical SNES USB adapter: 0=A, 1=B, 2=X, 3=Y
+                        buttons.a = gamepad.buttons[0]?.pressed || false;  // SNES A
+                        buttons.b = gamepad.buttons[1]?.pressed || false;  // SNES B
+                        buttons.x = gamepad.buttons[2]?.pressed || false;  // SNES X (was Y)
+                        buttons.y = gamepad.buttons[3]?.pressed || false;  // SNES Y (was X)
+                    }
+
+                    // Shoulders (if present): usually buttons 4, 5
+                    if (gamepad.buttons.length >= 6) {
+                        buttons.lb = gamepad.buttons[4]?.pressed || false;  // SNES L
+                        buttons.rb = gamepad.buttons[5]?.pressed || false;  // SNES R
+                    }
+
+                    // Select/Start: usually buttons 6, 7 or 8, 9
+                    if (gamepad.buttons.length >= 8) {
+                        buttons.back = gamepad.buttons[6]?.pressed || gamepad.buttons[8]?.pressed || false;
+                        buttons.start = gamepad.buttons[7]?.pressed || gamepad.buttons[9]?.pressed || false;
+                    }
+
+                    // D-Pad on non-standard: often axes or high-numbered buttons
+                    // Try axes 4,5 or 6,7 or 9 (hat switch)
+                    if (gamepad.axes.length >= 6) {
+                        const dx = gamepad.axes[4];
+                        const dy = gamepad.axes[5];
+                        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+                            inputSources.dpad = true;
+                        }
+                        if (dx < -0.5) gamepadInput.left = true;
+                        if (dx > 0.5) gamepadInput.right = true;
+                        if (dy < -0.5) gamepadInput.up = true;
+                        if (dy > 0.5) gamepadInput.down = true;
+                    }
+
+                    // Some controllers use axis 9 as a "hat switch" for D-pad
+                    if (gamepad.axes.length >= 10) {
+                        const hat = gamepad.axes[9];
+                        // Hat values: -1=up, -0.43=up-right, 0.14=right, 0.43=down-right, etc.
+                        if (hat < -0.5) { gamepadInput.up = true; inputSources.dpad = true; }
+                        if (hat > 0.5 && hat < 0.8) { gamepadInput.down = true; inputSources.dpad = true; }
+                    }
+
+                    // Try buttons 12-15 even on non-standard (some controllers do use these)
+                    if (gamepad.buttons.length >= 16) {
+                        if (gamepad.buttons[12]?.pressed) { gamepadInput.up = true; inputSources.dpad = true; }
+                        if (gamepad.buttons[13]?.pressed) { gamepadInput.down = true; inputSources.dpad = true; }
+                        if (gamepad.buttons[14]?.pressed) { gamepadInput.left = true; inputSources.dpad = true; }
+                        if (gamepad.buttons[15]?.pressed) { gamepadInput.right = true; inputSources.dpad = true; }
+                    }
+                }
+            }
+
+            // Update debug display
+            debugMapping.textContent = debugInfo.mapping;
+            debugButtons.textContent = debugInfo.buttons.length > 0 ? debugInfo.buttons.join(', ') : 'none';
+            debugAxes.textContent = debugInfo.axes.length > 0 ? debugInfo.axes.join(', ') : '-';
+
+            return gamepadInput;
+        }
+
+        function updateUI() {
+            // Movement source indicators
+            srcKeyboard.classList.toggle('active', inputSources.keyboard);
+            srcDpad.classList.toggle('active', inputSources.dpad);
+            srcLStick.classList.toggle('active', inputSources.leftStick);
+            srcRStick.classList.toggle('active', inputSources.rightStick);
+
+            // Face buttons
+            btnA.classList.toggle('active', buttons.a);
+            btnB.classList.toggle('active', buttons.b);
+            btnX.classList.toggle('active', buttons.x);
+            btnY.classList.toggle('active', buttons.y);
+
+            // Shoulders
+            btnLB.classList.toggle('active', buttons.lb);
+            btnRB.classList.toggle('active', buttons.rb);
+            btnLT.classList.toggle('active', buttons.lt);
+            btnRT.classList.toggle('active', buttons.rt);
+
+            // Menu buttons
+            btnBack.classList.toggle('active', buttons.back);
+            btnStart.classList.toggle('active', buttons.start);
+
+            // Update player color based on face buttons (last pressed wins)
+            if (buttons.a) player.color = '#4ecdc4';      // Green/Teal (A)
+            else if (buttons.b) player.color = '#ff6b6b'; // Red (B)
+            else if (buttons.x) player.color = '#4a9eff'; // Blue (X)
+            else if (buttons.y) player.color = '#ffe66d'; // Yellow (Y)
+            else player.color = CONFIG.PLAYER_COLOR;       // Default red
+        }
+
+        // ============================================
+        // GAME LOGIC
+        // ============================================
+        function update() {
+            const gamepadInput = pollGamepads();
+
+            // Combine keyboard and gamepad input
+            const moveUp = input.up || gamepadInput.up;
+            const moveDown = input.down || gamepadInput.down;
+            const moveLeft = input.left || gamepadInput.left;
+            const moveRight = input.right || gamepadInput.right;
+
+            // Calculate velocity
+            player.vx = 0;
+            player.vy = 0;
+
+            if (moveLeft) player.vx -= CONFIG.PLAYER_SPEED;
+            if (moveRight) player.vx += CONFIG.PLAYER_SPEED;
+            if (moveUp) player.vy -= CONFIG.PLAYER_SPEED;
+            if (moveDown) player.vy += CONFIG.PLAYER_SPEED;
+
+            // Normalize diagonal movement
+            if (player.vx !== 0 && player.vy !== 0) {
+                const factor = 1 / Math.sqrt(2);
+                player.vx *= factor;
+                player.vy *= factor;
+            }
+
+            // Apply velocity
+            player.x += player.vx;
+            player.y += player.vy;
+
+            // Clamp to arena bounds
+            player.x = Math.max(0, Math.min(CONFIG.ARENA_WIDTH - CONFIG.PLAYER_SIZE, player.x));
+            player.y = Math.max(0, Math.min(CONFIG.ARENA_HEIGHT - CONFIG.PLAYER_SIZE, player.y));
+
+            // Update UI display
+            updateUI();
+        }
+
+        function render() {
+            // Clear arena
+            ctx.fillStyle = CONFIG.ARENA_COLOR;
+            ctx.fillRect(0, 0, CONFIG.ARENA_WIDTH, CONFIG.ARENA_HEIGHT);
+
+            // Draw player with current color
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, CONFIG.PLAYER_SIZE, CONFIG.PLAYER_SIZE);
+
+            // Draw player border (lighter version of current color)
+            ctx.strokeStyle = '#ffffff44';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(player.x, player.y, CONFIG.PLAYER_SIZE, CONFIG.PLAYER_SIZE);
+        }
+
+        // ============================================
+        // GAME LOOP
+        // ============================================
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        console.log('WebArcade initialized - connect a controller or use WASD/Arrows');
+        updateStatus();
+        gameLoop();
+    </script>
+</body>
+</html>

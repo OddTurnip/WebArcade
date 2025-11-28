@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serpentine</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+        }
+        h1 { margin-bottom: 10px; color: #ff6b6b; }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            display: block;
+        }
+        #scoreDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+        .score-item {
+            text-align: center;
+        }
+        .score-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .score-value {
+            font-size: 24px;
+            color: #4ecdc4;
+        }
+        .high-score .score-value {
+            color: #ffe66d;
+        }
+        #controls {
+            margin-top: 15px;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+        #audioControls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        #audioControls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #4ecdc4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Serpentine</h1>
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <div id="scoreDisplay">
+        <div class="score-item">
+            <div class="score-label">Score</div>
+            <div class="score-value" id="currentScore">0</div>
+        </div>
+        <div class="score-item">
+            <div class="score-label">Length</div>
+            <div class="score-value" id="lengthDisplay">3</div>
+        </div>
+        <div class="score-item high-score">
+            <div class="score-label">High Score</div>
+            <div class="score-value" id="highScore">0</div>
+        </div>
+    </div>
+    <div id="controls">
+        <strong>Keyboard:</strong> Arrow Keys / WASD to move | Esc to pause<br>
+        <strong>Controller:</strong> D-Pad / Left Stick to move | Start to pause
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+
+    <script src="controller.js"></script>
+    <script src="audio.js"></script>
+    <script src="storage.js"></script>
+    <script>
+        // ============================================
+        // GAME CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            WIDTH: 640,
+            HEIGHT: 480,
+            CELL_SIZE: 20,
+            INITIAL_SPEED: 150, // ms per move
+            MIN_SPEED: 50,      // fastest speed
+            SPEED_INCREASE: 2,  // ms faster per food eaten
+            COLORS: {
+                background: '#000000',
+                grid: '#1a1a2e',
+                snakeHead: '#ffe66d',
+                snakeBody: '#4ecdc4',
+                food: '#ff6b6b',
+                wall: '#4a4a6a',
+                text: '#ffffff',
+                textHighlight: '#ffe66d'
+            }
+        };
+
+        // Calculate grid dimensions
+        const GRID_COLS = CONFIG.WIDTH / CONFIG.CELL_SIZE;
+        const GRID_ROWS = CONFIG.HEIGHT / CONFIG.CELL_SIZE;
+
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        const GAME_ID = 'serpentine';
+        let gameData = GameStorage.load(GAME_ID, GameStorage.defaults.arcade());
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        const GameState = {
+            TITLE: 'title',
+            PLAYING: 'playing',
+            PAUSED: 'paused',
+            GAME_OVER: 'game_over'
+        };
+
+        let state = GameState.TITLE;
+        let score = 0;
+        let isNewHighScore = false;
+
+        // Snake state
+        let snake = [];
+        let direction = { x: 1, y: 0 };
+        let nextDirection = { x: 1, y: 0 };
+        let food = { x: 0, y: 0 };
+        let moveTimer = 0;
+        let currentSpeed = CONFIG.INITIAL_SPEED;
+
+        // Pause timing
+        let pauseTime = 0;
+        const UNPAUSE_DELAY = 250;
+
+        // ============================================
+        // CANVAS SETUP
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const currentScoreEl = document.getElementById('currentScore');
+        const lengthDisplayEl = document.getElementById('lengthDisplay');
+        const highScoreEl = document.getElementById('highScore');
+
+        // ============================================
+        // GAME FUNCTIONS
+        // ============================================
+        function initGame() {
+            // Start snake in the middle, facing right
+            const startX = Math.floor(GRID_COLS / 2);
+            const startY = Math.floor(GRID_ROWS / 2);
+            snake = [
+                { x: startX, y: startY },
+                { x: startX - 1, y: startY },
+                { x: startX - 2, y: startY }
+            ];
+            direction = { x: 1, y: 0 };
+            nextDirection = { x: 1, y: 0 };
+            score = 0;
+            currentSpeed = CONFIG.INITIAL_SPEED;
+            isNewHighScore = false;
+            spawnFood();
+            updateDisplays();
+        }
+
+        function spawnFood() {
+            let validPosition = false;
+            while (!validPosition) {
+                food.x = Math.floor(Math.random() * GRID_COLS);
+                food.y = Math.floor(Math.random() * GRID_ROWS);
+                // Make sure food doesn't spawn on snake
+                validPosition = !snake.some(seg => seg.x === food.x && seg.y === food.y);
+            }
+        }
+
+        function moveSnake() {
+            // Apply the queued direction
+            direction = { ...nextDirection };
+
+            // Calculate new head position
+            const head = snake[0];
+            const newHead = {
+                x: head.x + direction.x,
+                y: head.y + direction.y
+            };
+
+            // Check wall collision
+            if (newHead.x < 0 || newHead.x >= GRID_COLS ||
+                newHead.y < 0 || newHead.y >= GRID_ROWS) {
+                gameOver();
+                return;
+            }
+
+            // Check self collision
+            if (snake.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+                gameOver();
+                return;
+            }
+
+            // Add new head
+            snake.unshift(newHead);
+
+            // Check food collision
+            if (newHead.x === food.x && newHead.y === food.y) {
+                // Eat food - don't remove tail, snake grows
+                score += 10;
+                // Speed up slightly
+                currentSpeed = Math.max(CONFIG.MIN_SPEED, currentSpeed - CONFIG.SPEED_INCREASE);
+                AudioSystem.sfx.eat();
+                spawnFood();
+                updateDisplays();
+            } else {
+                // Remove tail
+                snake.pop();
+            }
+        }
+
+        function gameOver() {
+            state = GameState.GAME_OVER;
+            AudioSystem.music.stop();
+            AudioSystem.sfx.gameOver();
+
+            if (score > gameData.highScore) {
+                gameData.highScore = score;
+                isNewHighScore = gameData.gamesPlayed > 0;
+            }
+            gameData.gamesPlayed++;
+            saveGameData();
+            updateDisplays();
+        }
+
+        function startGame() {
+            AudioSystem.unlock();
+            initGame();
+            moveTimer = 0;
+            state = GameState.PLAYING;
+            AudioSystem.music.start('snake');
+        }
+
+        function updateDisplays() {
+            currentScoreEl.textContent = score;
+            lengthDisplayEl.textContent = snake.length;
+            highScoreEl.textContent = gameData.highScore;
+        }
+
+        // ============================================
+        // UPDATE FUNCTIONS
+        // ============================================
+        function updateTitle() {
+            if (GameController.anyButtonJustPressed() || startKeyPressed) {
+                startKeyPressed = false;
+                AudioSystem.sfx.select();
+                startGame();
+            }
+        }
+
+        function updatePlaying(deltaTime) {
+            // Pause
+            if (GameController.justPressed('start') || pauseKeyPressed) {
+                pauseKeyPressed = false;
+                pauseTime = Date.now();
+                state = GameState.PAUSED;
+                AudioSystem.music.stop();
+                return;
+            }
+
+            // Direction input - queue the next direction
+            // Prevent 180-degree turns
+            if ((GameController.justPressed('up') || upKeyPressed) && direction.y !== 1) {
+                upKeyPressed = false;
+                nextDirection = { x: 0, y: -1 };
+            } else if ((GameController.justPressed('down') || downKeyPressed) && direction.y !== -1) {
+                downKeyPressed = false;
+                nextDirection = { x: 0, y: 1 };
+            } else if ((GameController.justPressed('left') || leftKeyPressed) && direction.x !== 1) {
+                leftKeyPressed = false;
+                nextDirection = { x: -1, y: 0 };
+            } else if ((GameController.justPressed('right') || rightKeyPressed) && direction.x !== -1) {
+                rightKeyPressed = false;
+                nextDirection = { x: 1, y: 0 };
+            }
+
+            // Move snake at intervals
+            moveTimer += deltaTime;
+            if (moveTimer >= currentSpeed) {
+                moveTimer = 0;
+                moveSnake();
+            }
+        }
+
+        function updatePaused() {
+            if (Date.now() - pauseTime >= UNPAUSE_DELAY) {
+                if (GameController.justPressed('start') || pauseKeyPressed) {
+                    pauseKeyPressed = false;
+                    state = GameState.PLAYING;
+                    AudioSystem.music.start('snake');
+                }
+            }
+        }
+
+        function updateGameOver() {
+            if (GameController.anyButtonJustPressed() || keyJustPressed) {
+                keyJustPressed = false;
+                state = GameState.TITLE;
+            }
+        }
+
+        // ============================================
+        // RENDER FUNCTIONS
+        // ============================================
+        function renderBackground() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            // Draw subtle grid
+            ctx.strokeStyle = CONFIG.COLORS.grid;
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= GRID_COLS; x++) {
+                ctx.beginPath();
+                ctx.moveTo(x * CONFIG.CELL_SIZE, 0);
+                ctx.lineTo(x * CONFIG.CELL_SIZE, CONFIG.HEIGHT);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= GRID_ROWS; y++) {
+                ctx.beginPath();
+                ctx.moveTo(0, y * CONFIG.CELL_SIZE);
+                ctx.lineTo(CONFIG.WIDTH, y * CONFIG.CELL_SIZE);
+                ctx.stroke();
+            }
+        }
+
+        function renderSnake() {
+            snake.forEach((segment, index) => {
+                const x = segment.x * CONFIG.CELL_SIZE;
+                const y = segment.y * CONFIG.CELL_SIZE;
+
+                if (index === 0) {
+                    // Head
+                    ctx.fillStyle = CONFIG.COLORS.snakeHead;
+                } else {
+                    // Body - slight gradient effect
+                    const brightness = 1 - (index / snake.length) * 0.3;
+                    ctx.fillStyle = CONFIG.COLORS.snakeBody;
+                    ctx.globalAlpha = brightness;
+                }
+
+                ctx.fillRect(x + 1, y + 1, CONFIG.CELL_SIZE - 2, CONFIG.CELL_SIZE - 2);
+                ctx.globalAlpha = 1;
+
+                // Add highlight to head
+                if (index === 0) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.fillRect(x + 2, y + 2, CONFIG.CELL_SIZE - 6, 4);
+                }
+            });
+        }
+
+        function renderFood() {
+            const x = food.x * CONFIG.CELL_SIZE;
+            const y = food.y * CONFIG.CELL_SIZE;
+
+            // Pulsing effect
+            const pulse = Math.sin(Date.now() / 200) * 2;
+            const size = CONFIG.CELL_SIZE - 4 + pulse;
+            const offset = (CONFIG.CELL_SIZE - size) / 2;
+
+            ctx.fillStyle = CONFIG.COLORS.food;
+            ctx.beginPath();
+            ctx.arc(x + CONFIG.CELL_SIZE / 2, y + CONFIG.CELL_SIZE / 2, size / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Highlight
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.arc(x + CONFIG.CELL_SIZE / 2 - 2, y + CONFIG.CELL_SIZE / 2 - 2, size / 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function renderTitle() {
+            renderBackground();
+
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = 'bold 48px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('SERPENTINE', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 60);
+
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = '16px Courier New';
+            ctx.fillText('Eat food to grow, avoid walls and yourself!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2);
+
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = '14px Courier New';
+            ctx.fillText('Press any button to start', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
+
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Courier New';
+            ctx.fillText(`High Score: ${gameData.highScore}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 100);
+        }
+
+        function renderPlaying() {
+            renderBackground();
+            renderFood();
+            renderSnake();
+
+            // Score in corner
+            ctx.fillStyle = CONFIG.COLORS.text + '66';
+            ctx.font = '18px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Score: ${score}`, 10, 25);
+        }
+
+        function renderPaused() {
+            renderPlaying();
+
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = 'bold 32px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('PAUSED', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '14px Courier New';
+            ctx.fillText('Press Start to resume', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 40);
+        }
+
+        function renderGameOver() {
+            renderBackground();
+            renderFood();
+            renderSnake();
+
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = 'bold 36px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 50);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '20px Courier New';
+            ctx.fillText(`Score: ${score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 10);
+            ctx.fillText(`Length: ${snake.length}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 40);
+
+            if (isNewHighScore) {
+                ctx.fillStyle = CONFIG.COLORS.textHighlight;
+                ctx.font = 'bold 24px Courier New';
+                ctx.fillText('NEW HIGH SCORE!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 90);
+            }
+
+            ctx.fillStyle = '#888';
+            ctx.font = '14px Courier New';
+            ctx.fillText('Press any key to continue', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 140);
+        }
+
+        // ============================================
+        // KEYBOARD INPUT
+        // ============================================
+        let keyJustPressed = false;
+        let pauseKeyPressed = false;
+        let upKeyPressed = false;
+        let downKeyPressed = false;
+        let leftKeyPressed = false;
+        let rightKeyPressed = false;
+        let startKeyPressed = false;
+
+        const unlockAudio = () => {
+            AudioSystem.init();
+            if (AudioSystem.ctx && AudioSystem.ctx.state === 'suspended') {
+                AudioSystem.ctx.resume();
+            }
+            AudioSystem.unlocked = true;
+        };
+        document.addEventListener('keydown', unlockAudio, { once: true });
+        document.addEventListener('click', unlockAudio, { once: true });
+        document.addEventListener('touchstart', unlockAudio, { once: true });
+
+        canvas.addEventListener('click', () => {
+            unlockAudio();
+            if (state === GameState.TITLE) {
+                startKeyPressed = true;
+            } else if (state === GameState.GAME_OVER) {
+                keyJustPressed = true;
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            unlockAudio();
+
+            if (state === GameState.TITLE || state === GameState.GAME_OVER) {
+                if (!e.repeat) {
+                    if (state === GameState.TITLE) {
+                        startKeyPressed = true;
+                    } else {
+                        keyJustPressed = true;
+                    }
+                }
+                return;
+            }
+
+            if (state === GameState.PLAYING || state === GameState.PAUSED) {
+                if (key === 'escape' || key === 'p') {
+                    if (!e.repeat) pauseKeyPressed = true;
+                    e.preventDefault();
+                }
+            }
+
+            if (state === GameState.PLAYING) {
+                if ((key === 'arrowup' || key === 'w') && !e.repeat) {
+                    upKeyPressed = true;
+                    e.preventDefault();
+                } else if ((key === 'arrowdown' || key === 's') && !e.repeat) {
+                    downKeyPressed = true;
+                    e.preventDefault();
+                } else if ((key === 'arrowleft' || key === 'a') && !e.repeat) {
+                    leftKeyPressed = true;
+                    e.preventDefault();
+                } else if ((key === 'arrowright' || key === 'd') && !e.repeat) {
+                    rightKeyPressed = true;
+                    e.preventDefault();
+                }
+            }
+        });
+
+        // ============================================
+        // AUDIO CONTROLS
+        // ============================================
+        document.getElementById('musicToggle').addEventListener('change', (e) => {
+            AudioSystem.musicEnabled = e.target.checked;
+            gameData.musicEnabled = e.target.checked;
+            saveGameData();
+            if (state === GameState.PLAYING) {
+                if (e.target.checked) {
+                    AudioSystem.music.start('snake');
+                } else {
+                    AudioSystem.music.stop();
+                }
+            }
+        });
+
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        // Load audio preferences
+        AudioSystem.musicEnabled = gameData.musicEnabled;
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        document.getElementById('musicToggle').checked = gameData.musicEnabled;
+        document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+
+        // ============================================
+        // GAME LOOP
+        // ============================================
+        let lastFrameTime = 0;
+
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastFrameTime;
+            lastFrameTime = currentTime;
+
+            GameController.poll();
+
+            switch (state) {
+                case GameState.TITLE:
+                    updateTitle();
+                    renderTitle();
+                    break;
+                case GameState.PLAYING:
+                    updatePlaying(deltaTime);
+                    renderPlaying();
+                    break;
+                case GameState.PAUSED:
+                    updatePaused();
+                    renderPaused();
+                    break;
+                case GameState.GAME_OVER:
+                    updateGameOver();
+                    renderGameOver();
+                    break;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================
+        // START
+        // ============================================
+        console.log('Serpentine initialized');
+        initGame();
+        updateDisplays();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>

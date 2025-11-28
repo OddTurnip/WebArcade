@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sapper's Shapes</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+            padding: 20px;
+        }
+        h1 { margin-bottom: 10px; color: #e07be0; }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            display: none;
+            cursor: pointer;
+        }
+        #gameCanvas.visible { display: block; }
+        #statusDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: none;
+            gap: 40px;
+            justify-content: center;
+        }
+        #statusDisplay.visible { display: flex; }
+        .status-item { text-align: center; }
+        .status-label { font-size: 12px; color: #888; margin-bottom: 5px; }
+        .status-value { font-size: 24px; color: #4ecdc4; }
+        .mines .status-value { color: #ff6b6b; }
+        .time .status-value { color: #ffe66d; }
+        #controls {
+            margin-top: 15px;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+        #audioControls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        #audioControls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #4ecdc4;
+        }
+        #configPanel {
+            background: #2a2a4a;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-top: 15px;
+        }
+        .config-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .config-row:last-child { margin-bottom: 0; }
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .config-item label { color: #888; font-size: 12px; }
+        .config-item input, .config-item select {
+            padding: 6px;
+            background: #1a1a2e;
+            border: 2px solid #4a4a6a;
+            border-radius: 4px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            text-align: center;
+        }
+        .config-item input { width: 50px; }
+        .config-item select { width: 100px; }
+        .config-item input:focus, .config-item select:focus { outline: none; border-color: #4ecdc4; }
+        .preset-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+        .preset-btn {
+            padding: 6px 12px;
+            background: #3a3a5a;
+            border: 2px solid #4a4a6a;
+            border-radius: 4px;
+            color: #aaa;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .preset-btn:hover {
+            background: #4a4a6a;
+            color: #fff;
+            border-color: #4ecdc4;
+        }
+        .preset-btn.active {
+            background: #4ecdc4;
+            color: #1a1a2e;
+            border-color: #4ecdc4;
+        }
+        .new-game-btn {
+            padding: 8px 20px;
+            background: #e07be0;
+            border: none;
+            border-radius: 4px;
+            color: #1a1a2e;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .new-game-btn:hover { background: #ea9bea; }
+        #titleScreen {
+            text-align: center;
+            padding: 60px 40px;
+            background: #2a2a4a;
+            border-radius: 8px;
+            border: 4px solid #4a4a6a;
+        }
+        #titleScreen h2 { color: #e07be0; font-size: 28px; margin-bottom: 20px; }
+        #titleScreen p { color: #888; font-size: 14px; margin-bottom: 30px; line-height: 1.6; }
+        #titleScreen .start-btn {
+            padding: 15px 40px;
+            background: #e07be0;
+            border: none;
+            border-radius: 4px;
+            color: #1a1a2e;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #titleScreen .start-btn:hover { background: #ea9bea; transform: scale(1.05); }
+        .shape-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            justify-content: center;
+        }
+        .shape-btn {
+            padding: 8px 16px;
+            background: #3a3a5a;
+            border: 2px solid #4a4a6a;
+            border-radius: 4px;
+            color: #aaa;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .shape-btn:hover {
+            background: #4a4a6a;
+            color: #fff;
+        }
+        .shape-btn.active {
+            background: #e07be0;
+            color: #1a1a2e;
+            border-color: #e07be0;
+        }
+        .no-guess-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #aaa;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 8px 12px;
+            background: #3a3a5a;
+            border: 2px solid #4a4a6a;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .no-guess-toggle:hover {
+            background: #4a4a6a;
+            color: #fff;
+        }
+        .no-guess-toggle input {
+            cursor: pointer;
+            accent-color: #e07be0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sapper's Shapes</h1>
+
+    <div id="titleScreen">
+        <h2>Click to Start</h2>
+        <p>Mine-clearing on hex and triangle grids!<br>Left click to reveal | Right click to flag</p>
+        <button class="start-btn" onclick="startGame()">New Game</button>
+    </div>
+
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <div id="statusDisplay">
+        <div class="status-item mines">
+            <div class="status-label">Mines</div>
+            <div class="status-value" id="mineCount">10</div>
+        </div>
+        <div class="status-item time">
+            <div class="status-label">Time</div>
+            <div class="status-value" id="timeDisplay">0</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">Best</div>
+            <div class="status-value" id="bestTime">--</div>
+        </div>
+    </div>
+
+    <div id="configPanel">
+        <div class="shape-selector">
+            <button class="shape-btn active" data-shape="hex" onclick="setShape('hex')">Hexagon</button>
+            <button class="shape-btn" data-shape="triangle" onclick="setShape('triangle')">Triangle</button>
+            <label class="no-guess-toggle"><input type="checkbox" id="noGuessToggle" checked> No Guess</label>
+        </div>
+        <div class="preset-buttons">
+            <button class="preset-btn" data-preset="small" onclick="setPreset(8, 8, 10)">Small</button>
+            <button class="preset-btn" data-preset="medium" onclick="setPreset(12, 12, 25)">Medium</button>
+            <button class="preset-btn" data-preset="large" onclick="setPreset(16, 14, 45)">Large</button>
+            <button class="preset-btn" data-preset="custom">Custom</button>
+        </div>
+        <div class="config-row">
+            <div class="config-item">
+                <label for="widthInput">W:</label>
+                <input type="number" id="widthInput" min="5" max="30" value="8">
+            </div>
+            <div class="config-item">
+                <label for="heightInput">H:</label>
+                <input type="number" id="heightInput" min="5" max="25" value="8">
+            </div>
+            <div class="config-item">
+                <label for="minesInput">Mines:</label>
+                <input type="number" id="minesInput" min="1" max="200" value="10">
+            </div>
+            <button class="new-game-btn" onclick="startGame()">New Game</button>
+        </div>
+    </div>
+
+    <div id="controls">
+        <strong>Left Click:</strong> Reveal | <strong>Right Click:</strong> Flag | <strong>Click Number:</strong> Chord reveal
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="audio.js"></script>
+    <script src="grid.js"></script>
+    <script src="sappershapes.js"></script>
+    <script>
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        const CELL_SIZE_HEX = 22;
+        const CELL_SIZE_TRI = 36;
+        const PADDING = 30;
+
+        const COLORS = {
+            background: '#1a1a2e',
+            hidden: '#3a3a5a',
+            hiddenHover: '#4a4a6a',
+            revealed: '#2a2a4a',
+            borderLight: '#5a5a7a',
+            borderDark: '#2a2a3a',
+            stroke: '#4a4a6a',
+            mine: '#ff6b6b',
+            mineCorrect: '#4ecdc4',
+            flag: '#ffe66d',
+            numbers: ['', '#4ecdc4', '#4ecdc4', '#ff6b6b', '#9b59b6', '#e74c3c', '#1abc9c', '#2c3e50', '#7f8c8d',
+                      '#e07be0', '#f39c12', '#27ae60', '#2980b9'] // Extended for more neighbors
+        };
+
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        const GAME_ID = 'sappershapes';
+        let gameData = GameStorage.load(GAME_ID, {
+            bestTimes: {},
+            gamesPlayed: 0,
+            gamesWon: 0,
+            sfxEnabled: true,
+            noGuess: true,
+            lastShape: 'hex',
+            lastWidth: 8,
+            lastHeight: 8,
+            lastMines: 10
+        });
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        // ============================================
+        // DOM ELEMENTS
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const mineCountEl = document.getElementById('mineCount');
+        const timeDisplayEl = document.getElementById('timeDisplay');
+        const bestTimeEl = document.getElementById('bestTime');
+        const titleScreen = document.getElementById('titleScreen');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const widthInput = document.getElementById('widthInput');
+        const heightInput = document.getElementById('heightInput');
+        const minesInput = document.getElementById('minesInput');
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        let currentShape = 'hex';
+        let grid = null;
+        let game = null;
+        let isPlaying = false;
+        let firstClick = true;
+        let startTime = 0;
+        let elapsedTime = 0;
+        let timerInterval = null;
+        let hoverCell = { x: -1, y: -1 };
+        let gameOverTime = 0;
+        const RESTART_DELAY = 250;
+
+        // ============================================
+        // UI FUNCTIONS
+        // ============================================
+        function setShape(shape) {
+            currentShape = shape;
+            document.querySelectorAll('.shape-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.shape === shape);
+            });
+            gameData.lastShape = shape;
+            saveGameData();
+        }
+
+        function setPreset(w, h, m) {
+            widthInput.value = w;
+            heightInput.value = h;
+            minesInput.value = m;
+            updatePresetButtons();
+        }
+
+        function updatePresetButtons() {
+            const w = parseInt(widthInput.value);
+            const h = parseInt(heightInput.value);
+            const m = parseInt(minesInput.value);
+
+            document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+
+            if (w === 8 && h === 8 && m === 10) {
+                document.querySelector('[data-preset="small"]').classList.add('active');
+            } else if (w === 12 && h === 12 && m === 25) {
+                document.querySelector('[data-preset="medium"]').classList.add('active');
+            } else if (w === 16 && h === 14 && m === 45) {
+                document.querySelector('[data-preset="large"]').classList.add('active');
+            } else {
+                document.querySelector('[data-preset="custom"]').classList.add('active');
+            }
+        }
+
+        function clamp(val, min, max) {
+            return Math.max(min, Math.min(max, val));
+        }
+
+        function updateDisplays() {
+            mineCountEl.textContent = game ? game.getRemainingMines() : 0;
+            timeDisplayEl.textContent = elapsedTime;
+            const key = `${currentShape}-${grid.width}x${grid.height}x${game.totalMines}`;
+            bestTimeEl.textContent = gameData.bestTimes[key] || '--';
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                updateDisplays();
+            }, 1000);
+        }
+
+        // ============================================
+        // GAME FUNCTIONS
+        // ============================================
+        function startGame() {
+            AudioSystem.unlock();
+
+            const width = clamp(parseInt(widthInput.value) || 8, 5, 30);
+            const height = clamp(parseInt(heightInput.value) || 8, 5, 25);
+            const cellSize = currentShape === 'hex' ? CELL_SIZE_HEX : CELL_SIZE_TRI;
+
+            // Create grid based on shape
+            if (currentShape === 'hex') {
+                grid = new HexGrid(width, height, cellSize);
+            } else {
+                grid = new TriangleGrid(width, height, cellSize);
+            }
+
+            // Cap mines based on grid size
+            const maxMines = width * height - (currentShape === 'hex' ? 7 : 4);
+            const mines = clamp(parseInt(minesInput.value) || 10, 1, maxMines);
+
+            widthInput.value = width;
+            heightInput.value = height;
+            minesInput.value = mines;
+
+            const noGuess = document.getElementById('noGuessToggle').checked;
+
+            gameData.lastWidth = width;
+            gameData.lastHeight = height;
+            gameData.lastMines = mines;
+            gameData.noGuess = noGuess;
+            saveGameData();
+
+            // Create game instance
+            game = new SapperShapesGame(grid, { mines, noGuess });
+            game.initGrid();
+
+            // Setup canvas
+            const canvasSize = grid.getCanvasSize(PADDING);
+            canvas.width = canvasSize.width;
+            canvas.height = canvasSize.height;
+
+            clearInterval(timerInterval);
+            elapsedTime = 0;
+            firstClick = true;
+            isPlaying = true;
+
+            titleScreen.style.display = 'none';
+            canvas.classList.add('visible');
+            statusDisplay.classList.add('visible');
+
+            updateDisplays();
+            render();
+        }
+
+        function handleGameOver(won) {
+            clearInterval(timerInterval);
+            gameOverTime = Date.now();
+            isPlaying = false;
+
+            if (won) {
+                AudioSystem.sfx.levelComplete();
+                const key = `${currentShape}-${grid.width}x${grid.height}x${game.totalMines}`;
+                if (!gameData.bestTimes[key] || elapsedTime < gameData.bestTimes[key]) {
+                    gameData.bestTimes[key] = elapsedTime;
+                }
+                gameData.gamesWon++;
+            } else {
+                AudioSystem.sfx.explosion();
+            }
+
+            gameData.gamesPlayed++;
+            saveGameData();
+            updateDisplays();
+            render();
+        }
+
+        // ============================================
+        // RENDERING
+        // ============================================
+        function render() {
+            ctx.fillStyle = COLORS.background;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < grid.height; y++) {
+                for (let x = 0; x < grid.width; x++) {
+                    renderCell(x, y);
+                }
+            }
+
+            if (game.gameOver) {
+                renderGameOverOverlay();
+            }
+        }
+
+        function renderCell(x, y) {
+            const cell = game.getCell(x, y);
+            if (!cell) return;
+
+            const isHover = hoverCell.x === x && hoverCell.y === y;
+            const { px, py } = grid.gridToPixel(x, y, PADDING, PADDING);
+
+            // Determine fill color
+            let fillColor;
+            if (cell.revealed) {
+                fillColor = COLORS.revealed;
+            } else {
+                fillColor = isHover ? COLORS.hiddenHover : COLORS.hidden;
+            }
+
+            // Draw cell shape
+            ctx.lineWidth = 1.5;
+            grid.drawCell(ctx, x, y, fillColor, COLORS.stroke, PADDING, PADDING);
+
+            // Draw cell contents
+            if (cell.revealed) {
+                if (cell.mine) {
+                    const wasCorrectlyFlagged = cell.flagged;
+                    drawMine(px, py, wasCorrectlyFlagged);
+                } else if (cell.count > 0) {
+                    ctx.fillStyle = COLORS.numbers[cell.count] || COLORS.numbers[1];
+                    ctx.font = 'bold 14px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(cell.count, px, py + 1);
+                }
+            } else if (cell.flagged) {
+                drawFlag(px, py);
+            }
+        }
+
+        function drawMine(cx, cy, correctlyFlagged) {
+            const radius = currentShape === 'hex' ? 8 : 10;
+            const color = correctlyFlagged ? COLORS.mineCorrect : COLORS.mine;
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx + Math.cos(angle) * radius * 1.4, cy + Math.sin(angle) * radius * 1.4);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.arc(cx - radius * 0.25, cy - radius * 0.25, radius * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawFlag(cx, cy) {
+            const scale = currentShape === 'hex' ? 0.7 : 0.8;
+
+            ctx.fillStyle = '#666';
+            ctx.fillRect(cx + 1 * scale, cy - 7 * scale, 2 * scale, 14 * scale);
+
+            ctx.fillStyle = COLORS.flag;
+            ctx.beginPath();
+            ctx.moveTo(cx + 3 * scale, cy - 7 * scale);
+            ctx.lineTo(cx + 3 * scale, cy - 1 * scale);
+            ctx.lineTo(cx - 5 * scale, cy - 4 * scale);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#666';
+            ctx.fillRect(cx - 2 * scale, cy + 5 * scale, 6 * scale, 2 * scale);
+        }
+
+        function renderGameOverOverlay() {
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (game.won) {
+                ctx.fillStyle = '#4ecdc4';
+                ctx.font = 'bold 36px Courier New';
+                ctx.fillText('YOU WIN!', canvas.width / 2, canvas.height / 2 - 30);
+
+                ctx.fillStyle = '#ffe66d';
+                ctx.font = '20px Courier New';
+                ctx.fillText(`Time: ${elapsedTime}s`, canvas.width / 2, canvas.height / 2 + 10);
+            } else {
+                ctx.fillStyle = '#ff6b6b';
+                ctx.font = 'bold 36px Courier New';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 30);
+            }
+
+            ctx.fillStyle = '#888';
+            ctx.font = '14px Courier New';
+            ctx.fillText('Click to play again', canvas.width / 2, canvas.height / 2 + 60);
+        }
+
+        // ============================================
+        // INPUT HANDLING
+        // ============================================
+        function getCellFromEvent(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+
+            const cell = grid.pixelToGrid(mx, my, PADDING, PADDING);
+            return cell || { x: -1, y: -1 };
+        }
+
+        canvas.addEventListener('click', (e) => {
+            AudioSystem.unlock();
+
+            if (game && game.gameOver) {
+                if (Date.now() - gameOverTime >= RESTART_DELAY) {
+                    startGame();
+                }
+                return;
+            }
+
+            if (!isPlaying || !game) return;
+
+            const cell = getCellFromEvent(e);
+            if (cell.x < 0 || cell.y < 0) return;
+
+            if (firstClick) {
+                firstClick = false;
+                game.handleFirstClick(cell.x, cell.y);
+                startTimer();
+                render();
+                return;
+            }
+
+            let result;
+            if (game.isRevealed(cell.x, cell.y)) {
+                result = game.chordReveal(cell.x, cell.y);
+            } else if (!game.isFlagged(cell.x, cell.y)) {
+                result = game.revealCell(cell.x, cell.y);
+                if (!result.hit && !result.won) {
+                    AudioSystem.sfx.hit();
+                }
+            }
+
+            if (result && (result.won || result.lost)) {
+                handleGameOver(result.won);
+            }
+
+            render();
+        });
+
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (!isPlaying || !game || game.gameOver) return;
+
+            const cell = getCellFromEvent(e);
+            if (cell.x < 0 || cell.y < 0) return;
+
+            game.toggleFlag(cell.x, cell.y);
+            AudioSystem.sfx.select();
+            updateDisplays();
+            render();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isPlaying || !game) return;
+
+            const cell = getCellFromEvent(e);
+            if (cell.x !== hoverCell.x || cell.y !== hoverCell.y) {
+                hoverCell = cell;
+                render();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoverCell = { x: -1, y: -1 };
+            if (isPlaying) render();
+        });
+
+        canvas.oncontextmenu = (e) => e.preventDefault();
+
+        widthInput.addEventListener('input', updatePresetButtons);
+        heightInput.addEventListener('input', updatePresetButtons);
+        minesInput.addEventListener('input', updatePresetButtons);
+
+        // ============================================
+        // AUDIO CONTROLS
+        // ============================================
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+
+        // ============================================
+        // INITIALIZE
+        // ============================================
+        currentShape = gameData.lastShape || 'hex';
+        setShape(currentShape);
+
+        widthInput.value = gameData.lastWidth;
+        heightInput.value = gameData.lastHeight;
+        minesInput.value = gameData.lastMines;
+
+        // Initialize no-guess checkbox (default to true)
+        document.getElementById('noGuessToggle').checked = gameData.noGuess !== false;
+
+        updatePresetButtons();
+
+        console.log('Sapper\'s Shapes initialized');
+    </script>
+</body>
+</html>

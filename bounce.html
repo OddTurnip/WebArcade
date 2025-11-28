@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bounce</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+        }
+        h1 {
+            margin-bottom: 10px;
+            color: #ff6b6b;
+        }
+        #gameContainer {
+            position: relative;
+        }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-bottom: 4px solid #ff6b6b;
+            border-radius: 4px;
+            display: block;
+        }
+        #scoreDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            font-size: 18px;
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+        .score-item {
+            text-align: center;
+        }
+        .score-label {
+            font-size: 12px;
+            color: #888;
+        }
+        .score-value {
+            font-size: 24px;
+            color: #4ecdc4;
+        }
+        .high-score .score-value {
+            color: #ffe66d;
+        }
+        #controls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+        #audioControls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        #audioControls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #4ecdc4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bounce</h1>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="640" height="480"></canvas>
+    </div>
+    <div id="scoreDisplay">
+        <div class="score-item">
+            <div class="score-label">Score</div>
+            <div class="score-value" id="currentScore">0</div>
+        </div>
+        <div class="score-item high-score">
+            <div class="score-label">High Score</div>
+            <div class="score-value" id="highScore">0</div>
+        </div>
+    </div>
+    <div id="controls">
+        <strong>Keyboard:</strong> Left/Right or A/D to move | Esc to pause<br>
+        <strong>Controller:</strong> D-Pad / Left Stick to move | Start to pause
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+    <div id="rules" style="margin-top: 8px; font-size: 11px; color: #666;">
+        Ball starts at speed <span id="startSpeed">5</span>, +<span id="speedIncrement">0.2</span> per bounce (currently <span id="currentSpeed">5.0</span>) | Max speed: <span id="maxSpeed">12</span>
+    </div>
+
+    <script src="controller.js"></script>
+    <script src="audio.js"></script>
+    <script src="storage.js"></script>
+    <script>
+        // ============================================
+        // GAME CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            WIDTH: 640,
+            HEIGHT: 480,
+            PADDLE_WIDTH: 100,
+            PADDLE_HEIGHT: 15,
+            PADDLE_SPEED: 8,
+            PADDLE_Y: 450,
+            BALL_SIZE: 12,
+            BALL_SPEED_INITIAL: 5,
+            BALL_SPEED_INCREMENT: 0.2,
+            BALL_MAX_SPEED: 12,
+            COLORS: {
+                background: '#000000',
+                paddle: '#4ecdc4',
+                ball: '#ffffff',
+                walls: '#4a4a6a',
+                deathZone: '#ff6b6b',
+                text: '#ffffff',
+                textHighlight: '#ffe66d'
+            }
+        };
+
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        const GAME_ID = 'bounce';
+        let gameData = GameStorage.load(GAME_ID, GameStorage.defaults.arcade());
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        const GameState = {
+            TITLE: 'title',
+            PLAYING: 'playing',
+            PAUSED: 'paused',
+            GAME_OVER: 'game_over'
+        };
+
+        let state = GameState.TITLE;
+        let score = 0;
+        let isNewHighScore = false;
+        let pauseTime = 0;
+        const UNPAUSE_DELAY = 250;
+
+        const paddle = {
+            x: CONFIG.WIDTH / 2 - CONFIG.PADDLE_WIDTH / 2,
+            y: CONFIG.PADDLE_Y,
+            width: CONFIG.PADDLE_WIDTH,
+            height: CONFIG.PADDLE_HEIGHT
+        };
+
+        const ball = {
+            x: CONFIG.WIDTH / 2,
+            y: CONFIG.HEIGHT / 2,
+            vx: 0,
+            vy: 0,
+            size: CONFIG.BALL_SIZE,
+            speed: CONFIG.BALL_SPEED_INITIAL
+        };
+
+        // ============================================
+        // CANVAS SETUP
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const currentScoreEl = document.getElementById('currentScore');
+        const highScoreEl = document.getElementById('highScore');
+        const currentSpeedEl = document.getElementById('currentSpeed');
+        const startSpeedEl = document.getElementById('startSpeed');
+        const speedIncrementEl = document.getElementById('speedIncrement');
+        const maxSpeedEl = document.getElementById('maxSpeed');
+
+        // Initialize displays
+        startSpeedEl.textContent = CONFIG.BALL_SPEED_INITIAL;
+        speedIncrementEl.textContent = CONFIG.BALL_SPEED_INCREMENT;
+        maxSpeedEl.textContent = CONFIG.BALL_MAX_SPEED;
+        highScoreEl.textContent = gameData.highScore;
+
+        function updateSpeedDisplay() {
+            currentSpeedEl.textContent = ball.speed.toFixed(1);
+        }
+
+        // ============================================
+        // AUDIO SETUP
+        // ============================================
+        const musicToggle = document.getElementById('musicToggle');
+        const sfxToggle = document.getElementById('sfxToggle');
+
+        // Load audio preferences
+        AudioSystem.musicEnabled = gameData.musicEnabled;
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        musicToggle.checked = gameData.musicEnabled;
+        sfxToggle.checked = gameData.sfxEnabled;
+
+        musicToggle.addEventListener('change', (e) => {
+            AudioSystem.musicEnabled = e.target.checked;
+            gameData.musicEnabled = e.target.checked;
+            saveGameData();
+            if (e.target.checked && state === GameState.PLAYING) {
+                AudioSystem.music.start('bounce');
+            } else {
+                AudioSystem.music.stop();
+            }
+        });
+
+        sfxToggle.addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        // Unlock audio on first interaction
+        const unlockAudio = () => {
+            AudioSystem.unlock();
+        };
+        document.addEventListener('keydown', unlockAudio, { once: true });
+        document.addEventListener('click', unlockAudio, { once: true });
+        document.addEventListener('touchstart', unlockAudio, { once: true });
+
+        canvas.addEventListener('click', () => {
+            unlockAudio();
+            if (state === GameState.TITLE || state === GameState.GAME_OVER) {
+                startGame();
+            }
+        });
+
+        // ============================================
+        // GAME FUNCTIONS
+        // ============================================
+        function resetBall() {
+            ball.x = CONFIG.WIDTH / 2;
+            ball.y = CONFIG.HEIGHT / 3;
+            ball.speed = CONFIG.BALL_SPEED_INITIAL;
+
+            // Random angle between 30 and 150 degrees (downward)
+            const angle = (Math.random() * 120 + 30) * Math.PI / 180;
+            ball.vx = Math.cos(angle) * ball.speed * (Math.random() > 0.5 ? 1 : -1);
+            ball.vy = Math.abs(Math.sin(angle) * ball.speed);
+            updateSpeedDisplay();
+        }
+
+        function resetGame() {
+            score = 0;
+            isNewHighScore = false;
+            paddle.x = CONFIG.WIDTH / 2 - CONFIG.PADDLE_WIDTH / 2;
+            resetBall();
+            updateScoreDisplay();
+        }
+
+        function startGame() {
+            AudioSystem.unlock();
+            AudioSystem.sfx.select();
+            resetGame();
+            state = GameState.PLAYING;
+            AudioSystem.music.start('bounce');
+        }
+
+        function endGame() {
+            AudioSystem.music.stop();
+            AudioSystem.sfx.death();
+
+            if (score > gameData.highScore) {
+                gameData.highScore = score;
+                isNewHighScore = gameData.gamesPlayed > 0;
+                highScoreEl.textContent = gameData.highScore;
+            }
+            gameData.gamesPlayed++;
+            saveGameData();
+            state = GameState.GAME_OVER;
+        }
+
+        function updateScoreDisplay() {
+            currentScoreEl.textContent = score;
+        }
+
+        // ============================================
+        // UPDATE FUNCTIONS
+        // ============================================
+        function updateTitle() {
+            if (GameController.anyButtonJustPressed()) {
+                startGame();
+            }
+        }
+
+        function updatePlaying() {
+            // Check for pause
+            if (GameController.justPressed('start')) {
+                pauseTime = Date.now();
+                AudioSystem.music.stop();
+                state = GameState.PAUSED;
+                return;
+            }
+
+            // Move paddle
+            if (GameController.direction.left) {
+                paddle.x -= CONFIG.PADDLE_SPEED;
+            }
+            if (GameController.direction.right) {
+                paddle.x += CONFIG.PADDLE_SPEED;
+            }
+
+            // Clamp paddle to screen
+            paddle.x = Math.max(0, Math.min(CONFIG.WIDTH - paddle.width, paddle.x));
+
+            // Move ball
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Ball collision with walls (left, right, top)
+            if (ball.x - ball.size / 2 <= 0) {
+                ball.x = ball.size / 2;
+                ball.vx = Math.abs(ball.vx);
+                AudioSystem.sfx.wallHit();
+            }
+            if (ball.x + ball.size / 2 >= CONFIG.WIDTH) {
+                ball.x = CONFIG.WIDTH - ball.size / 2;
+                ball.vx = -Math.abs(ball.vx);
+                AudioSystem.sfx.wallHit();
+            }
+            if (ball.y - ball.size / 2 <= 0) {
+                ball.y = ball.size / 2;
+                ball.vy = Math.abs(ball.vy);
+                AudioSystem.sfx.wallHit();
+            }
+
+            // Ball collision with paddle
+            if (ball.vy > 0 && // Ball moving down
+                ball.y + ball.size / 2 >= paddle.y &&
+                ball.y - ball.size / 2 <= paddle.y + paddle.height &&
+                ball.x >= paddle.x &&
+                ball.x <= paddle.x + paddle.width) {
+
+                // Bounce!
+                ball.y = paddle.y - ball.size / 2;
+                ball.vy = -Math.abs(ball.vy);
+
+                // Adjust horizontal velocity based on where ball hit paddle
+                const hitPos = (ball.x - paddle.x) / paddle.width; // 0 to 1
+                const angle = (hitPos - 0.5) * Math.PI * 0.7; // -63 to +63 degrees
+                ball.speed = Math.min(ball.speed + CONFIG.BALL_SPEED_INCREMENT, CONFIG.BALL_MAX_SPEED);
+                ball.vx = Math.sin(angle) * ball.speed;
+                ball.vy = -Math.cos(angle) * ball.speed;
+
+                // Score!
+                score++;
+                updateScoreDisplay();
+                updateSpeedDisplay();
+                AudioSystem.sfx.paddleHit();
+            }
+
+            // Ball falls off bottom - game over
+            if (ball.y - ball.size / 2 > CONFIG.HEIGHT) {
+                endGame();
+            }
+        }
+
+        function updatePaused() {
+            const timeSincePause = Date.now() - pauseTime;
+            if (timeSincePause >= UNPAUSE_DELAY && GameController.justPressed('start')) {
+                state = GameState.PLAYING;
+                AudioSystem.music.start('bounce');
+            }
+        }
+
+        function updateGameOver() {
+            if (GameController.anyButtonJustPressed()) {
+                startGame();
+            }
+        }
+
+        // ============================================
+        // RENDER FUNCTIONS
+        // ============================================
+        function renderBackground() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            // Draw death zone indicator at bottom
+            ctx.fillStyle = CONFIG.COLORS.deathZone + '33';
+            ctx.fillRect(0, CONFIG.HEIGHT - 10, CONFIG.WIDTH, 10);
+        }
+
+        function renderPaddle() {
+            ctx.fillStyle = CONFIG.COLORS.paddle;
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+
+            // Paddle glow
+            ctx.shadowColor = CONFIG.COLORS.paddle;
+            ctx.shadowBlur = 10;
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            ctx.shadowBlur = 0;
+        }
+
+        function renderBall() {
+            ctx.fillStyle = CONFIG.COLORS.ball;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ball glow
+            ctx.shadowColor = CONFIG.COLORS.ball;
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function renderTitle() {
+            renderBackground();
+            renderPaddle();
+
+            // Draw ball in starting position
+            ctx.fillStyle = CONFIG.COLORS.ball + '88';
+            ctx.beginPath();
+            ctx.arc(CONFIG.WIDTH / 2, CONFIG.HEIGHT / 3, ball.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Title text
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('BOUNCE', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 40);
+
+            // Instructions
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.fillText('Press Any Button to Start', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
+
+            ctx.font = '14px "Courier New", monospace';
+            ctx.fillStyle = CONFIG.COLORS.text + 'aa';
+            ctx.fillText('Keep the ball from falling!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
+        }
+
+        function renderPlaying() {
+            renderBackground();
+            renderPaddle();
+            renderBall();
+
+            // Score in corner
+            ctx.fillStyle = CONFIG.COLORS.text + '66';
+            ctx.font = '24px "Courier New", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(score.toString(), 20, 35);
+        }
+
+        function renderPaused() {
+            renderBackground();
+            renderPaddle();
+            renderBall();
+
+            // Darken background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.textAlign = 'center';
+
+            // Paused text
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.fillText('PAUSED', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 20);
+
+            // Resume prompt
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillText('Press Start to Resume', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 30);
+        }
+
+        function renderGameOver() {
+            renderBackground();
+            renderPaddle();
+
+            // Darken background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.textAlign = 'center';
+
+            // Game Over text
+            ctx.fillStyle = CONFIG.COLORS.deathZone;
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.fillText('GAME OVER', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 60);
+
+            // Score
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '24px "Courier New", monospace';
+            ctx.fillText(`Score: ${score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2);
+
+            // New High Score message
+            if (isNewHighScore) {
+                ctx.fillStyle = CONFIG.COLORS.textHighlight;
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.fillText('NEW HIGH SCORE!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 45);
+            }
+
+            // Continue prompt
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = '18px "Courier New", monospace';
+            const continueY = isNewHighScore ? CONFIG.HEIGHT / 2 + 100 : CONFIG.HEIGHT / 2 + 60;
+            ctx.fillText('Press Any Button to Continue', CONFIG.WIDTH / 2, continueY);
+        }
+
+        // ============================================
+        // GAME LOOP
+        // ============================================
+        function update() {
+            GameController.poll();
+
+            switch (state) {
+                case GameState.TITLE:
+                    updateTitle();
+                    break;
+                case GameState.PLAYING:
+                    updatePlaying();
+                    break;
+                case GameState.PAUSED:
+                    updatePaused();
+                    break;
+                case GameState.GAME_OVER:
+                    updateGameOver();
+                    break;
+            }
+        }
+
+        function render() {
+            switch (state) {
+                case GameState.TITLE:
+                    renderTitle();
+                    break;
+                case GameState.PLAYING:
+                    renderPlaying();
+                    break;
+                case GameState.PAUSED:
+                    renderPaused();
+                    break;
+                case GameState.GAME_OVER:
+                    renderGameOver();
+                    break;
+            }
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        console.log('Bounce initialized');
+        gameLoop();
+    </script>
+</body>
+</html>

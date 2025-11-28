@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #ffffff;
+        }
+
+        h1 {
+            color: #ff6b6b;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #gameContainer {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            display: block;
+        }
+
+        #scoreDisplay {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .score-panel {
+            background: #2a2a4a;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .score-label {
+            color: #4ecdc4;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .score-value {
+            color: #ffe66d;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        #controls {
+            background: #2a2a4a;
+            padding: 15px 25px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 640px;
+            margin-bottom: 20px;
+        }
+
+        #controls h3 {
+            color: #4ecdc4;
+            margin-bottom: 10px;
+        }
+
+        #controls p {
+            color: #aaaaaa;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .key {
+            display: inline-block;
+            background: #4a4a6a;
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #ffe66d;
+            font-weight: bold;
+        }
+
+        #audioControls {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .audio-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #4ecdc4;
+            font-size: 14px;
+        }
+
+        .audio-toggle input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .ball-indicator {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+
+        .solid-ball { background: linear-gradient(135deg, #ffe66d 0%, #cc9900 100%); }
+        .stripe-ball {
+            background: linear-gradient(135deg, #ffffff 0%, #ffffff 30%, #ff6b6b 30%, #ff6b6b 70%, #ffffff 70%, #ffffff 100%);
+        }
+    </style>
+</head>
+<body>
+    <h1>POOL</h1>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="640" height="480"></canvas>
+    </div>
+
+    <div id="scoreDisplay">
+        <div class="score-panel">
+            <div class="score-label">PLAYER 1</div>
+            <div class="score-value" id="player1Score">0</div>
+        </div>
+        <div class="score-panel">
+            <div class="score-label">TARGET</div>
+            <div class="score-value" id="targetDisplay">-</div>
+        </div>
+        <div class="score-panel">
+            <div class="score-label">PLAYER 2</div>
+            <div class="score-value" id="player2Score">0</div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <h3>Controls</h3>
+        <p>
+            <span class="key">←</span><span class="key">→</span> Aim cue |
+            <span class="key">Q</span><span class="key">E</span> Fine aim<br>
+            <span class="key">↑</span><span class="key">↓</span> Adjust power |
+            <span class="key">SPACE</span> Shoot<br>
+            <span class="key">ESC</span> Pause
+        </p>
+        <div id="audioControls">
+            <label class="audio-toggle">
+                <input type="checkbox" id="musicToggle" checked>
+                Music
+            </label>
+            <label class="audio-toggle">
+                <input type="checkbox" id="sfxToggle" checked>
+                Sound FX
+            </label>
+        </div>
+    </div>
+
+    <script src="controller.js"></script>
+    <script src="audio.js"></script>
+    <script src="storage.js"></script>
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const WIDTH = 640;
+        const HEIGHT = 480;
+
+        // Game constants
+        const TABLE_MARGIN = 40;
+        const CUSHION_WIDTH = 15;
+        const POCKET_RADIUS = 18;
+        const BALL_RADIUS = 10;
+        const CUE_LENGTH = 150;
+        const CUE_WIDTH = 6;
+
+        // Physics constants
+        const FRICTION = 0.985;
+        const CUSHION_BOUNCE = 0.75;
+        const BALL_BOUNCE = 0.95;
+        const MIN_VELOCITY = 0.05;
+        const MAX_POWER = 20;
+
+        // Colors
+        const COLORS = {
+            felt: '#1a6b35',
+            feltDark: '#145a2c',
+            cushion: '#2d1810',
+            wood: '#4a2c17',
+            woodLight: '#6b4423',
+            pocket: '#000000',
+            cueBall: '#f5f5f0',
+            eightBall: '#1a1a1a',
+            cue: '#d4a574',
+            cueEnd: '#1a1a1a'
+        };
+
+        // Ball colors (solids 1-7, stripes 9-15)
+        const BALL_COLORS = {
+            1: '#ffe135',  // Yellow
+            2: '#1e4d8c',  // Blue
+            3: '#d42027',  // Red
+            4: '#3d1a5c',  // Purple
+            5: '#f15a29',  // Orange
+            6: '#006b3f',  // Green
+            7: '#8b2332',  // Maroon
+            8: '#1a1a1a',  // Black (8-ball)
+            9: '#ffe135',  // Yellow stripe
+            10: '#1e4d8c', // Blue stripe
+            11: '#d42027', // Red stripe
+            12: '#3d1a5c', // Purple stripe
+            13: '#f15a29', // Orange stripe
+            14: '#006b3f', // Green stripe
+            15: '#8b2332'  // Maroon stripe
+        };
+
+        // Custom Pool SFX using Web Audio API
+        const PoolSFX = {
+            audioCtx: null,
+
+            init() {
+                if (!this.audioCtx) {
+                    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+
+            // Ball-to-ball collision clack
+            ballHit(intensity = 1) {
+                if (!AudioSystem.sfxEnabled) return;
+                this.init();
+                const ctx = this.audioCtx;
+
+                // Sharp attack noise for clack
+                const duration = 0.08;
+                const gain = ctx.createGain();
+                gain.connect(ctx.destination);
+                gain.gain.setValueAtTime(0.4 * intensity, ctx.currentTime);
+                gain.gain.exponentialDecayTo = 0.001;
+                gain.gain.setTargetAtTime(0.001, ctx.currentTime, duration / 4);
+
+                // Noise burst for the clack
+                const bufferSize = ctx.sampleRate * duration;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.1));
+                }
+
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                // Bandpass filter for woody clack sound
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 2000 + Math.random() * 500;
+                filter.Q.value = 2;
+
+                noise.connect(filter);
+                filter.connect(gain);
+                noise.start();
+                noise.stop(ctx.currentTime + duration);
+
+                // Add a subtle pitched component
+                const osc = ctx.createOscillator();
+                const oscGain = ctx.createGain();
+                osc.frequency.value = 800 + Math.random() * 200;
+                osc.type = 'sine';
+                oscGain.gain.setValueAtTime(0.15 * intensity, ctx.currentTime);
+                oscGain.gain.exponentialDecayTo = 0.001;
+                oscGain.gain.setTargetAtTime(0.001, ctx.currentTime, 0.02);
+                osc.connect(oscGain);
+                oscGain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.05);
+            },
+
+            // Cue hitting cue ball
+            cueHit(power) {
+                if (!AudioSystem.sfxEnabled) return;
+                this.init();
+                const ctx = this.audioCtx;
+
+                const intensity = 0.3 + (power / MAX_POWER) * 0.7;
+                const duration = 0.1;
+
+                // Sharper, louder clack for cue hit
+                const gain = ctx.createGain();
+                gain.connect(ctx.destination);
+                gain.gain.setValueAtTime(0.5 * intensity, ctx.currentTime);
+                gain.gain.setTargetAtTime(0.001, ctx.currentTime, duration / 3);
+
+                const bufferSize = ctx.sampleRate * duration;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.08));
+                }
+
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 2500;
+                filter.Q.value = 1.5;
+
+                noise.connect(filter);
+                filter.connect(gain);
+                noise.start();
+                noise.stop(ctx.currentTime + duration);
+            },
+
+            // Cushion bounce - thud sound
+            cushionHit(speed) {
+                if (!AudioSystem.sfxEnabled) return;
+                this.init();
+                const ctx = this.audioCtx;
+
+                const intensity = Math.min(1, speed / 10);
+                if (intensity < 0.1) return;
+
+                const duration = 0.12;
+                const gain = ctx.createGain();
+                gain.connect(ctx.destination);
+                gain.gain.setValueAtTime(0.25 * intensity, ctx.currentTime);
+                gain.gain.setTargetAtTime(0.001, ctx.currentTime, duration / 3);
+
+                // Lower frequency thud
+                const osc = ctx.createOscillator();
+                osc.frequency.value = 150 + Math.random() * 50;
+                osc.type = 'sine';
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 400;
+
+                osc.connect(filter);
+                filter.connect(gain);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+
+                // Add some noise
+                const noiseGain = ctx.createGain();
+                noiseGain.connect(ctx.destination);
+                noiseGain.gain.setValueAtTime(0.1 * intensity, ctx.currentTime);
+                noiseGain.gain.setTargetAtTime(0.001, ctx.currentTime, 0.05);
+
+                const bufferSize = ctx.sampleRate * 0.08;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.15));
+                }
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                const noiseFilter = ctx.createBiquadFilter();
+                noiseFilter.type = 'lowpass';
+                noiseFilter.frequency.value = 800;
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noise.start();
+                noise.stop(ctx.currentTime + 0.08);
+            },
+
+            // Ball falling into pocket
+            pocketFall() {
+                if (!AudioSystem.sfxEnabled) return;
+                this.init();
+                const ctx = this.audioCtx;
+
+                // Falling swoosh + thunk
+                const duration = 0.4;
+
+                // Swoosh (descending noise)
+                const swooshGain = ctx.createGain();
+                swooshGain.connect(ctx.destination);
+                swooshGain.gain.setValueAtTime(0.2, ctx.currentTime);
+                swooshGain.gain.setTargetAtTime(0.001, ctx.currentTime + 0.1, 0.1);
+
+                const bufferSize = ctx.sampleRate * 0.2;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+                }
+                const swoosh = ctx.createBufferSource();
+                swoosh.buffer = buffer;
+
+                const swooshFilter = ctx.createBiquadFilter();
+                swooshFilter.type = 'bandpass';
+                swooshFilter.frequency.setValueAtTime(1500, ctx.currentTime);
+                swooshFilter.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.2);
+                swooshFilter.Q.value = 1;
+
+                swoosh.connect(swooshFilter);
+                swooshFilter.connect(swooshGain);
+                swoosh.start();
+                swoosh.stop(ctx.currentTime + 0.2);
+
+                // Thunk at the bottom (delayed)
+                setTimeout(() => {
+                    if (!this.audioCtx) return;
+                    const thunkGain = ctx.createGain();
+                    thunkGain.connect(ctx.destination);
+                    thunkGain.gain.setValueAtTime(0.35, ctx.currentTime);
+                    thunkGain.gain.setTargetAtTime(0.001, ctx.currentTime, 0.08);
+
+                    const osc = ctx.createOscillator();
+                    osc.frequency.value = 100;
+                    osc.type = 'sine';
+                    osc.connect(thunkGain);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.15);
+
+                    // Rattle
+                    const rattleGain = ctx.createGain();
+                    rattleGain.connect(ctx.destination);
+                    rattleGain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    rattleGain.gain.setTargetAtTime(0.001, ctx.currentTime, 0.15);
+
+                    const rattleSize = ctx.sampleRate * 0.2;
+                    const rattleBuffer = ctx.createBuffer(1, rattleSize, ctx.sampleRate);
+                    const rattleData = rattleBuffer.getChannelData(0);
+                    for (let i = 0; i < rattleSize; i++) {
+                        rattleData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (rattleSize * 0.4));
+                    }
+                    const rattle = ctx.createBufferSource();
+                    rattle.buffer = rattleBuffer;
+                    const rattleFilter = ctx.createBiquadFilter();
+                    rattleFilter.type = 'bandpass';
+                    rattleFilter.frequency.value = 600;
+                    rattleFilter.Q.value = 2;
+                    rattle.connect(rattleFilter);
+                    rattleFilter.connect(rattleGain);
+                    rattle.start();
+                    rattle.stop(ctx.currentTime + 0.2);
+                }, 150);
+            },
+
+            // Scratch/foul - cue ball pocketed
+            scratch() {
+                if (!AudioSystem.sfxEnabled) return;
+                this.pocketFall();
+                // Add a sad tone
+                setTimeout(() => {
+                    if (!this.audioCtx) return;
+                    const ctx = this.audioCtx;
+                    const gain = ctx.createGain();
+                    gain.connect(ctx.destination);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.setTargetAtTime(0.001, ctx.currentTime, 0.3);
+
+                    const osc = ctx.createOscillator();
+                    osc.frequency.setValueAtTime(400, ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.3);
+                    osc.type = 'sine';
+                    osc.connect(gain);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.4);
+                }, 200);
+            }
+        };
+
+        // Game state
+        const GameState = {
+            TITLE: 'title',
+            MODE_SELECT: 'mode_select',
+            PLAYING: 'playing',
+            AIMING: 'aiming',
+            SHOOTING: 'shooting',
+            BALLS_MOVING: 'balls_moving',
+            PLACING_CUE: 'placing_cue',
+            PAUSED: 'paused',
+            GAME_OVER: 'game_over'
+        };
+
+        let state = GameState.MODE_SELECT;
+        let balls = [];
+        let pockets = [];
+        let cue = {
+            angle: 0,
+            power: 0
+        };
+
+        // Game mode
+        let gameMode = '2p'; // '1p' or '2p'
+        let selectedMode = 0; // 0 = 1 Player, 1 = 2 Players
+
+        // Game rules
+        let currentPlayer = 1;
+        let player1Type = null; // 'solids' or 'stripes'
+        let player2Type = null;
+        let player1Score = 0;
+        let player2Score = 0;
+        let player1Turns = 0;
+        let player2Turns = 0;
+        let totalTurns = 0; // For 1P mode
+        let foul = false;
+        let gameMessage = '';
+        let messageTimer = 0;
+        let turnSwitchPending = false;
+        let ballsPocketedThisTurn = [];
+        let firstBallHit = null;
+        let cueBallPocketed = false;
+        let shotStartDelay = 0; // Delay before allowing shots after game start
+
+        // Pause handling
+        let pauseDebounce = 0;
+        const PAUSE_DEBOUNCE_TIME = 250;
+        const SHOT_START_DELAY = 300; // ms delay before first shot allowed
+
+        // Storage
+        const GAME_ID = 'pool';
+        let gameData = GameStorage.load(GAME_ID, {
+            highScore: 0,
+            gamesPlayed: 0,
+            musicEnabled: true,
+            sfxEnabled: true
+        });
+
+        // Audio controls
+        const musicToggle = document.getElementById('musicToggle');
+        const sfxToggle = document.getElementById('sfxToggle');
+        musicToggle.checked = gameData.musicEnabled;
+        sfxToggle.checked = gameData.sfxEnabled;
+        AudioSystem.musicEnabled = gameData.musicEnabled;
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+
+        musicToggle.addEventListener('change', (e) => {
+            AudioSystem.musicEnabled = e.target.checked;
+            gameData.musicEnabled = e.target.checked;
+            saveGameData();
+            if (e.target.checked && (state === GameState.AIMING || state === GameState.BALLS_MOVING)) {
+                AudioSystem.music.start('bounce');
+            } else {
+                AudioSystem.music.stop();
+            }
+        });
+
+        sfxToggle.addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        // Unlock audio on first interaction
+        document.addEventListener('click', () => AudioSystem.unlock(), { once: true });
+        document.addEventListener('keydown', () => AudioSystem.unlock(), { once: true });
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        // Initialize pockets
+        function initPockets() {
+            const left = TABLE_MARGIN + CUSHION_WIDTH;
+            const right = WIDTH - TABLE_MARGIN - CUSHION_WIDTH;
+            const top = TABLE_MARGIN + CUSHION_WIDTH;
+            const bottom = HEIGHT - TABLE_MARGIN - CUSHION_WIDTH;
+            const midX = WIDTH / 2;
+
+            pockets = [
+                { x: left, y: top },                    // Top-left
+                { x: midX, y: top - 5 },                // Top-middle
+                { x: right, y: top },                   // Top-right
+                { x: left, y: bottom },                 // Bottom-left
+                { x: midX, y: bottom + 5 },             // Bottom-middle
+                { x: right, y: bottom }                 // Bottom-right
+            ];
+        }
+
+        // Initialize balls in rack formation
+        function initBalls() {
+            balls = [];
+
+            // Cue ball
+            balls.push({
+                id: 0,
+                x: WIDTH * 0.25,
+                y: HEIGHT / 2,
+                vx: 0,
+                vy: 0,
+                number: 0,
+                type: 'cue',
+                pocketed: false
+            });
+
+            // Rack position (apex of triangle)
+            const rackX = WIDTH * 0.7;
+            const rackY = HEIGHT / 2;
+            const spacing = BALL_RADIUS * 2.1;
+
+            // Ball arrangement (standard 8-ball rack)
+            // Row 1: 1 ball, Row 2: 2 balls, etc.
+            // 8-ball must be in center (row 3, position 2)
+            // One solid and one stripe in back corners
+            const arrangement = [
+                [1],
+                [9, 2],
+                [3, 8, 10],
+                [11, 4, 5, 12],
+                [6, 13, 14, 7, 15]
+            ];
+
+            let ballIndex = 1;
+            for (let row = 0; row < arrangement.length; row++) {
+                const rowBalls = arrangement[row];
+                const rowOffset = row * spacing * Math.cos(Math.PI / 6);
+                const startY = rackY - (rowBalls.length - 1) * spacing / 2;
+
+                for (let col = 0; col < rowBalls.length; col++) {
+                    const num = arrangement[row][col];
+                    balls.push({
+                        id: ballIndex++,
+                        x: rackX + rowOffset,
+                        y: startY + col * spacing,
+                        vx: 0,
+                        vy: 0,
+                        number: num,
+                        type: num === 8 ? 'eight' : (num < 8 ? 'solid' : 'stripe'),
+                        pocketed: false
+                    });
+                }
+            }
+        }
+
+        function resetGame() {
+            initPockets();
+            initBalls();
+            currentPlayer = 1;
+            player1Type = null;
+            player2Type = null;
+            player1Score = 0;
+            player2Score = 0;
+            player1Turns = 0;
+            player2Turns = 0;
+            totalTurns = 0;
+            foul = false;
+            gameMessage = '';
+            messageTimer = 0;
+            turnSwitchPending = false;
+            cue.angle = 0; // Point towards racked balls (right)
+            cue.power = 0;
+            shotStartDelay = SHOT_START_DELAY; // Prevent immediate shot
+            state = GameState.AIMING;
+            updateScoreDisplay();
+        }
+
+        function updateScoreDisplay() {
+            const p1Display = document.getElementById('player1Score');
+            const p2Display = document.getElementById('player2Score');
+            const targetDisplay = document.getElementById('targetDisplay');
+
+            // Get label elements
+            const p1Label = p1Display.previousElementSibling;
+            const p2Label = p2Display.previousElementSibling;
+            const targetLabel = targetDisplay.previousElementSibling;
+
+            if (gameMode === '1p') {
+                p1Label.textContent = 'BALLS';
+                p2Label.textContent = 'SHOTS';
+                targetLabel.textContent = 'MODE';
+
+                p1Display.textContent = player1Score;
+                p2Display.textContent = totalTurns;
+                targetDisplay.textContent = '1P';
+            } else {
+                p1Label.textContent = 'PLAYER 1';
+                p2Label.textContent = 'PLAYER 2';
+                targetLabel.textContent = 'TARGET';
+
+                p1Display.textContent = `${player1Score} (${player1Turns})`;
+                p2Display.textContent = `${player2Score} (${player2Turns})`;
+
+                if (player1Type) {
+                    const p1Target = player1Type === 'solids' ? 'Solids' : 'Stripes';
+                    const p2Target = player2Type === 'solids' ? 'Solids' : 'Stripes';
+                    targetDisplay.innerHTML = currentPlayer === 1 ?
+                        `<span style="color: ${player1Type === 'solids' ? '#ffe66d' : '#ff6b6b'}">${p1Target}</span>` :
+                        `<span style="color: ${player2Type === 'solids' ? '#ffe66d' : '#ff6b6b'}">${p2Target}</span>`;
+                } else {
+                    targetDisplay.textContent = 'Open';
+                }
+            }
+        }
+
+        function setMessage(msg, duration = 2000) {
+            gameMessage = msg;
+            messageTimer = duration;
+        }
+
+        // Physics functions
+        function getCueBall() {
+            return balls.find(b => b.type === 'cue' && !b.pocketed);
+        }
+
+        function ballsAreMoving() {
+            return balls.some(b => !b.pocketed && (Math.abs(b.vx) > MIN_VELOCITY || Math.abs(b.vy) > MIN_VELOCITY));
+        }
+
+        function applyFriction(ball) {
+            ball.vx *= FRICTION;
+            ball.vy *= FRICTION;
+
+            if (Math.abs(ball.vx) < MIN_VELOCITY) ball.vx = 0;
+            if (Math.abs(ball.vy) < MIN_VELOCITY) ball.vy = 0;
+        }
+
+        function checkCushionCollision(ball) {
+            const left = TABLE_MARGIN + CUSHION_WIDTH + BALL_RADIUS;
+            const right = WIDTH - TABLE_MARGIN - CUSHION_WIDTH - BALL_RADIUS;
+            const top = TABLE_MARGIN + CUSHION_WIDTH + BALL_RADIUS;
+            const bottom = HEIGHT - TABLE_MARGIN - CUSHION_WIDTH - BALL_RADIUS;
+
+            let hit = false;
+            let speed = 0;
+
+            if (ball.x < left) {
+                speed = Math.abs(ball.vx);
+                ball.x = left;
+                ball.vx = Math.abs(ball.vx) * CUSHION_BOUNCE;
+                hit = true;
+            } else if (ball.x > right) {
+                speed = Math.abs(ball.vx);
+                ball.x = right;
+                ball.vx = -Math.abs(ball.vx) * CUSHION_BOUNCE;
+                hit = true;
+            }
+
+            if (ball.y < top) {
+                speed = Math.max(speed, Math.abs(ball.vy));
+                ball.y = top;
+                ball.vy = Math.abs(ball.vy) * CUSHION_BOUNCE;
+                hit = true;
+            } else if (ball.y > bottom) {
+                speed = Math.max(speed, Math.abs(ball.vy));
+                ball.y = bottom;
+                ball.vy = -Math.abs(ball.vy) * CUSHION_BOUNCE;
+                hit = true;
+            }
+
+            if (hit) {
+                PoolSFX.cushionHit(speed);
+            }
+        }
+
+        function checkBallCollision(ball1, ball2) {
+            const dx = ball2.x - ball1.x;
+            const dy = ball2.y - ball1.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDist = BALL_RADIUS * 2;
+
+            if (dist < minDist && dist > 0) {
+                // Track first ball hit for foul detection
+                if (ball1.type === 'cue' && firstBallHit === null) {
+                    firstBallHit = ball2;
+                } else if (ball2.type === 'cue' && firstBallHit === null) {
+                    firstBallHit = ball1;
+                }
+
+                // Normalize collision vector
+                const nx = dx / dist;
+                const ny = dy / dist;
+
+                // Relative velocity
+                const dvx = ball1.vx - ball2.vx;
+                const dvy = ball1.vy - ball2.vy;
+
+                // Relative velocity along collision normal
+                const dvn = dvx * nx + dvy * ny;
+
+                // Only resolve if balls are moving towards each other
+                if (dvn > 0) {
+                    // Apply impulse (elastic collision with slight energy loss)
+                    const impulse = dvn * BALL_BOUNCE;
+
+                    ball1.vx -= impulse * nx;
+                    ball1.vy -= impulse * ny;
+                    ball2.vx += impulse * nx;
+                    ball2.vy += impulse * ny;
+
+                    // Play clack sound with intensity based on collision speed
+                    const intensity = Math.min(1, dvn / 15);
+                    PoolSFX.ballHit(intensity);
+                }
+
+                // Separate balls to prevent overlap
+                const overlap = minDist - dist;
+                const separationX = overlap * nx / 2;
+                const separationY = overlap * ny / 2;
+
+                ball1.x -= separationX;
+                ball1.y -= separationY;
+                ball2.x += separationX;
+                ball2.y += separationY;
+            }
+        }
+
+        function checkPocketCollision(ball) {
+            for (const pocket of pockets) {
+                const dx = ball.x - pocket.x;
+                const dy = ball.y - pocket.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < POCKET_RADIUS) {
+                    ball.pocketed = true;
+                    ball.vx = 0;
+                    ball.vy = 0;
+
+                    if (ball.type === 'cue') {
+                        cueBallPocketed = true;
+                        PoolSFX.scratch();
+                    } else {
+                        ballsPocketedThisTurn.push(ball);
+                        PoolSFX.pocketFall();
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function updatePhysics() {
+            const activeBalls = balls.filter(b => !b.pocketed);
+
+            // Update positions and apply friction
+            for (const ball of activeBalls) {
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+                applyFriction(ball);
+            }
+
+            // Check cushion collisions
+            for (const ball of activeBalls) {
+                checkCushionCollision(ball);
+            }
+
+            // Check ball-to-ball collisions
+            for (let i = 0; i < activeBalls.length; i++) {
+                for (let j = i + 1; j < activeBalls.length; j++) {
+                    checkBallCollision(activeBalls[i], activeBalls[j]);
+                }
+            }
+
+            // Check pocket collisions
+            for (const ball of activeBalls) {
+                checkPocketCollision(ball);
+            }
+        }
+
+        function processTurnEnd() {
+            let switchTurn = true;
+            let gameOver = false;
+            let winner = null;
+
+            // Handle 1P mode separately
+            if (gameMode === '1p') {
+                // Count balls pocketed
+                for (const ball of ballsPocketedThisTurn) {
+                    if (ball.type !== 'eight') {
+                        player1Score++;
+                    }
+                }
+
+                // Check for 8-ball
+                const eightBallPocketed = ballsPocketedThisTurn.some(b => b.type === 'eight');
+                const otherBallsRemaining = balls.filter(b =>
+                    b.type !== 'cue' && b.type !== 'eight' && !b.pocketed
+                ).length;
+
+                if (eightBallPocketed) {
+                    if (otherBallsRemaining === 0 && !cueBallPocketed) {
+                        // Win!
+                        gameOver = true;
+                        // Check for high score (lower is better)
+                        if (gameData.highScore === 0 || totalTurns < gameData.highScore) {
+                            gameData.highScore = totalTurns;
+                            setMessage(`New Best: ${totalTurns} shots!`);
+                        } else {
+                            setMessage(`Cleared in ${totalTurns} shots!`);
+                        }
+                    } else {
+                        // Loss - 8 ball pocketed early
+                        gameOver = true;
+                        setMessage('Game Over! 8-ball pocketed early.');
+                    }
+                }
+
+                if (gameOver) {
+                    state = GameState.GAME_OVER;
+                    gameData.gamesPlayed++;
+                    saveGameData();
+                    // Reset turn tracking
+                    foul = false;
+                    cueBallPocketed = false;
+                    firstBallHit = null;
+                    ballsPocketedThisTurn = [];
+                    updateScoreDisplay();
+                    return;
+                }
+
+                // Handle scratch in 1P mode
+                if (cueBallPocketed) {
+                    const cueBall = balls.find(b => b.type === 'cue');
+                    cueBall.pocketed = false;
+                    cueBall.x = WIDTH * 0.25;
+                    cueBall.y = HEIGHT / 2;
+                    cueBall.vx = 0;
+                    cueBall.vy = 0;
+                    state = GameState.PLACING_CUE;
+                    setMessage('Scratch!');
+                } else {
+                    state = GameState.AIMING;
+                }
+
+                // Reset turn tracking
+                foul = false;
+                cueBallPocketed = false;
+                firstBallHit = null;
+                ballsPocketedThisTurn = [];
+                updateScoreDisplay();
+                return;
+            }
+
+            // 2P mode logic below
+            // Check for fouls
+            if (cueBallPocketed) {
+                foul = true;
+                setMessage('Scratch! Cue ball pocketed.');
+            } else if (firstBallHit === null) {
+                foul = true;
+                setMessage('Foul! No ball hit.');
+            } else if (player1Type && currentPlayer === 1) {
+                // Check if correct ball type was hit first
+                const requiredType = player1Type === 'solids' ? 'solid' : 'stripe';
+                const solidsRemaining = balls.filter(b => b.type === 'solid' && !b.pocketed).length;
+                if (solidsRemaining > 0 || player1Type !== 'solids') {
+                    if (firstBallHit.type !== requiredType && firstBallHit.type !== 'eight') {
+                        foul = true;
+                        setMessage('Foul! Wrong ball hit first.');
+                    }
+                }
+            } else if (player2Type && currentPlayer === 2) {
+                const requiredType = player2Type === 'solids' ? 'solid' : 'stripe';
+                const solidsRemaining = balls.filter(b => b.type === 'solid' && !b.pocketed).length;
+                if (solidsRemaining > 0 || player2Type !== 'solids') {
+                    if (firstBallHit.type !== requiredType && firstBallHit.type !== 'eight') {
+                        foul = true;
+                        setMessage('Foul! Wrong ball hit first.');
+                    }
+                }
+            }
+
+            // Process pocketed balls
+            for (const ball of ballsPocketedThisTurn) {
+                if (ball.type === 'eight') {
+                    // 8-ball pocketed - check win/loss conditions
+                    const playerType = currentPlayer === 1 ? player1Type : player2Type;
+                    const playerBallsRemaining = balls.filter(b =>
+                        b.type === (playerType === 'solids' ? 'solid' : 'stripe') && !b.pocketed
+                    ).length;
+
+                    if (playerBallsRemaining === 0 && !foul) {
+                        // Win!
+                        winner = currentPlayer;
+                        setMessage(`Player ${currentPlayer} wins!`);
+                    } else {
+                        // Loss!
+                        winner = currentPlayer === 1 ? 2 : 1;
+                        setMessage(`Player ${currentPlayer} loses! (8-ball pocketed early)`);
+                    }
+                    gameOver = true;
+                } else if (ball.type === 'solid') {
+                    if (!player1Type) {
+                        // First ball pocketed - assign types
+                        if (currentPlayer === 1) {
+                            player1Type = 'solids';
+                            player2Type = 'stripes';
+                        } else {
+                            player2Type = 'solids';
+                            player1Type = 'stripes';
+                        }
+                        setMessage(`Player ${currentPlayer} is Solids!`);
+                    }
+
+                    if ((currentPlayer === 1 && player1Type === 'solids') ||
+                        (currentPlayer === 2 && player2Type === 'solids')) {
+                        if (currentPlayer === 1) player1Score++;
+                        else player2Score++;
+                        switchTurn = false;
+                    }
+                } else if (ball.type === 'stripe') {
+                    if (!player1Type) {
+                        if (currentPlayer === 1) {
+                            player1Type = 'stripes';
+                            player2Type = 'solids';
+                        } else {
+                            player2Type = 'stripes';
+                            player1Type = 'solids';
+                        }
+                        setMessage(`Player ${currentPlayer} is Stripes!`);
+                    }
+
+                    if ((currentPlayer === 1 && player1Type === 'stripes') ||
+                        (currentPlayer === 2 && player2Type === 'stripes')) {
+                        if (currentPlayer === 1) player1Score++;
+                        else player2Score++;
+                        switchTurn = false;
+                    }
+                }
+            }
+
+            if (foul) {
+                switchTurn = true;
+            }
+
+            if (gameOver) {
+                state = GameState.GAME_OVER;
+                gameData.gamesPlayed++;
+                saveGameData();
+                // Reset turn tracking
+                foul = false;
+                cueBallPocketed = false;
+                firstBallHit = null;
+                ballsPocketedThisTurn = [];
+                updateScoreDisplay();
+                return;
+            }
+
+            // Handle cue ball scratch
+            if (cueBallPocketed) {
+                // Reset cue ball for next player
+                const cueBall = balls.find(b => b.type === 'cue');
+                cueBall.pocketed = false;
+                cueBall.x = WIDTH * 0.25;
+                cueBall.y = HEIGHT / 2;
+                cueBall.vx = 0;
+                cueBall.vy = 0;
+                state = GameState.PLACING_CUE;
+            } else {
+                state = GameState.AIMING;
+            }
+
+            if (switchTurn) {
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+                if (!gameMessage) {
+                    setMessage(`Player ${currentPlayer}'s turn`);
+                }
+            }
+
+            // Reset turn tracking
+            foul = false;
+            cueBallPocketed = false;
+            firstBallHit = null;
+            ballsPocketedThisTurn = [];
+
+            updateScoreDisplay();
+        }
+
+        // Update functions
+        function update() {
+            GameController.poll();
+
+            if (messageTimer > 0) {
+                messageTimer -= 16;
+            }
+
+            if (pauseDebounce > 0) {
+                pauseDebounce -= 16;
+            }
+
+            if (shotStartDelay > 0) {
+                shotStartDelay -= 16;
+            }
+
+            switch (state) {
+                case GameState.TITLE:
+                    updateTitle();
+                    break;
+                case GameState.MODE_SELECT:
+                    updateModeSelect();
+                    break;
+                case GameState.AIMING:
+                    updateAiming();
+                    break;
+                case GameState.PLACING_CUE:
+                    updatePlacingCue();
+                    break;
+                case GameState.BALLS_MOVING:
+                    updateBallsMoving();
+                    break;
+                case GameState.PAUSED:
+                    updatePaused();
+                    break;
+                case GameState.GAME_OVER:
+                    updateGameOver();
+                    break;
+            }
+        }
+
+        function updateTitle() {
+            if (GameController.anyButtonJustPressed()) {
+                state = GameState.MODE_SELECT;
+                AudioSystem.sfx.select();
+            }
+        }
+
+        function updateModeSelect() {
+            // Navigate selection
+            if (GameController.justPressed('up') || GameController.justPressed('down')) {
+                selectedMode = selectedMode === 0 ? 1 : 0;
+                AudioSystem.sfx.select();
+            }
+
+            // Confirm selection
+            if (GameController.justPressed('a') || GameController.justPressed('start')) {
+                gameMode = selectedMode === 0 ? '1p' : '2p';
+                resetGame();
+                AudioSystem.sfx.select();
+                AudioSystem.music.start('bounce');
+            }
+        }
+
+        function updateAiming() {
+            // Check for pause
+            if (GameController.justPressed('start') && pauseDebounce <= 0) {
+                state = GameState.PAUSED;
+                pauseDebounce = PAUSE_DEBOUNCE_TIME;
+                AudioSystem.sfx.select();
+                return;
+            }
+
+            const cueBall = getCueBall();
+            if (!cueBall) return;
+
+            // Aim control (always available, even while adjusting power)
+            const aimSpeed = 0.03;
+            const fineAimSpeed = 0.008;
+
+            if (GameController.direction.left) {
+                cue.angle += aimSpeed;
+            }
+            if (GameController.direction.right) {
+                cue.angle -= aimSpeed;
+            }
+            if (GameController.buttons.lb) {
+                cue.angle += fineAimSpeed;
+            }
+            if (GameController.buttons.rb) {
+                cue.angle -= fineAimSpeed;
+            }
+
+            // Power control (up/down to adjust)
+            const powerSpeed = 0.25;
+            if (GameController.direction.up) {
+                cue.power = Math.min(MAX_POWER, cue.power + powerSpeed);
+            }
+            if (GameController.direction.down) {
+                cue.power = Math.max(0, cue.power - powerSpeed);
+            }
+
+            // Don't allow shots during start delay
+            if (shotStartDelay > 0) return;
+
+            // Fire with Space/A button
+            if (GameController.justPressed('a') && cue.power > 0.5) {
+                const speed = cue.power;
+                cueBall.vx = Math.cos(cue.angle) * speed;
+                cueBall.vy = Math.sin(cue.angle) * speed;
+
+                // Increment turn counter
+                if (gameMode === '1p') {
+                    totalTurns++;
+                } else {
+                    if (currentPlayer === 1) player1Turns++;
+                    else player2Turns++;
+                }
+
+                state = GameState.BALLS_MOVING;
+                PoolSFX.cueHit(cue.power);
+                cue.power = 0; // Reset power after shot
+                updateScoreDisplay();
+            }
+        }
+
+        function updatePlacingCue() {
+            const cueBall = getCueBall();
+            if (!cueBall) return;
+
+            // Check for pause
+            if (GameController.justPressed('start') && pauseDebounce <= 0) {
+                state = GameState.PAUSED;
+                pauseDebounce = PAUSE_DEBOUNCE_TIME;
+                AudioSystem.sfx.select();
+                return;
+            }
+
+            // Move cue ball (restricted to left quarter of table - "kitchen")
+            const moveSpeed = 3;
+            const minX = TABLE_MARGIN + CUSHION_WIDTH + BALL_RADIUS;
+            const maxX = WIDTH * 0.3;
+            const minY = TABLE_MARGIN + CUSHION_WIDTH + BALL_RADIUS;
+            const maxY = HEIGHT - TABLE_MARGIN - CUSHION_WIDTH - BALL_RADIUS;
+
+            if (GameController.direction.left) {
+                cueBall.x = Math.max(minX, cueBall.x - moveSpeed);
+            }
+            if (GameController.direction.right) {
+                cueBall.x = Math.min(maxX, cueBall.x + moveSpeed);
+            }
+            if (GameController.direction.up) {
+                cueBall.y = Math.max(minY, cueBall.y - moveSpeed);
+            }
+            if (GameController.direction.down) {
+                cueBall.y = Math.min(maxY, cueBall.y + moveSpeed);
+            }
+
+            // Check for collision with other balls
+            let validPosition = true;
+            for (const ball of balls) {
+                if (ball.type !== 'cue' && !ball.pocketed) {
+                    const dx = ball.x - cueBall.x;
+                    const dy = ball.y - cueBall.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < BALL_RADIUS * 2) {
+                        validPosition = false;
+                        break;
+                    }
+                }
+            }
+
+            // Place ball with Space/A button
+            if (GameController.justPressed('a') && validPosition) {
+                state = GameState.AIMING;
+                shotStartDelay = SHOT_START_DELAY; // Give time for cue to appear before shooting
+                AudioSystem.sfx.select();
+            }
+        }
+
+        function updateBallsMoving() {
+            updatePhysics();
+
+            if (!ballsAreMoving()) {
+                processTurnEnd();
+            }
+        }
+
+        function updatePaused() {
+            if (GameController.justPressed('start') && pauseDebounce <= 0) {
+                state = GameState.AIMING;
+                pauseDebounce = PAUSE_DEBOUNCE_TIME;
+                AudioSystem.sfx.select();
+            }
+        }
+
+        function updateGameOver() {
+            if (GameController.anyButtonJustPressed()) {
+                state = GameState.TITLE;
+                AudioSystem.sfx.select();
+            }
+        }
+
+        // Render functions
+        function render() {
+            switch (state) {
+                case GameState.TITLE:
+                    renderTitle();
+                    break;
+                case GameState.MODE_SELECT:
+                    renderModeSelect();
+                    break;
+                case GameState.AIMING:
+                case GameState.PLACING_CUE:
+                case GameState.BALLS_MOVING:
+                    renderPlaying();
+                    break;
+                case GameState.PAUSED:
+                    renderPaused();
+                    break;
+                case GameState.GAME_OVER:
+                    renderGameOver();
+                    break;
+            }
+        }
+
+        function renderTable() {
+            // Wood frame
+            ctx.fillStyle = COLORS.wood;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // Lighter wood border
+            ctx.fillStyle = COLORS.woodLight;
+            ctx.fillRect(10, 10, WIDTH - 20, HEIGHT - 20);
+
+            // Cushions
+            ctx.fillStyle = COLORS.cushion;
+            ctx.fillRect(TABLE_MARGIN, TABLE_MARGIN, WIDTH - TABLE_MARGIN * 2, HEIGHT - TABLE_MARGIN * 2);
+
+            // Felt surface
+            ctx.fillStyle = COLORS.felt;
+            const feltX = TABLE_MARGIN + CUSHION_WIDTH;
+            const feltY = TABLE_MARGIN + CUSHION_WIDTH;
+            const feltW = WIDTH - (TABLE_MARGIN + CUSHION_WIDTH) * 2;
+            const feltH = HEIGHT - (TABLE_MARGIN + CUSHION_WIDTH) * 2;
+            ctx.fillRect(feltX, feltY, feltW, feltH);
+
+            // Felt texture (subtle lines)
+            ctx.strokeStyle = COLORS.feltDark;
+            ctx.lineWidth = 0.5;
+            for (let y = feltY; y < feltY + feltH; y += 8) {
+                ctx.beginPath();
+                ctx.moveTo(feltX, y);
+                ctx.lineTo(feltX + feltW, y);
+                ctx.stroke();
+            }
+
+            // Head string (line behind which cue ball is placed)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(WIDTH * 0.3, feltY);
+            ctx.lineTo(WIDTH * 0.3, feltY + feltH);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Pockets
+            for (const pocket of pockets) {
+                ctx.fillStyle = COLORS.pocket;
+                ctx.beginPath();
+                ctx.arc(pocket.x, pocket.y, POCKET_RADIUS, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Pocket rim
+                ctx.strokeStyle = COLORS.cushion;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+
+            // Spot markers
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            // Foot spot (where balls are racked)
+            ctx.beginPath();
+            ctx.arc(WIDTH * 0.7, HEIGHT / 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+            // Head spot
+            ctx.beginPath();
+            ctx.arc(WIDTH * 0.25, HEIGHT / 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function renderBall(ball) {
+            if (ball.pocketed) return;
+
+            const x = ball.x;
+            const y = ball.y;
+            const r = BALL_RADIUS;
+
+            // Ball shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(x + 2, y + 2, r, r * 0.7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (ball.type === 'cue') {
+                // Cue ball - white with shine
+                const gradient = ctx.createRadialGradient(x - 3, y - 3, 0, x, y, r);
+                gradient.addColorStop(0, '#ffffff');
+                gradient.addColorStop(0.7, COLORS.cueBall);
+                gradient.addColorStop(1, '#cccccc');
+                ctx.fillStyle = gradient;
+            } else if (ball.type === 'eight') {
+                // 8-ball - black
+                const gradient = ctx.createRadialGradient(x - 3, y - 3, 0, x, y, r);
+                gradient.addColorStop(0, '#333333');
+                gradient.addColorStop(1, COLORS.eightBall);
+                ctx.fillStyle = gradient;
+            } else {
+                const color = BALL_COLORS[ball.number];
+
+                if (ball.type === 'solid') {
+                    // Solid ball
+                    const gradient = ctx.createRadialGradient(x - 3, y - 3, 0, x, y, r);
+                    gradient.addColorStop(0, lightenColor(color, 30));
+                    gradient.addColorStop(0.7, color);
+                    gradient.addColorStop(1, darkenColor(color, 30));
+                    ctx.fillStyle = gradient;
+                } else {
+                    // Stripe ball - white base
+                    const gradient = ctx.createRadialGradient(x - 3, y - 3, 0, x, y, r);
+                    gradient.addColorStop(0, '#ffffff');
+                    gradient.addColorStop(0.7, '#f0f0f0');
+                    gradient.addColorStop(1, '#cccccc');
+                    ctx.fillStyle = gradient;
+                }
+            }
+
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Stripe band
+            if (ball.type === 'stripe') {
+                const color = BALL_COLORS[ball.number];
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.clip();
+
+                ctx.fillStyle = color;
+                ctx.fillRect(x - r - 2, y - r * 0.5, r * 2 + 4, r);
+                ctx.restore();
+            }
+
+            // Number circle (only for 8-ball)
+            if (ball.number === 8) {
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(x, y, r * 0.45, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Number
+                ctx.fillStyle = '#000000';
+                ctx.font = `bold ${r * 0.7}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('8', x, y);
+            }
+
+            // Shine highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(x - r * 0.3, y - r * 0.3, r * 0.25, r * 0.15, -Math.PI / 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function lightenColor(color, percent) {
+            const num = parseInt(color.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = Math.min(255, (num >> 16) + amt);
+            const G = Math.min(255, (num >> 8 & 0x00FF) + amt);
+            const B = Math.min(255, (num & 0x0000FF) + amt);
+            return `rgb(${R}, ${G}, ${B})`;
+        }
+
+        function darkenColor(color, percent) {
+            const num = parseInt(color.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = Math.max(0, (num >> 16) - amt);
+            const G = Math.max(0, (num >> 8 & 0x00FF) - amt);
+            const B = Math.max(0, (num & 0x0000FF) - amt);
+            return `rgb(${R}, ${G}, ${B})`;
+        }
+
+        function renderCue() {
+            const cueBall = getCueBall();
+            if (!cueBall) return;
+
+            const pullBack = cue.power * 3; // Cue pulls back as power increases
+            const startDist = BALL_RADIUS + 5 + pullBack;
+            const endDist = startDist + CUE_LENGTH;
+
+            const startX = cueBall.x - Math.cos(cue.angle) * startDist;
+            const startY = cueBall.y - Math.sin(cue.angle) * startDist;
+            const endX = cueBall.x - Math.cos(cue.angle) * endDist;
+            const endY = cueBall.y - Math.sin(cue.angle) * endDist;
+
+            // Player-based cue colors
+            const playerColor = gameMode === '1p' ? '#4ecdc4' : (currentPlayer === 1 ? '#4ecdc4' : '#ff6b6b');
+            const playerColorDark = gameMode === '1p' ? '#2a9d8f' : (currentPlayer === 1 ? '#2a9d8f' : '#cc5555');
+
+            // Cue stick shadow
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.lineWidth = CUE_WIDTH + 2;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(startX + 3, startY + 3);
+            ctx.lineTo(endX + 3, endY + 3);
+            ctx.stroke();
+
+            // Cue stick main body with player color accent
+            const cueGradient = ctx.createLinearGradient(startX, startY, endX, endY);
+            cueGradient.addColorStop(0, '#f5f5f5');  // Tip
+            cueGradient.addColorStop(0.05, '#1a1a1a'); // Ferrule
+            cueGradient.addColorStop(0.1, playerColor); // Player color band
+            cueGradient.addColorStop(0.25, COLORS.cue);
+            cueGradient.addColorStop(0.7, '#8b4513');
+            cueGradient.addColorStop(0.85, playerColorDark); // Player color accent at end
+            cueGradient.addColorStop(1, COLORS.cueEnd);
+
+            ctx.strokeStyle = cueGradient;
+            ctx.lineWidth = CUE_WIDTH;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // Aim line (dotted) - consistent grey for fairness
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 10]);
+            ctx.beginPath();
+            ctx.moveTo(cueBall.x, cueBall.y);
+            ctx.lineTo(
+                cueBall.x + Math.cos(cue.angle) * 200,
+                cueBall.y + Math.sin(cue.angle) * 200
+            );
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function renderPowerMeter() {
+            if (cue.power === 0) return;
+
+            const meterX = 20;
+            const meterY = HEIGHT - 30;
+            const meterWidth = 150;
+            const meterHeight = 15;
+
+            // Background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(meterX - 2, meterY - 2, meterWidth + 4, meterHeight + 4);
+
+            // Power bar
+            const powerPercent = cue.power / MAX_POWER;
+            const gradient = ctx.createLinearGradient(meterX, 0, meterX + meterWidth, 0);
+            gradient.addColorStop(0, '#4ecdc4');
+            gradient.addColorStop(0.5, '#ffe66d');
+            gradient.addColorStop(1, '#ff6b6b');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(meterX, meterY, meterWidth * powerPercent, meterHeight);
+
+            // Border
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(meterX, meterY, meterWidth, meterHeight);
+
+            // Label
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '12px "Courier New", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText('POWER', meterX, meterY - 5);
+        }
+
+        function renderMessage() {
+            if (messageTimer <= 0 || !gameMessage) return;
+
+            const alpha = Math.min(1, messageTimer / 500);
+            ctx.fillStyle = `rgba(0, 0, 0, ${0.7 * alpha})`;
+            ctx.fillRect(WIDTH / 2 - 150, HEIGHT / 2 - 30, 300, 60);
+
+            ctx.fillStyle = `rgba(255, 230, 109, ${alpha})`;
+            ctx.font = 'bold 20px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(gameMessage, WIDTH / 2, HEIGHT / 2);
+        }
+
+        function renderPlayerIndicator() {
+            if (gameMode === '1p') {
+                // Show best score in corner if exists (shots counter is in score panel)
+                if (gameData.highScore > 0) {
+                    ctx.font = '12px "Courier New", monospace';
+                    ctx.fillStyle = '#ffe66d';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`Best: ${gameData.highScore}`, 20, 25);
+                }
+            } else {
+                ctx.fillStyle = currentPlayer === 1 ? '#4ecdc4' : '#ff6b6b';
+                ctx.font = 'bold 16px "Courier New", monospace';
+                ctx.textAlign = 'left';
+                ctx.fillText(`Player ${currentPlayer}'s Turn`, 20, 25);
+
+                if (player1Type) {
+                    const type = currentPlayer === 1 ? player1Type : player2Type;
+                    ctx.font = '14px "Courier New", monospace';
+                    ctx.fillText(` (${type})`, 160, 25);
+                }
+            }
+        }
+
+        function renderPlaying() {
+            renderTable();
+
+            // Render all balls
+            for (const ball of balls) {
+                renderBall(ball);
+            }
+
+            // Render cue stick (only when aiming or placing)
+            if (state === GameState.AIMING) {
+                renderCue();
+                renderPowerMeter();
+            }
+
+            // Highlight cue ball when placing
+            if (state === GameState.PLACING_CUE) {
+                const cueBall = getCueBall();
+                if (cueBall) {
+                    ctx.strokeStyle = '#ffe66d';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.arc(cueBall.x, cueBall.y, BALL_RADIUS + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = '#ffe66d';
+                    ctx.font = '14px "Courier New", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Place cue ball - SPACE to confirm', WIDTH / 2, 25);
+                }
+            }
+
+            renderPlayerIndicator();
+            renderMessage();
+        }
+
+        function renderTitle() {
+            // Dark background
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // Render a mini table preview
+            ctx.save();
+            ctx.translate(WIDTH / 2 - 150, HEIGHT / 2 - 80);
+            ctx.scale(0.5, 0.5);
+            renderTable();
+            ctx.restore();
+
+            // Title
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = 'bold 64px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('POOL', WIDTH / 2, 80);
+
+            // Subtitle
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillText('8-Ball Billiards', WIDTH / 2, 110);
+
+            // Instructions
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = '20px "Courier New", monospace';
+            ctx.fillText('Press Any Button to Start', WIDTH / 2, HEIGHT - 80);
+
+            // Controls preview
+            ctx.fillStyle = '#aaaaaa';
+            ctx.font = '14px "Courier New", monospace';
+            ctx.fillText('← → Aim | ↑ ↓ Power | SPACE Shoot', WIDTH / 2, HEIGHT - 50);
+        }
+
+        function renderModeSelect() {
+            // Dark background
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // Title
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('SELECT MODE', WIDTH / 2, 100);
+
+            // Mode options
+            const modes = [
+                { name: '1 PLAYER', desc: 'Clear all balls in fewest shots' },
+                { name: '2 PLAYERS', desc: 'Classic 8-ball vs a friend' }
+            ];
+
+            const startY = 200;
+            const spacing = 100;
+
+            modes.forEach((mode, index) => {
+                const y = startY + index * spacing;
+                const isSelected = selectedMode === index;
+
+                // Selection box
+                if (isSelected) {
+                    ctx.fillStyle = 'rgba(78, 205, 196, 0.2)';
+                    ctx.fillRect(WIDTH / 2 - 180, y - 30, 360, 70);
+                    ctx.strokeStyle = '#4ecdc4';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(WIDTH / 2 - 180, y - 30, 360, 70);
+
+                    // Arrow indicator
+                    ctx.fillStyle = '#ffe66d';
+                    ctx.font = 'bold 24px "Courier New", monospace';
+                    ctx.textAlign = 'right';
+                    ctx.fillText('►', WIDTH / 2 - 140, y + 8);
+                }
+
+                // Mode name
+                ctx.fillStyle = isSelected ? '#ffe66d' : '#888888';
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(mode.name, WIDTH / 2, y);
+
+                // Mode description
+                ctx.fillStyle = isSelected ? '#ffffff' : '#666666';
+                ctx.font = '14px "Courier New", monospace';
+                ctx.fillText(mode.desc, WIDTH / 2, y + 25);
+            });
+
+            // Best score for 1P mode
+            if (gameData.highScore > 0) {
+                ctx.fillStyle = '#ffe66d';
+                ctx.font = '16px "Courier New", monospace';
+                ctx.fillText(`Best: ${gameData.highScore} shots`, WIDTH / 2, startY + 55);
+            }
+
+            // Instructions
+            ctx.fillStyle = '#aaaaaa';
+            ctx.font = '14px "Courier New", monospace';
+            ctx.fillText('↑ ↓ Select | SPACE Confirm', WIDTH / 2, HEIGHT - 50);
+        }
+
+        function renderPaused() {
+            renderPlaying();
+
+            // Darken screen
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // Paused text
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('PAUSED', WIDTH / 2, HEIGHT / 2 - 20);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillText('Press ESC to Resume', WIDTH / 2, HEIGHT / 2 + 30);
+        }
+
+        function renderGameOver() {
+            renderPlaying();
+
+            // Darken screen
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            if (gameMode === '1p') {
+                // 1P mode game over
+                const isWin = balls.filter(b => b.type !== 'cue' && !b.pocketed).length === 0;
+
+                ctx.fillStyle = isWin ? '#4ecdc4' : '#ff6b6b';
+                ctx.font = 'bold 48px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(isWin ? 'CLEARED!' : 'GAME OVER', WIDTH / 2, HEIGHT / 2 - 60);
+
+                // Result message
+                ctx.fillStyle = '#ffe66d';
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.fillText(gameMessage, WIDTH / 2, HEIGHT / 2);
+
+                // Stats
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '20px "Courier New", monospace';
+                ctx.fillText(`Total Shots: ${totalTurns}`, WIDTH / 2, HEIGHT / 2 + 45);
+                ctx.fillText(`Balls Pocketed: ${player1Score}`, WIDTH / 2, HEIGHT / 2 + 75);
+
+                if (gameData.highScore > 0) {
+                    ctx.fillStyle = '#ffe66d';
+                    ctx.font = '18px "Courier New", monospace';
+                    ctx.fillText(`Best: ${gameData.highScore} shots`, WIDTH / 2, HEIGHT / 2 + 105);
+                }
+            } else {
+                // 2P mode game over
+                ctx.fillStyle = '#ff6b6b';
+                ctx.font = 'bold 48px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', WIDTH / 2, HEIGHT / 2 - 60);
+
+                // Winner
+                ctx.fillStyle = '#ffe66d';
+                ctx.font = 'bold 32px "Courier New", monospace';
+                ctx.fillText(gameMessage, WIDTH / 2, HEIGHT / 2);
+
+                // Scores
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '20px "Courier New", monospace';
+                ctx.fillText(`Player 1: ${player1Score} balls (${player1Turns} shots)`, WIDTH / 2, HEIGHT / 2 + 50);
+                ctx.fillText(`Player 2: ${player2Score} balls (${player2Turns} shots)`, WIDTH / 2, HEIGHT / 2 + 80);
+            }
+
+            // Restart prompt
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillText('Press Any Button to Continue', WIDTH / 2, HEIGHT / 2 + 140);
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        initPockets();
+        gameLoop();
+    </script>
+</body>
+</html>

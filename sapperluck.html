@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sapper's Luck</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+            padding: 20px;
+        }
+        h1 { margin-bottom: 10px; color: #ff6b6b; }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            display: none;
+            cursor: pointer;
+        }
+        #gameCanvas.visible { display: block; }
+        #statusDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: none;
+            gap: 40px;
+            justify-content: center;
+        }
+        #statusDisplay.visible { display: flex; }
+        .status-item { text-align: center; }
+        .status-label { font-size: 12px; color: #888; margin-bottom: 5px; }
+        .status-value { font-size: 24px; color: #4ecdc4; }
+        .mines .status-value { color: #ff6b6b; }
+        .time .status-value { color: #ffe66d; }
+        #controls {
+            margin-top: 15px;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+        #audioControls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        #audioControls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #4ecdc4;
+        }
+        #configPanel {
+            background: #2a2a4a;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-top: 15px;
+        }
+        .config-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .config-item label { color: #888; font-size: 12px; }
+        .config-item input {
+            width: 50px;
+            padding: 6px;
+            background: #1a1a2e;
+            border: 2px solid #4a4a6a;
+            border-radius: 4px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            text-align: center;
+        }
+        .config-item input:focus { outline: none; border-color: #4ecdc4; }
+        .preset-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+        .preset-btn {
+            padding: 6px 12px;
+            background: #3a3a5a;
+            border: 2px solid #4a4a6a;
+            border-radius: 4px;
+            color: #aaa;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .preset-btn:hover {
+            background: #4a4a6a;
+            color: #fff;
+            border-color: #4ecdc4;
+        }
+        .preset-btn.active {
+            background: #4ecdc4;
+            color: #1a1a2e;
+            border-color: #4ecdc4;
+        }
+        .new-game-btn {
+            padding: 8px 20px;
+            background: #4ecdc4;
+            border: none;
+            border-radius: 4px;
+            color: #1a1a2e;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-left: 15px;
+        }
+        .new-game-btn:hover { background: #5fd9d1; }
+        #titleScreen {
+            text-align: center;
+            padding: 60px 40px;
+            background: #2a2a4a;
+            border-radius: 8px;
+            border: 4px solid #4a4a6a;
+        }
+        #titleScreen h2 { color: #4ecdc4; font-size: 28px; margin-bottom: 20px; }
+        #titleScreen p { color: #888; font-size: 14px; margin-bottom: 30px; line-height: 1.6; }
+        #titleScreen .start-btn {
+            padding: 15px 40px;
+            background: #4ecdc4;
+            border: none;
+            border-radius: 4px;
+            color: #1a1a2e;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #titleScreen .start-btn:hover { background: #5fd9d1; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <h1>Sapper's Luck</h1>
+
+    <div id="titleScreen">
+        <h2>Click to Start</h2>
+        <p>Left click to reveal cells<br>Right click to place flags<br>Clear all safe cells to win!</p>
+        <button class="start-btn" onclick="startGame()">New Game</button>
+    </div>
+
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <div id="statusDisplay">
+        <div class="status-item mines">
+            <div class="status-label">Mines</div>
+            <div class="status-value" id="mineCount">10</div>
+        </div>
+        <div class="status-item time">
+            <div class="status-label">Time</div>
+            <div class="status-value" id="timeDisplay">0</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">Best</div>
+            <div class="status-value" id="bestTime">--</div>
+        </div>
+    </div>
+
+    <div id="configPanel">
+        <div class="preset-buttons">
+            <button class="preset-btn" data-preset="beginner" onclick="setPreset(9, 9, 10)">Beginner</button>
+            <button class="preset-btn" data-preset="intermediate" onclick="setPreset(16, 16, 40)">Intermediate</button>
+            <button class="preset-btn" data-preset="expert" onclick="setPreset(30, 16, 99)">Expert</button>
+            <button class="preset-btn" data-preset="custom">Custom</button>
+        </div>
+        <div class="config-row">
+            <div class="config-item">
+                <label for="widthInput">W:</label>
+                <input type="number" id="widthInput" min="5" max="40" value="9">
+            </div>
+            <div class="config-item">
+                <label for="heightInput">H:</label>
+                <input type="number" id="heightInput" min="5" max="30" value="9">
+            </div>
+            <div class="config-item">
+                <label for="minesInput">Mines:</label>
+                <input type="number" id="minesInput" min="1" max="500" value="10">
+            </div>
+            <button class="new-game-btn" onclick="startGame()">New Game</button>
+        </div>
+    </div>
+
+    <div id="controls">
+        <strong>Left Click:</strong> Reveal | <strong>Right Click:</strong> Flag | <strong>Click Number:</strong> Chord reveal
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="audio.js"></script>
+    <script src="sapper.js"></script>
+    <script>
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        const CELL_SIZE = 28;
+        const COLORS = {
+            background: '#1a1a2e',
+            hidden: '#3a3a5a',
+            hiddenHover: '#4a4a6a',
+            revealed: '#2a2a4a',
+            borderLight: '#5a5a7a',
+            borderDark: '#2a2a3a',
+            mine: '#ff6b6b',
+            mineCorrect: '#4ecdc4',
+            flag: '#ffe66d',
+            numbers: ['', '#4ecdc4', '#4ecdc4', '#ff6b6b', '#9b59b6', '#e74c3c', '#1abc9c', '#2c3e50', '#7f8c8d']
+        };
+
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        const GAME_ID = 'sapperluck';
+        let gameData = GameStorage.load(GAME_ID, {
+            bestTimes: {},
+            gamesPlayed: 0,
+            gamesWon: 0,
+            sfxEnabled: true,
+            lastWidth: 9,
+            lastHeight: 9,
+            lastMines: 10
+        });
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        // ============================================
+        // DOM ELEMENTS
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const mineCountEl = document.getElementById('mineCount');
+        const timeDisplayEl = document.getElementById('timeDisplay');
+        const bestTimeEl = document.getElementById('bestTime');
+        const titleScreen = document.getElementById('titleScreen');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const widthInput = document.getElementById('widthInput');
+        const heightInput = document.getElementById('heightInput');
+        const minesInput = document.getElementById('minesInput');
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        let game = null;
+        let isPlaying = false;
+        let firstClick = true;
+        let startTime = 0;
+        let elapsedTime = 0;
+        let timerInterval = null;
+        let hoverCell = { x: -1, y: -1 };
+        let gameOverTime = 0;
+        const RESTART_DELAY = 250;
+
+        // ============================================
+        // UI FUNCTIONS
+        // ============================================
+        function setPreset(w, h, m) {
+            widthInput.value = w;
+            heightInput.value = h;
+            minesInput.value = m;
+            updatePresetButtons();
+        }
+
+        function updatePresetButtons() {
+            const w = parseInt(widthInput.value);
+            const h = parseInt(heightInput.value);
+            const m = parseInt(minesInput.value);
+
+            document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+
+            if (w === 9 && h === 9 && m === 10) {
+                document.querySelector('[data-preset="beginner"]').classList.add('active');
+            } else if (w === 16 && h === 16 && m === 40) {
+                document.querySelector('[data-preset="intermediate"]').classList.add('active');
+            } else if (w === 30 && h === 16 && m === 99) {
+                document.querySelector('[data-preset="expert"]').classList.add('active');
+            } else {
+                document.querySelector('[data-preset="custom"]').classList.add('active');
+            }
+        }
+
+        function clamp(val, min, max) {
+            return Math.max(min, Math.min(max, val));
+        }
+
+        function updateDisplays() {
+            mineCountEl.textContent = game ? game.getRemainingMines() : 0;
+            timeDisplayEl.textContent = elapsedTime;
+            const key = `${game.width}x${game.height}x${game.totalMines}`;
+            bestTimeEl.textContent = gameData.bestTimes[key] || '--';
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                updateDisplays();
+            }, 1000);
+        }
+
+        // ============================================
+        // GAME FUNCTIONS
+        // ============================================
+        function startGame() {
+            AudioSystem.unlock();
+
+            const width = clamp(parseInt(widthInput.value) || 9, 5, 40);
+            const height = clamp(parseInt(heightInput.value) || 9, 5, 30);
+            const mines = clamp(parseInt(minesInput.value) || 10, 1, width * height - 9);
+
+            widthInput.value = width;
+            heightInput.value = height;
+            minesInput.value = mines;
+
+            gameData.lastWidth = width;
+            gameData.lastHeight = height;
+            gameData.lastMines = mines;
+            saveGameData();
+
+            // Create game instance (noGuess: false for Sapper's Luck)
+            game = new SapperGame({ width, height, mines, noGuess: false });
+            game.initGrid();
+
+            // Setup canvas
+            canvas.width = width * CELL_SIZE;
+            canvas.height = height * CELL_SIZE;
+
+            clearInterval(timerInterval);
+            elapsedTime = 0;
+            firstClick = true;
+            isPlaying = true;
+
+            titleScreen.style.display = 'none';
+            canvas.classList.add('visible');
+            statusDisplay.classList.add('visible');
+
+            updateDisplays();
+            render();
+        }
+
+        function handleGameOver(won) {
+            clearInterval(timerInterval);
+            gameOverTime = Date.now();
+            isPlaying = false;
+
+            if (won) {
+                AudioSystem.sfx.levelComplete();
+                const key = `${game.width}x${game.height}x${game.totalMines}`;
+                if (!gameData.bestTimes[key] || elapsedTime < gameData.bestTimes[key]) {
+                    gameData.bestTimes[key] = elapsedTime;
+                }
+                gameData.gamesWon++;
+            } else {
+                AudioSystem.sfx.explosion();
+            }
+
+            gameData.gamesPlayed++;
+            saveGameData();
+            updateDisplays();
+            render();
+        }
+
+        // ============================================
+        // RENDERING
+        // ============================================
+        function render() {
+            ctx.fillStyle = COLORS.background;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < game.height; y++) {
+                for (let x = 0; x < game.width; x++) {
+                    renderCell(x, y);
+                }
+            }
+
+            if (game.gameOver) {
+                renderGameOverOverlay();
+            }
+        }
+
+        function renderCell(x, y) {
+            const px = x * CELL_SIZE;
+            const py = y * CELL_SIZE;
+            const isHover = hoverCell.x === x && hoverCell.y === y;
+
+            if (game.isRevealed(x, y)) {
+                ctx.fillStyle = COLORS.revealed;
+                ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+
+                ctx.strokeStyle = COLORS.borderDark;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(px + 0.5, py + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
+
+                const cell = game.getCell(x, y);
+                if (cell === -1) {
+                    const wasCorrectlyFlagged = game.isFlagged(x, y);
+                    drawMine(px, py, wasCorrectlyFlagged);
+                } else if (cell > 0) {
+                    ctx.fillStyle = COLORS.numbers[cell];
+                    ctx.font = 'bold 18px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(cell, px + CELL_SIZE / 2, py + CELL_SIZE / 2 + 1);
+                }
+            } else {
+                ctx.fillStyle = isHover ? COLORS.hiddenHover : COLORS.hidden;
+                ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+
+                ctx.fillStyle = COLORS.borderLight;
+                ctx.fillRect(px, py, CELL_SIZE, 2);
+                ctx.fillRect(px, py, 2, CELL_SIZE);
+
+                ctx.fillStyle = COLORS.borderDark;
+                ctx.fillRect(px + CELL_SIZE - 2, py, 2, CELL_SIZE);
+                ctx.fillRect(px, py + CELL_SIZE - 2, CELL_SIZE, 2);
+
+                if (game.isFlagged(x, y)) {
+                    drawFlag(px, py);
+                }
+            }
+        }
+
+        function drawMine(px, py, correctlyFlagged) {
+            const cx = px + CELL_SIZE / 2;
+            const cy = py + CELL_SIZE / 2;
+            const radius = CELL_SIZE * 0.3;
+            const color = correctlyFlagged ? COLORS.mineCorrect : COLORS.mine;
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(cx + Math.cos(angle) * radius * 1.5, cy + Math.sin(angle) * radius * 1.5);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.arc(cx - radius * 0.3, cy - radius * 0.3, radius * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawFlag(px, py) {
+            const cx = px + CELL_SIZE / 2;
+            const cy = py + CELL_SIZE / 2;
+
+            ctx.fillStyle = '#666';
+            ctx.fillRect(cx + 2, cy - 8, 2, 16);
+
+            ctx.fillStyle = COLORS.flag;
+            ctx.beginPath();
+            ctx.moveTo(cx + 4, cy - 8);
+            ctx.lineTo(cx + 4, cy);
+            ctx.lineTo(cx - 6, cy - 4);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#666';
+            ctx.fillRect(cx - 2, cy + 6, 8, 2);
+        }
+
+        function renderGameOverOverlay() {
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (game.won) {
+                ctx.fillStyle = '#4ecdc4';
+                ctx.font = 'bold 36px Courier New';
+                ctx.fillText('YOU WIN!', canvas.width / 2, canvas.height / 2 - 30);
+
+                ctx.fillStyle = '#ffe66d';
+                ctx.font = '20px Courier New';
+                ctx.fillText(`Time: ${elapsedTime}s`, canvas.width / 2, canvas.height / 2 + 10);
+            } else {
+                ctx.fillStyle = '#ff6b6b';
+                ctx.font = 'bold 36px Courier New';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 30);
+            }
+
+            ctx.fillStyle = '#888';
+            ctx.font = '14px Courier New';
+            ctx.fillText('Click to play again', canvas.width / 2, canvas.height / 2 + 60);
+        }
+
+        // ============================================
+        // INPUT HANDLING
+        // ============================================
+        function getCellFromEvent(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+            return {
+                x: Math.floor(mx / CELL_SIZE),
+                y: Math.floor(my / CELL_SIZE)
+            };
+        }
+
+        canvas.addEventListener('click', (e) => {
+            AudioSystem.unlock();
+
+            if (game && game.gameOver) {
+                if (Date.now() - gameOverTime >= RESTART_DELAY) {
+                    startGame();
+                }
+                return;
+            }
+
+            if (!isPlaying || !game) return;
+
+            const cell = getCellFromEvent(e);
+            if (cell.x < 0 || cell.x >= game.width || cell.y < 0 || cell.y >= game.height) return;
+
+            if (firstClick) {
+                firstClick = false;
+                game.handleFirstClick(cell.x, cell.y);
+                startTimer();
+                render();
+                return;
+            }
+
+            let result;
+            if (game.isRevealed(cell.x, cell.y)) {
+                result = game.chordReveal(cell.x, cell.y);
+            } else if (!game.isFlagged(cell.x, cell.y)) {
+                result = game.revealCell(cell.x, cell.y);
+                if (!result.hit && !result.won) {
+                    AudioSystem.sfx.hit();
+                }
+            }
+
+            if (result && (result.won || result.lost)) {
+                handleGameOver(result.won);
+            }
+
+            render();
+        });
+
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (!isPlaying || !game || game.gameOver) return;
+
+            const cell = getCellFromEvent(e);
+            if (cell.x < 0 || cell.x >= game.width || cell.y < 0 || cell.y >= game.height) return;
+
+            game.toggleFlag(cell.x, cell.y);
+            AudioSystem.sfx.select();
+            updateDisplays();
+            render();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isPlaying || !game) return;
+
+            const cell = getCellFromEvent(e);
+            if (cell.x !== hoverCell.x || cell.y !== hoverCell.y) {
+                hoverCell = cell;
+                render();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoverCell = { x: -1, y: -1 };
+            if (isPlaying) render();
+        });
+
+        canvas.oncontextmenu = (e) => e.preventDefault();
+
+        widthInput.addEventListener('input', updatePresetButtons);
+        heightInput.addEventListener('input', updatePresetButtons);
+        minesInput.addEventListener('input', updatePresetButtons);
+
+        // ============================================
+        // AUDIO CONTROLS
+        // ============================================
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+
+        // ============================================
+        // INITIALIZE
+        // ============================================
+        widthInput.value = gameData.lastWidth;
+        heightInput.value = gameData.lastHeight;
+        minesInput.value = gameData.lastMines;
+
+        updatePresetButtons();
+
+        console.log('Sapper\'s Luck initialized');
+    </script>
+</body>
+</html>
