@@ -2,7 +2,7 @@
 
 Classic arcade games recreated for the browser using Claude Code.
 
-## Games
+## Arcade Games (Keyboard / Gamepad)
 
 - **Bounce** - Keep the ball from falling
 - **Brick Bounce** - Break all the bricks
@@ -10,6 +10,13 @@ Classic arcade games recreated for the browser using Claude Code.
 - **Brick Spinner** - Stack and clear falling blocks
 - **Serpentine** - Grow your snake, avoid yourself
 - **Galactic Defense** - Defend Earth from alien invaders
+- **Pool** - Classic 8-ball billiards with realistic physics
+
+## Puzzle Games (Mouse)
+
+- **Sapper's Luck** - Classic mine-clearing puzzle
+- **Sapper's Logic** - No-guess mode, guaranteed solvable through logic
+- **Sapper's Shapes** - Mine-clearing on hex and triangle grids
 
 ## Features
 
