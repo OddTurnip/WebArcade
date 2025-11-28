@@ -4,6 +4,8 @@
 
 ```
 WebArcade/
+├── README.md            # Project overview
+├── LICENSE.md           # CC BY-NC-SA 4.0 license
 ├── index.html           # Main game selection page
 ├── controller.js        # Shared input handling (keyboard + gamepad)
 ├── audio.js             # Shared audio system (SFX + music)
