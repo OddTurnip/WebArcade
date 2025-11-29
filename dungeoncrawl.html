@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dungeon Crawl</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+        }
+        h1 { margin-bottom: 10px; color: #ff6b6b; }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            display: block;
+            cursor: pointer;
+        }
+        #statsDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 24px;
+            color: #4ecdc4;
+        }
+        .gold .stat-value {
+            color: #ffe66d;
+        }
+        #controls {
+            margin-top: 15px;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            max-width: 640px;
+            line-height: 1.6;
+        }
+        #audioControls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        #audioControls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #4ecdc4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dungeon Crawl</h1>
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <div id="statsDisplay">
+        <div class="stat-item gold">
+            <div class="stat-label">Gold</div>
+            <div class="stat-value" id="goldDisplay">0</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">Deepest Level</div>
+            <div class="stat-value" id="levelDisplay">0</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">Runs</div>
+            <div class="stat-value" id="runsDisplay">0</div>
+        </div>
+    </div>
+    <div id="controls">
+        <strong>Mouse:</strong> Click to interact | <strong>Keyboard:</strong> 1-5 select shop items, Space/Enter to continue, Esc to return to town
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+
+    <script src="controller.js"></script>
+    <script src="audio.js"></script>
+    <script src="storage.js"></script>
+    <script>
+        // ============================================
+        // GAME CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            WIDTH: 640,
+            HEIGHT: 480,
+            COMBAT_SPEED: 800, // ms between combat actions
+            COLORS: {
+                background: '#000000',
+                panel: '#1a1a2e',
+                panelBorder: '#4a4a6a',
+                text: '#ffffff',
+                textDim: '#888888',
+                highlight: '#ffe66d',
+                health: '#4ecdc4',
+                healthLost: '#ff6b6b',
+                gold: '#ffe66d',
+                damage: '#ff6b6b',
+                heal: '#4ecdc4',
+                playerBg: '#2a4a3a',
+                monsterBg: '#4a2a2a',
+                boss: '#8b4513'
+            }
+        };
+
+        // ============================================
+        // DICE ROLLING
+        // ============================================
+        function rollDice(diceStr) {
+            // Parse strings like "1d8", "2d6+2", "1d4-1"
+            const match = diceStr.match(/(\d+)d(\d+)([+-]\d+)?/);
+            if (!match) return 0;
+
+            const numDice = parseInt(match[1]);
+            const dieSize = parseInt(match[2]);
+            const modifier = match[3] ? parseInt(match[3]) : 0;
+
+            let total = modifier;
+            for (let i = 0; i < numDice; i++) {
+                total += Math.floor(Math.random() * dieSize) + 1;
+            }
+            return Math.max(1, total);
+        }
+
+        function rollD20() {
+            return Math.floor(Math.random() * 20) + 1;
+        }
+
+        // ============================================
+        // ITEM DEFINITIONS
+        // ============================================
+        const WEAPONS = {
+            fists: { name: 'Fists', damage: '1d4', price: 0 },
+            dagger: { name: 'Dagger', damage: '1d4', price: 5 },
+            shortsword: { name: 'Short Sword', damage: '1d6', price: 15 },
+            longsword: { name: 'Longsword', damage: '1d8', price: 30 },
+            greatsword: { name: 'Greatsword', damage: '2d6', price: 75 },
+            battleaxe: { name: 'Battle Axe', damage: '1d10', price: 50 },
+            greataxe: { name: 'Greataxe', damage: '1d12', price: 100 }
+        };
+
+        const ARMOR = {
+            none: { name: 'Clothes', ac: 10, price: 0 },
+            leather: { name: 'Leather', ac: 11, price: 10 },
+            studded: { name: 'Studded Leather', ac: 12, price: 25 },
+            chain: { name: 'Chain Mail', ac: 14, price: 50 },
+            splint: { name: 'Splint', ac: 16, price: 100 },
+            plate: { name: 'Plate', ac: 18, price: 250 }
+        };
+
+        const SHIELDS = {
+            none: { name: 'None', ac: 0, price: 0 },
+            shield: { name: 'Shield', ac: 2, price: 10 },
+            tower: { name: 'Tower Shield', ac: 3, price: 50 }
+        };
+
+        // ============================================
+        // MONSTER DEFINITIONS
+        // ============================================
+        const MONSTER_TYPES = {
+            // Levels 1-9
+            goblin: { name: 'Goblin', hp: 7, attack: 2, ac: 13, damage: '1d6', gold: 3 },
+            kobold: { name: 'Kobold', hp: 5, attack: 1, ac: 12, damage: '1d4', gold: 2 },
+            rat: { name: 'Giant Rat', hp: 4, attack: 1, ac: 11, damage: '1d4', gold: 1 },
+
+            // Level 10 boss
+            goblinChief: { name: 'Goblin Chief', hp: 21, attack: 4, ac: 15, damage: '1d8+2', gold: 25, boss: true },
+
+            // Levels 11-19
+            orc: { name: 'Orc', hp: 15, attack: 3, ac: 14, damage: '1d8', gold: 6 },
+            skeleton: { name: 'Skeleton', hp: 13, attack: 2, ac: 13, damage: '1d6', gold: 5 },
+            wolf: { name: 'Dire Wolf', hp: 12, attack: 4, ac: 12, damage: '1d8', gold: 5 },
+
+            // Level 20 boss
+            orcWarlord: { name: 'Orc Warlord', hp: 45, attack: 6, ac: 16, damage: '2d6+3', gold: 75, boss: true },
+
+            // Levels 21-29
+            gnoll: { name: 'Gnoll', hp: 22, attack: 4, ac: 15, damage: '1d8+2', gold: 10 },
+            zombie: { name: 'Zombie', hp: 22, attack: 3, ac: 8, damage: '1d6+1', gold: 8 },
+            bugbear: { name: 'Bugbear', hp: 27, attack: 4, ac: 16, damage: '2d8', gold: 12 },
+
+            // Level 30 boss
+            ogre: { name: 'Ogre', hp: 59, attack: 6, ac: 11, damage: '2d8+4', gold: 150, boss: true },
+
+            // Levels 31+
+            troll: { name: 'Troll', hp: 44, attack: 7, ac: 15, damage: '2d6+3', gold: 20 },
+            ghoul: { name: 'Ghoul', hp: 22, attack: 4, ac: 12, damage: '2d6', gold: 15 },
+            wight: { name: 'Wight', hp: 45, attack: 4, ac: 14, damage: '1d8+2', gold: 25 }
+        };
+
+        function getMonsterTier(level) {
+            if (level <= 9) return ['goblin', 'kobold', 'rat'];
+            if (level === 10) return ['goblinChief'];
+            if (level <= 19) return ['orc', 'skeleton', 'wolf'];
+            if (level === 20) return ['orcWarlord'];
+            if (level <= 29) return ['gnoll', 'zombie', 'bugbear'];
+            if (level === 30) return ['ogre'];
+            return ['troll', 'ghoul', 'wight'];
+        }
+
+        function createMonster(type, levelBonus = 0) {
+            const template = MONSTER_TYPES[type];
+            return {
+                name: template.name,
+                hp: template.hp + levelBonus * 2,
+                maxHp: template.hp + levelBonus * 2,
+                attack: template.attack + Math.floor(levelBonus / 5),
+                ac: template.ac + Math.floor(levelBonus / 10),
+                damage: template.damage,
+                gold: template.gold + levelBonus,
+                boss: template.boss || false
+            };
+        }
+
+        function generateEncounter(level) {
+            const tier = getMonsterTier(level);
+            const isBoss = level % 10 === 0;
+            const levelBonus = Math.floor(level / 10) * 5;
+
+            if (isBoss) {
+                return [createMonster(tier[0], levelBonus)];
+            }
+
+            // Regular encounter: 1-3 monsters
+            const count = Math.min(3, 1 + Math.floor(Math.random() * (1 + Math.floor(level / 5))));
+            const monsters = [];
+            for (let i = 0; i < count; i++) {
+                const type = tier[Math.floor(Math.random() * tier.length)];
+                monsters.push(createMonster(type, levelBonus));
+            }
+            return monsters;
+        }
+
+        // ============================================
+        // CHARACTER CLASS
+        // ============================================
+        function createCharacter(name, charClass) {
+            const stats = {
+                Fighter: { hp: 12, attack: 4, baseAc: 10 },
+                Rogue: { hp: 8, attack: 5, baseAc: 11 },
+                Cleric: { hp: 10, attack: 3, baseAc: 10 }
+            };
+
+            const s = stats[charClass] || stats.Fighter;
+
+            return {
+                name: name,
+                class: charClass,
+                hp: s.hp,
+                maxHp: s.hp,
+                attack: s.attack,
+                baseAc: s.baseAc,
+                weapon: 'longsword',
+                armor: 'none',
+                shield: 'shield',
+
+                get ac() {
+                    return this.baseAc + ARMOR[this.armor].ac - 10 + SHIELDS[this.shield].ac;
+                },
+
+                get damage() {
+                    return WEAPONS[this.weapon].damage;
+                },
+
+                get displayAc() {
+                    return ARMOR[this.armor].ac + SHIELDS[this.shield].ac;
+                }
+            };
+        }
+
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        const GAME_ID = 'dungeoncrawl';
+        const defaultData = {
+            gold: 0,
+            deepestLevel: 0,
+            totalRuns: 0,
+            musicEnabled: true,
+            sfxEnabled: true,
+            party: null, // Will be initialized on first play
+            purchasedWeapons: ['longsword'],
+            purchasedArmor: ['none'],
+            purchasedShields: ['shield']
+        };
+
+        let gameData = GameStorage.load(GAME_ID, defaultData);
+
+        // Initialize party if needed
+        if (!gameData.party) {
+            gameData.party = [createCharacter('Hero', 'Fighter')];
+        }
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        const GameState = {
+            TITLE: 'title',
+            TOWN: 'town',
+            SHOP: 'shop',
+            DUNGEON: 'dungeon',
+            COMBAT: 'combat',
+            VICTORY: 'victory',
+            DEFEAT: 'defeat'
+        };
+
+        let state = GameState.TITLE;
+        let dungeonLevel = 1;
+        let runGold = 0;
+        let party = [];
+        let monsters = [];
+        let combatLog = [];
+        let combatTimer = 0;
+        let currentTurn = 'player'; // 'player' or 'monster'
+        let turnIndex = 0;
+        let shopCategory = 'weapons'; // 'weapons', 'armor', 'shields'
+        let shopScroll = 0;
+        let selectedShopItem = 0;
+        let hoverButton = null;
+
+        // Button definitions for click detection
+        let buttons = [];
+
+        // ============================================
+        // CANVAS SETUP
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const goldDisplayEl = document.getElementById('goldDisplay');
+        const levelDisplayEl = document.getElementById('levelDisplay');
+        const runsDisplayEl = document.getElementById('runsDisplay');
+
+        // ============================================
+        // COMBAT FUNCTIONS
+        // ============================================
+        function attack(attacker, defender) {
+            const roll = rollD20();
+            const totalAttack = roll + attacker.attack;
+            const hit = totalAttack >= defender.ac;
+
+            let result = {
+                attacker: attacker.name,
+                defender: defender.name,
+                roll: roll,
+                total: totalAttack,
+                targetAc: defender.ac,
+                hit: hit,
+                damage: 0,
+                killed: false
+            };
+
+            if (hit) {
+                const dmg = rollDice(attacker.damage);
+                result.damage = dmg;
+                defender.hp -= dmg;
+                if (defender.hp <= 0) {
+                    defender.hp = 0;
+                    result.killed = true;
+                }
+            }
+
+            return result;
+        }
+
+        function logCombat(result) {
+            let msg;
+            if (result.hit) {
+                msg = `${result.attacker} hits ${result.defender} for ${result.damage} damage!`;
+                if (result.killed) {
+                    msg += ` ${result.defender} is slain!`;
+                }
+            } else {
+                msg = `${result.attacker} misses ${result.defender}. (${result.total} vs AC ${result.targetAc})`;
+            }
+            combatLog.push(msg);
+            if (combatLog.length > 5) combatLog.shift();
+        }
+
+        function processCombatTurn() {
+            // Remove dead combatants
+            party = party.filter(c => c.hp > 0);
+            monsters = monsters.filter(m => m.hp > 0);
+
+            // Check for combat end
+            if (party.length === 0) {
+                state = GameState.DEFEAT;
+                AudioSystem.sfx.death();
+                return;
+            }
+            if (monsters.length === 0) {
+                state = GameState.VICTORY;
+                AudioSystem.sfx.levelComplete();
+                return;
+            }
+
+            if (currentTurn === 'player') {
+                if (turnIndex < party.length) {
+                    const attacker = party[turnIndex];
+                    const target = monsters[0]; // Attack front monster
+                    const result = attack(attacker, target);
+                    logCombat(result);
+                    if (result.hit) {
+                        AudioSystem.sfx.hit();
+                    }
+                    turnIndex++;
+                } else {
+                    // Switch to monster turn
+                    currentTurn = 'monster';
+                    turnIndex = 0;
+                }
+            } else {
+                if (turnIndex < monsters.length) {
+                    const attacker = monsters[turnIndex];
+                    const target = party[0]; // Attack front party member
+                    const result = attack(attacker, target);
+                    logCombat(result);
+                    if (result.hit) {
+                        AudioSystem.sfx.hit();
+                    }
+                    turnIndex++;
+                } else {
+                    // New round - back to player
+                    currentTurn = 'player';
+                    turnIndex = 0;
+                }
+            }
+        }
+
+        // ============================================
+        // GAME FUNCTIONS
+        // ============================================
+        function startDungeonRun() {
+            dungeonLevel = 1;
+            runGold = 0;
+            combatLog = [];
+
+            // Reset party HP and copy from saved data
+            party = gameData.party.map(c => ({
+                ...c,
+                hp: c.maxHp,
+                get ac() { return c.ac; },
+                get damage() { return c.damage; },
+                get displayAc() { return c.displayAc; }
+            }));
+
+            startLevel();
+        }
+
+        function startLevel() {
+            monsters = generateEncounter(dungeonLevel);
+            currentTurn = 'player';
+            turnIndex = 0;
+            combatTimer = 0;
+            state = GameState.COMBAT;
+
+            const isBoss = dungeonLevel % 10 === 0;
+            if (isBoss) {
+                combatLog.push(`--- BOSS: Level ${dungeonLevel}! ---`);
+            } else {
+                combatLog.push(`--- Level ${dungeonLevel} ---`);
+            }
+
+            AudioSystem.music.start('invaders');
+        }
+
+        function collectLevelGold() {
+            let gold = 0;
+            // We already collected gold from dead monsters during combat
+            // Add bonus for completing the level
+            gold += dungeonLevel * 2;
+            if (dungeonLevel % 10 === 0) {
+                gold += dungeonLevel * 5; // Boss bonus
+            }
+            runGold += gold;
+            combatLog.push(`Level complete! +${gold} gold`);
+        }
+
+        function nextLevel() {
+            collectLevelGold();
+            dungeonLevel++;
+            if (dungeonLevel > gameData.deepestLevel) {
+                gameData.deepestLevel = dungeonLevel;
+            }
+            startLevel();
+        }
+
+        function returnToTown() {
+            gameData.gold += runGold;
+            gameData.totalRuns++;
+            saveGameData();
+            state = GameState.TOWN;
+            AudioSystem.music.stop();
+            updateDisplays();
+        }
+
+        function updateDisplays() {
+            goldDisplayEl.textContent = gameData.gold;
+            levelDisplayEl.textContent = gameData.deepestLevel;
+            runsDisplayEl.textContent = gameData.totalRuns;
+        }
+
+        function getShopItems() {
+            if (shopCategory === 'weapons') {
+                return Object.entries(WEAPONS)
+                    .filter(([key, item]) => item.price > 0)
+                    .map(([key, item]) => ({
+                        key,
+                        ...item,
+                        owned: gameData.purchasedWeapons.includes(key),
+                        equipped: gameData.party[0].weapon === key
+                    }));
+            } else if (shopCategory === 'armor') {
+                return Object.entries(ARMOR)
+                    .filter(([key, item]) => item.price > 0)
+                    .map(([key, item]) => ({
+                        key,
+                        ...item,
+                        owned: gameData.purchasedArmor.includes(key),
+                        equipped: gameData.party[0].armor === key
+                    }));
+            } else {
+                return Object.entries(SHIELDS)
+                    .filter(([key, item]) => item.price > 0)
+                    .map(([key, item]) => ({
+                        key,
+                        ...item,
+                        owned: gameData.purchasedShields.includes(key),
+                        equipped: gameData.party[0].shield === key
+                    }));
+            }
+        }
+
+        function buyOrEquipItem(itemKey) {
+            const items = getShopItems();
+            const item = items.find(i => i.key === itemKey);
+            if (!item) return;
+
+            if (item.owned) {
+                // Equip it
+                if (shopCategory === 'weapons') {
+                    gameData.party[0].weapon = itemKey;
+                } else if (shopCategory === 'armor') {
+                    gameData.party[0].armor = itemKey;
+                } else {
+                    gameData.party[0].shield = itemKey;
+                }
+                AudioSystem.sfx.select();
+            } else if (gameData.gold >= item.price) {
+                // Buy it
+                gameData.gold -= item.price;
+                if (shopCategory === 'weapons') {
+                    gameData.purchasedWeapons.push(itemKey);
+                    gameData.party[0].weapon = itemKey;
+                } else if (shopCategory === 'armor') {
+                    gameData.purchasedArmor.push(itemKey);
+                    gameData.party[0].armor = itemKey;
+                } else {
+                    gameData.purchasedShields.push(itemKey);
+                    gameData.party[0].shield = itemKey;
+                }
+                AudioSystem.sfx.powerUp();
+                updateDisplays();
+            }
+            saveGameData();
+        }
+
+        // ============================================
+        // RENDER FUNCTIONS
+        // ============================================
+        function drawPanel(x, y, w, h, title = null) {
+            ctx.fillStyle = CONFIG.COLORS.panel;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = CONFIG.COLORS.panelBorder;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, w, h);
+
+            if (title) {
+                ctx.fillStyle = CONFIG.COLORS.highlight;
+                ctx.font = 'bold 14px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(title, x + w/2, y + 18);
+            }
+        }
+
+        function drawHealthBar(x, y, w, h, current, max) {
+            const pct = current / max;
+            ctx.fillStyle = CONFIG.COLORS.healthLost;
+            ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = CONFIG.COLORS.health;
+            ctx.fillRect(x, y, w * pct, h);
+            ctx.strokeStyle = CONFIG.COLORS.panelBorder;
+            ctx.strokeRect(x, y, w, h);
+        }
+
+        function drawButton(x, y, w, h, text, enabled = true, highlight = false) {
+            const isHovered = hoverButton &&
+                hoverButton.x === x && hoverButton.y === y;
+
+            ctx.fillStyle = !enabled ? '#333' : (isHovered || highlight) ? '#4a6a4a' : '#3a3a5a';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = enabled ? CONFIG.COLORS.panelBorder : '#444';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, w, h);
+
+            ctx.fillStyle = enabled ? CONFIG.COLORS.text : '#666';
+            ctx.font = '14px Courier New';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, x + w/2, y + h/2);
+
+            buttons.push({ x, y, w, h, text, enabled });
+        }
+
+        function renderTitle() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            // Title
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = 'bold 48px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('DUNGEON CRAWL', CONFIG.WIDTH/2, 100);
+
+            // Subtitle
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = '16px Courier New';
+            ctx.fillText('An Incremental D&D Adventure', CONFIG.WIDTH/2, 140);
+
+            // Instructions
+            ctx.fillStyle = CONFIG.COLORS.textDim;
+            ctx.font = '14px Courier New';
+            const instructions = [
+                'Build your party, buy better gear, delve deeper!',
+                '',
+                'Combat is automatic - your party attacks monsters',
+                'Each level cleared earns gold to spend in town',
+                'Every 10th level is a boss fight!',
+                '',
+                'You start with a Fighter wielding a Longsword and Shield'
+            ];
+            instructions.forEach((line, i) => {
+                ctx.fillText(line, CONFIG.WIDTH/2, 200 + i * 24);
+            });
+
+            // Start button
+            buttons = [];
+            drawButton(CONFIG.WIDTH/2 - 100, 400, 200, 40, 'Start Adventure', true);
+
+            ctx.fillStyle = CONFIG.COLORS.textDim;
+            ctx.font = '12px Courier New';
+            ctx.fillText('Click to begin', CONFIG.WIDTH/2, 460);
+        }
+
+        function renderTown() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            buttons = [];
+
+            // Title
+            ctx.fillStyle = CONFIG.COLORS.highlight;
+            ctx.font = 'bold 24px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('TOWN', CONFIG.WIDTH/2, 40);
+
+            // Party panel
+            drawPanel(20, 60, 280, 200, 'Your Party');
+
+            const char = gameData.party[0];
+            ctx.textAlign = 'left';
+            ctx.font = '14px Courier New';
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.fillText(`${char.name} the ${char.class}`, 40, 100);
+
+            ctx.fillStyle = CONFIG.COLORS.health;
+            ctx.fillText(`HP: ${char.maxHp}`, 40, 125);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.fillText(`Attack: +${char.attack}`, 40, 150);
+            ctx.fillText(`AC: ${char.displayAc}`, 160, 150);
+
+            ctx.fillStyle = CONFIG.COLORS.textDim;
+            ctx.fillText(`Weapon: ${WEAPONS[char.weapon].name} (${WEAPONS[char.weapon].damage})`, 40, 180);
+            ctx.fillText(`Armor: ${ARMOR[char.armor].name}`, 40, 200);
+            ctx.fillText(`Shield: ${SHIELDS[char.shield].name}`, 40, 220);
+
+            // Stats panel
+            drawPanel(320, 60, 300, 200, 'Statistics');
+
+            ctx.textAlign = 'left';
+            ctx.fillStyle = CONFIG.COLORS.gold;
+            ctx.fillText(`Gold: ${gameData.gold}`, 340, 100);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.fillText(`Deepest Level: ${gameData.deepestLevel}`, 340, 130);
+            ctx.fillText(`Total Runs: ${gameData.totalRuns}`, 340, 160);
+
+            // Buttons
+            drawButton(50, 300, 180, 50, 'Enter Dungeon', true);
+            drawButton(250, 300, 140, 50, 'Shop', true);
+
+            // Return to title
+            ctx.fillStyle = CONFIG.COLORS.textDim;
+            ctx.font = '12px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('Press Escape to return to title', CONFIG.WIDTH/2, 460);
+        }
+
+        function renderShop() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            buttons = [];
+
+            // Title
+            ctx.fillStyle = CONFIG.COLORS.highlight;
+            ctx.font = 'bold 24px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('SHOP', CONFIG.WIDTH/2, 40);
+
+            // Gold display
+            ctx.fillStyle = CONFIG.COLORS.gold;
+            ctx.font = '16px Courier New';
+            ctx.fillText(`Gold: ${gameData.gold}`, CONFIG.WIDTH/2, 65);
+
+            // Category tabs
+            const categories = ['weapons', 'armor', 'shields'];
+            const tabWidth = 120;
+            const tabStart = (CONFIG.WIDTH - tabWidth * 3) / 2;
+
+            categories.forEach((cat, i) => {
+                const x = tabStart + i * tabWidth;
+                const isActive = shopCategory === cat;
+                drawButton(x, 85, tabWidth - 5, 30, cat.toUpperCase(), true, isActive);
+            });
+
+            // Items list
+            drawPanel(40, 130, 560, 280, null);
+
+            const items = getShopItems();
+            ctx.textAlign = 'left';
+            ctx.font = '14px Courier New';
+
+            items.forEach((item, i) => {
+                const y = 155 + i * 45;
+                const isSelected = selectedShopItem === i;
+
+                // Selection highlight
+                if (isSelected) {
+                    ctx.fillStyle = '#2a3a4a';
+                    ctx.fillRect(50, y - 15, 540, 40);
+                }
+
+                // Item name
+                ctx.fillStyle = item.equipped ? CONFIG.COLORS.highlight : CONFIG.COLORS.text;
+                ctx.fillText(`${i + 1}. ${item.name}`, 60, y);
+
+                // Stats
+                ctx.fillStyle = CONFIG.COLORS.textDim;
+                if (shopCategory === 'weapons') {
+                    ctx.fillText(`Damage: ${item.damage}`, 250, y);
+                } else {
+                    ctx.fillText(`AC: +${item.ac - (shopCategory === 'armor' ? 10 : 0)}`, 250, y);
+                }
+
+                // Price / Status
+                if (item.equipped) {
+                    ctx.fillStyle = CONFIG.COLORS.health;
+                    ctx.fillText('EQUIPPED', 450, y);
+                } else if (item.owned) {
+                    ctx.fillStyle = '#888';
+                    ctx.fillText('OWNED', 450, y);
+                    drawButton(500, y - 12, 80, 28, 'Equip', true);
+                } else {
+                    ctx.fillStyle = gameData.gold >= item.price ? CONFIG.COLORS.gold : '#ff6b6b';
+                    ctx.fillText(`${item.price}g`, 400, y);
+                    drawButton(500, y - 12, 80, 28, 'Buy', gameData.gold >= item.price);
+                }
+            });
+
+            // Back button
+            drawButton(260, 430, 120, 40, 'Back', true);
+        }
+
+        function renderCombat() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            buttons = [];
+
+            // Level header
+            const isBoss = dungeonLevel % 10 === 0;
+            ctx.fillStyle = isBoss ? CONFIG.COLORS.boss : CONFIG.COLORS.highlight;
+            ctx.font = 'bold 20px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(isBoss ? `BOSS - Level ${dungeonLevel}` : `Level ${dungeonLevel}`, CONFIG.WIDTH/2, 30);
+
+            // Gold counter
+            ctx.fillStyle = CONFIG.COLORS.gold;
+            ctx.font = '14px Courier New';
+            ctx.fillText(`Run Gold: ${runGold}`, CONFIG.WIDTH/2, 50);
+
+            // Party panel (left)
+            drawPanel(20, 70, 280, 220, 'Party');
+
+            party.forEach((char, i) => {
+                const y = 100 + i * 50;
+                ctx.textAlign = 'left';
+                ctx.font = '14px Courier New';
+                ctx.fillStyle = CONFIG.COLORS.text;
+                ctx.fillText(char.name, 40, y);
+                drawHealthBar(40, y + 8, 150, 12, char.hp, char.maxHp);
+                ctx.fillStyle = CONFIG.COLORS.textDim;
+                ctx.font = '11px Courier New';
+                ctx.fillText(`${char.hp}/${char.maxHp}`, 200, y + 18);
+            });
+
+            // Monster panel (right)
+            drawPanel(340, 70, 280, 220, 'Monsters');
+
+            monsters.forEach((mon, i) => {
+                const y = 100 + i * 50;
+                ctx.textAlign = 'left';
+                ctx.font = '14px Courier New';
+                ctx.fillStyle = mon.boss ? CONFIG.COLORS.boss : CONFIG.COLORS.text;
+                ctx.fillText(mon.name, 360, y);
+                drawHealthBar(360, y + 8, 150, 12, mon.hp, mon.maxHp);
+                ctx.fillStyle = CONFIG.COLORS.textDim;
+                ctx.font = '11px Courier New';
+                ctx.fillText(`${mon.hp}/${mon.maxHp}`, 520, y + 18);
+            });
+
+            // Combat log
+            drawPanel(20, 300, 600, 130, 'Combat Log');
+
+            ctx.textAlign = 'left';
+            ctx.font = '12px Courier New';
+            combatLog.slice(-5).forEach((msg, i) => {
+                ctx.fillStyle = msg.includes('slain') ? CONFIG.COLORS.damage :
+                               msg.includes('misses') ? CONFIG.COLORS.textDim : CONFIG.COLORS.text;
+                ctx.fillText(msg, 40, 335 + i * 18);
+            });
+
+            // Flee button
+            drawButton(250, 440, 140, 35, 'Flee to Town', true);
+        }
+
+        function renderVictory() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            buttons = [];
+
+            ctx.fillStyle = CONFIG.COLORS.health;
+            ctx.font = 'bold 32px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('LEVEL COMPLETE!', CONFIG.WIDTH/2, 150);
+
+            ctx.fillStyle = CONFIG.COLORS.gold;
+            ctx.font = '20px Courier New';
+            ctx.fillText(`Level ${dungeonLevel} cleared`, CONFIG.WIDTH/2, 200);
+            ctx.fillText(`Run Gold: ${runGold}`, CONFIG.WIDTH/2, 240);
+
+            // Show party status
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '14px Courier New';
+            party.forEach((char, i) => {
+                ctx.fillText(`${char.name}: ${char.hp}/${char.maxHp} HP`, CONFIG.WIDTH/2, 290 + i * 25);
+            });
+
+            drawButton(150, 380, 150, 45, 'Continue', true);
+            drawButton(340, 380, 150, 45, 'Return to Town', true);
+        }
+
+        function renderDefeat() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            buttons = [];
+
+            ctx.fillStyle = CONFIG.COLORS.damage;
+            ctx.font = 'bold 32px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('DEFEAT!', CONFIG.WIDTH/2, 150);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '18px Courier New';
+            ctx.fillText('Your party has fallen...', CONFIG.WIDTH/2, 200);
+
+            ctx.fillStyle = CONFIG.COLORS.gold;
+            ctx.font = '20px Courier New';
+            ctx.fillText(`Reached Level ${dungeonLevel}`, CONFIG.WIDTH/2, 260);
+            ctx.fillText(`Gold earned: ${runGold}`, CONFIG.WIDTH/2, 300);
+
+            drawButton(220, 380, 200, 45, 'Return to Town', true);
+        }
+
+        // ============================================
+        // INPUT HANDLING
+        // ============================================
+        function getButtonAt(x, y) {
+            return buttons.find(b =>
+                x >= b.x && x <= b.x + b.w &&
+                y >= b.y && y <= b.y + b.h &&
+                b.enabled
+            );
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            hoverButton = getButtonAt(x, y);
+            canvas.style.cursor = hoverButton ? 'pointer' : 'default';
+        });
+
+        canvas.addEventListener('click', (e) => {
+            AudioSystem.unlock();
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const button = getButtonAt(x, y);
+            if (!button) return;
+
+            AudioSystem.sfx.select();
+
+            switch (state) {
+                case GameState.TITLE:
+                    if (button.text === 'Start Adventure') {
+                        state = GameState.TOWN;
+                        updateDisplays();
+                    }
+                    break;
+
+                case GameState.TOWN:
+                    if (button.text === 'Enter Dungeon') {
+                        startDungeonRun();
+                    } else if (button.text === 'Shop') {
+                        state = GameState.SHOP;
+                        shopCategory = 'weapons';
+                        selectedShopItem = 0;
+                    }
+                    break;
+
+                case GameState.SHOP:
+                    if (button.text === 'Back') {
+                        state = GameState.TOWN;
+                    } else if (button.text === 'WEAPONS') {
+                        shopCategory = 'weapons';
+                        selectedShopItem = 0;
+                    } else if (button.text === 'ARMOR') {
+                        shopCategory = 'armor';
+                        selectedShopItem = 0;
+                    } else if (button.text === 'SHIELDS') {
+                        shopCategory = 'shields';
+                        selectedShopItem = 0;
+                    } else if (button.text === 'Buy' || button.text === 'Equip') {
+                        const items = getShopItems();
+                        // Find which item this button belongs to
+                        const itemIndex = Math.floor((button.y - 143) / 45);
+                        if (itemIndex >= 0 && itemIndex < items.length) {
+                            buyOrEquipItem(items[itemIndex].key);
+                        }
+                    }
+                    break;
+
+                case GameState.COMBAT:
+                    if (button.text === 'Flee to Town') {
+                        returnToTown();
+                    }
+                    break;
+
+                case GameState.VICTORY:
+                    if (button.text === 'Continue') {
+                        nextLevel();
+                    } else if (button.text === 'Return to Town') {
+                        collectLevelGold();
+                        returnToTown();
+                    }
+                    break;
+
+                case GameState.DEFEAT:
+                    if (button.text === 'Return to Town') {
+                        returnToTown();
+                    }
+                    break;
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            AudioSystem.unlock();
+
+            if (state === GameState.TITLE) {
+                if (e.key === ' ' || e.key === 'Enter') {
+                    state = GameState.TOWN;
+                    updateDisplays();
+                    AudioSystem.sfx.select();
+                }
+            } else if (state === GameState.TOWN) {
+                if (e.key === 'Escape') {
+                    state = GameState.TITLE;
+                } else if (e.key === ' ' || e.key === 'Enter') {
+                    startDungeonRun();
+                    AudioSystem.sfx.select();
+                }
+            } else if (state === GameState.SHOP) {
+                if (e.key === 'Escape') {
+                    state = GameState.TOWN;
+                    AudioSystem.sfx.select();
+                } else if (e.key >= '1' && e.key <= '9') {
+                    const index = parseInt(e.key) - 1;
+                    const items = getShopItems();
+                    if (index < items.length) {
+                        buyOrEquipItem(items[index].key);
+                    }
+                }
+            } else if (state === GameState.COMBAT) {
+                if (e.key === 'Escape') {
+                    returnToTown();
+                }
+            } else if (state === GameState.VICTORY) {
+                if (e.key === ' ' || e.key === 'Enter') {
+                    nextLevel();
+                    AudioSystem.sfx.select();
+                } else if (e.key === 'Escape') {
+                    collectLevelGold();
+                    returnToTown();
+                }
+            } else if (state === GameState.DEFEAT) {
+                if (e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') {
+                    returnToTown();
+                    AudioSystem.sfx.select();
+                }
+            }
+        });
+
+        // ============================================
+        // AUDIO CONTROLS
+        // ============================================
+        document.getElementById('musicToggle').addEventListener('change', (e) => {
+            AudioSystem.musicEnabled = e.target.checked;
+            gameData.musicEnabled = e.target.checked;
+            saveGameData();
+            if (state === GameState.COMBAT) {
+                if (e.target.checked) {
+                    AudioSystem.music.start('invaders');
+                } else {
+                    AudioSystem.music.stop();
+                }
+            }
+        });
+
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        // Load audio preferences
+        AudioSystem.musicEnabled = gameData.musicEnabled;
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        document.getElementById('musicToggle').checked = gameData.musicEnabled;
+        document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+
+        // ============================================
+        // GAME LOOP
+        // ============================================
+        let lastFrameTime = 0;
+
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastFrameTime;
+            lastFrameTime = currentTime;
+
+            GameController.poll();
+
+            // Combat auto-processing
+            if (state === GameState.COMBAT) {
+                combatTimer += deltaTime;
+                if (combatTimer >= CONFIG.COMBAT_SPEED) {
+                    combatTimer = 0;
+                    processCombatTurn();
+                }
+            }
+
+            // Render current state
+            switch (state) {
+                case GameState.TITLE:
+                    renderTitle();
+                    break;
+                case GameState.TOWN:
+                    renderTown();
+                    break;
+                case GameState.SHOP:
+                    renderShop();
+                    break;
+                case GameState.COMBAT:
+                    renderCombat();
+                    break;
+                case GameState.VICTORY:
+                    renderVictory();
+                    break;
+                case GameState.DEFEAT:
+                    renderDefeat();
+                    break;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================
+        // START
+        // ============================================
+        console.log('Dungeon Crawl initialized');
+        updateDisplays();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
