@@ -777,6 +777,10 @@
                 const y = 155 + i * 45;
                 const isSelected = selectedShopItem === i;
 
+                // Reset text properties (drawButton changes these)
+                ctx.textAlign = 'left';
+                ctx.font = '14px Courier New';
+
                 // Selection highlight
                 if (isSelected) {
                     ctx.fillStyle = '#2a3a4a';
