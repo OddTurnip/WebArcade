@@ -131,88 +131,84 @@
         };
 
         // ============================================
-        // DICE ROLLING
+        // FATE DICE
         // ============================================
-        function rollDice(diceStr) {
-            // Parse strings like "1d8", "2d6+2", "1d4-1"
-            const match = diceStr.match(/(\d+)d(\d+)([+-]\d+)?/);
-            if (!match) return 0;
-
-            const numDice = parseInt(match[1]);
-            const dieSize = parseInt(match[2]);
-            const modifier = match[3] ? parseInt(match[3]) : 0;
-
-            let total = modifier;
-            for (let i = 0; i < numDice; i++) {
-                total += Math.floor(Math.random() * dieSize) + 1;
+        function rollFateDice() {
+            // Roll 4 Fate dice: each die is -1, 0, or +1 with equal probability
+            let total = 0;
+            const dice = [];
+            for (let i = 0; i < 4; i++) {
+                const roll = Math.floor(Math.random() * 3) - 1; // -1, 0, or +1
+                dice.push(roll);
+                total += roll;
             }
-            return Math.max(1, total);
+            return { total, dice };
         }
 
-        function rollD20() {
-            return Math.floor(Math.random() * 20) + 1;
+        function formatFateDice(dice) {
+            return dice.map(d => d === 1 ? '+' : d === -1 ? '-' : '0').join('');
         }
 
         // ============================================
         // ITEM DEFINITIONS
         // ============================================
         const WEAPONS = {
-            fists: { name: 'Fists', damage: '1d4', price: 0 },
-            dagger: { name: 'Dagger', damage: '1d4', price: 5 },
-            shortsword: { name: 'Short Sword', damage: '1d6', price: 15 },
-            longsword: { name: 'Longsword', damage: '1d8', price: 30 },
-            greatsword: { name: 'Greatsword', damage: '2d6', price: 75 },
-            battleaxe: { name: 'Battle Axe', damage: '1d10', price: 50 },
-            greataxe: { name: 'Greataxe', damage: '1d12', price: 100 }
+            fists: { name: 'Fists', damage: 0, price: 0, twoHanded: false },
+            dagger: { name: 'Dagger', damage: 0, price: 5, twoHanded: false },
+            shortsword: { name: 'Short Sword', damage: 1, price: 15, twoHanded: false },
+            longsword: { name: 'Longsword', damage: 2, price: 30, twoHanded: false },
+            greatsword: { name: 'Greatsword', damage: 4, price: 75, twoHanded: true },
+            battleaxe: { name: 'Battle Axe', damage: 3, price: 50, twoHanded: false },
+            greataxe: { name: 'Greataxe', damage: 5, price: 100, twoHanded: true }
         };
 
         const ARMOR = {
-            none: { name: 'Clothes', ac: 10, price: 0 },
-            leather: { name: 'Leather', ac: 11, price: 10 },
-            studded: { name: 'Studded Leather', ac: 12, price: 25 },
-            chain: { name: 'Chain Mail', ac: 14, price: 50 },
-            splint: { name: 'Splint', ac: 16, price: 100 },
-            plate: { name: 'Plate', ac: 18, price: 250 }
+            none: { name: 'Clothes', defense: 0, price: 0 },
+            leather: { name: 'Leather', defense: 1, price: 10 },
+            studded: { name: 'Studded Leather', defense: 2, price: 25 },
+            chain: { name: 'Chain Mail', defense: 3, price: 50 },
+            splint: { name: 'Splint', defense: 4, price: 100 },
+            plate: { name: 'Plate', defense: 5, price: 250 }
         };
 
         const SHIELDS = {
-            none: { name: 'None', ac: 0, price: 0 },
-            shield: { name: 'Shield', ac: 2, price: 10 },
-            tower: { name: 'Tower Shield', ac: 3, price: 50 }
+            none: { name: 'None', defense: 0, price: 0 },
+            shield: { name: 'Shield', defense: 1, price: 10 },
+            tower: { name: 'Tower Shield', defense: 2, price: 50 }
         };
 
         // ============================================
         // MONSTER DEFINITIONS
         // ============================================
         const MONSTER_TYPES = {
-            // Levels 1-9
-            goblin: { name: 'Goblin', hp: 7, attack: 2, ac: 13, damage: '1d6', gold: 3 },
-            kobold: { name: 'Kobold', hp: 5, attack: 1, ac: 12, damage: '1d4', gold: 2 },
-            rat: { name: 'Giant Rat', hp: 4, attack: 1, ac: 11, damage: '1d4', gold: 1 },
+            // Levels 1-9: Basic enemies with +0/+0
+            goblin: { name: 'Goblin', hp: 3, attack: 0, defense: 0, damage: 1, gold: 3 },
+            kobold: { name: 'Kobold', hp: 2, attack: 0, defense: 0, damage: 1, gold: 2 },
+            rat: { name: 'Giant Rat', hp: 2, attack: 0, defense: 0, damage: 0, gold: 1 },
 
             // Level 10 boss
-            goblinChief: { name: 'Goblin Chief', hp: 21, attack: 4, ac: 15, damage: '1d8+2', gold: 25, boss: true },
+            goblinChief: { name: 'Goblin Chief', hp: 8, attack: 1, defense: 1, damage: 2, gold: 25, boss: true },
 
             // Levels 11-19
-            orc: { name: 'Orc', hp: 15, attack: 3, ac: 14, damage: '1d8', gold: 6 },
-            skeleton: { name: 'Skeleton', hp: 13, attack: 2, ac: 13, damage: '1d6', gold: 5 },
-            wolf: { name: 'Dire Wolf', hp: 12, attack: 4, ac: 12, damage: '1d8', gold: 5 },
+            orc: { name: 'Orc', hp: 4, attack: 1, defense: 0, damage: 2, gold: 6 },
+            skeleton: { name: 'Skeleton', hp: 3, attack: 0, defense: 1, damage: 1, gold: 5 },
+            wolf: { name: 'Dire Wolf', hp: 3, attack: 1, defense: 0, damage: 1, gold: 5 },
 
             // Level 20 boss
-            orcWarlord: { name: 'Orc Warlord', hp: 45, attack: 6, ac: 16, damage: '2d6+3', gold: 75, boss: true },
+            orcWarlord: { name: 'Orc Warlord', hp: 12, attack: 2, defense: 2, damage: 3, gold: 75, boss: true },
 
             // Levels 21-29
-            gnoll: { name: 'Gnoll', hp: 22, attack: 4, ac: 15, damage: '1d8+2', gold: 10 },
-            zombie: { name: 'Zombie', hp: 22, attack: 3, ac: 8, damage: '1d6+1', gold: 8 },
-            bugbear: { name: 'Bugbear', hp: 27, attack: 4, ac: 16, damage: '2d8', gold: 12 },
+            gnoll: { name: 'Gnoll', hp: 5, attack: 1, defense: 1, damage: 2, gold: 10 },
+            zombie: { name: 'Zombie', hp: 6, attack: 0, defense: 0, damage: 2, gold: 8 },
+            bugbear: { name: 'Bugbear', hp: 6, attack: 2, defense: 1, damage: 2, gold: 12 },
 
             // Level 30 boss
-            ogre: { name: 'Ogre', hp: 59, attack: 6, ac: 11, damage: '2d8+4', gold: 150, boss: true },
+            ogre: { name: 'Ogre', hp: 15, attack: 2, defense: 1, damage: 4, gold: 150, boss: true },
 
             // Levels 31+
-            troll: { name: 'Troll', hp: 44, attack: 7, ac: 15, damage: '2d6+3', gold: 20 },
-            ghoul: { name: 'Ghoul', hp: 22, attack: 4, ac: 12, damage: '2d6', gold: 15 },
-            wight: { name: 'Wight', hp: 45, attack: 4, ac: 14, damage: '1d8+2', gold: 25 }
+            troll: { name: 'Troll', hp: 10, attack: 2, defense: 2, damage: 3, gold: 20 },
+            ghoul: { name: 'Ghoul', hp: 6, attack: 1, defense: 1, damage: 2, gold: 15 },
+            wight: { name: 'Wight', hp: 8, attack: 2, defense: 2, damage: 2, gold: 25 }
         };
 
         function getMonsterTier(level) {
@@ -229,11 +225,11 @@
             const template = MONSTER_TYPES[type];
             return {
                 name: template.name,
-                hp: template.hp + levelBonus * 2,
-                maxHp: template.hp + levelBonus * 2,
-                attack: template.attack + Math.floor(levelBonus / 5),
-                ac: template.ac + Math.floor(levelBonus / 10),
-                damage: template.damage,
+                hp: template.hp + Math.floor(levelBonus / 2),
+                maxHp: template.hp + Math.floor(levelBonus / 2),
+                attack: template.attack + Math.floor(levelBonus / 10),
+                defense: template.defense + Math.floor(levelBonus / 10),
+                damage: template.damage + Math.floor(levelBonus / 10),
                 gold: template.gold + levelBonus,
                 boss: template.boss || false
             };
@@ -255,6 +251,8 @@
                 const type = tier[Math.floor(Math.random() * tier.length)];
                 monsters.push(createMonster(type, levelBonus));
             }
+            // Sort by defense (highest first)
+            monsters.sort((a, b) => b.defense - a.defense);
             return monsters;
         }
 
@@ -263,9 +261,9 @@
         // ============================================
         function createCharacter(name, charClass) {
             const stats = {
-                Fighter: { hp: 12, attack: 4, baseAc: 10 },
-                Rogue: { hp: 8, attack: 5, baseAc: 11 },
-                Cleric: { hp: 10, attack: 3, baseAc: 10 }
+                Fighter: { hp: 10, attack: 1, baseDefense: 0 },
+                Rogue: { hp: 6, attack: 2, baseDefense: 0 },
+                Cleric: { hp: 8, attack: 0, baseDefense: 1 }
             };
 
             const s = stats[charClass] || stats.Fighter;
@@ -276,21 +274,22 @@
                 hp: s.hp,
                 maxHp: s.hp,
                 attack: s.attack,
-                baseAc: s.baseAc,
+                baseDefense: s.baseDefense,
                 weapon: 'longsword',
                 armor: 'none',
                 shield: 'shield',
 
-                get ac() {
-                    return this.baseAc + ARMOR[this.armor].ac - 10 + SHIELDS[this.shield].ac;
+                get defense() {
+                    const shieldBonus = WEAPONS[this.weapon].twoHanded ? 0 : SHIELDS[this.shield].defense;
+                    return this.baseDefense + ARMOR[this.armor].defense + shieldBonus;
                 },
 
                 get damage() {
                     return WEAPONS[this.weapon].damage;
                 },
 
-                get displayAc() {
-                    return ARMOR[this.armor].ac + SHIELDS[this.shield].ac;
+                get effectiveShield() {
+                    return WEAPONS[this.weapon].twoHanded ? 'none' : this.shield;
                 }
             };
         }
@@ -364,23 +363,29 @@
         // COMBAT FUNCTIONS
         // ============================================
         function attack(attacker, defender) {
-            const roll = rollD20();
-            const totalAttack = roll + attacker.attack;
-            const hit = totalAttack >= defender.ac;
+            const fateRoll = rollFateDice();
+            const attackTotal = fateRoll.total + attacker.attack;
+            const defenseTotal = defender.defense;
+            const margin = attackTotal - defenseTotal;
+            const hit = margin >= 0;
 
             let result = {
                 attacker: attacker.name,
                 defender: defender.name,
-                roll: roll,
-                total: totalAttack,
-                targetAc: defender.ac,
+                dice: fateRoll.dice,
+                roll: fateRoll.total,
+                attackBonus: attacker.attack,
+                attackTotal: attackTotal,
+                defenseTotal: defenseTotal,
+                margin: margin,
                 hit: hit,
                 damage: 0,
                 killed: false
             };
 
             if (hit) {
-                const dmg = rollDice(attacker.damage);
+                // Damage = weapon damage + margin (shifts)
+                const dmg = Math.max(1, attacker.damage + margin);
                 result.damage = dmg;
                 defender.hp -= dmg;
                 if (defender.hp <= 0) {
@@ -394,13 +399,14 @@
 
         function logCombat(result) {
             let msg;
+            const diceStr = formatFateDice(result.dice);
             if (result.hit) {
-                msg = `${result.attacker} hits ${result.defender} for ${result.damage} damage!`;
+                msg = `${result.attacker} [${diceStr}] hits ${result.defender} for ${result.damage}!`;
                 if (result.killed) {
-                    msg += ` ${result.defender} is slain!`;
+                    msg += ` Slain!`;
                 }
             } else {
-                msg = `${result.attacker} misses ${result.defender}. (${result.total} vs AC ${result.targetAc})`;
+                msg = `${result.attacker} [${diceStr}] misses. (${result.attackTotal} vs ${result.defenseTotal})`;
             }
             combatLog.push(msg);
             if (combatLog.length > 5) combatLog.shift();
@@ -474,9 +480,9 @@
             party = gameData.party.map(c => ({
                 ...c,
                 hp: c.maxHp,
-                get ac() { return c.ac; },
+                get defense() { return c.defense; },
                 get damage() { return c.damage; },
-                get displayAc() { return c.displayAc; }
+                get effectiveShield() { return c.effectiveShield; }
             }));
 
             startLevel();
@@ -704,13 +710,15 @@
             ctx.fillText(`HP: ${char.maxHp}`, 40, 125);
 
             ctx.fillStyle = CONFIG.COLORS.text;
-            ctx.fillText(`Attack: +${char.attack}`, 40, 150);
-            ctx.fillText(`AC: ${char.displayAc}`, 160, 150);
+            ctx.fillText(`Atk: +${char.attack}  Def: +${char.defense}  Dmg: ${char.damage}`, 40, 150);
 
             ctx.fillStyle = CONFIG.COLORS.textDim;
-            ctx.fillText(`Weapon: ${WEAPONS[char.weapon].name} (${WEAPONS[char.weapon].damage})`, 40, 180);
-            ctx.fillText(`Armor: ${ARMOR[char.armor].name}`, 40, 200);
-            ctx.fillText(`Shield: ${SHIELDS[char.shield].name}`, 40, 220);
+            const weaponInfo = WEAPONS[char.weapon];
+            ctx.fillText(`Weapon: ${weaponInfo.name}${weaponInfo.twoHanded ? ' (2H)' : ''}`, 40, 180);
+            ctx.fillText(`Armor: ${ARMOR[char.armor].name} (+${ARMOR[char.armor].defense})`, 40, 200);
+            const effectiveShield = char.effectiveShield;
+            const shieldText = weaponInfo.twoHanded ? '(using 2H weapon)' : SHIELDS[char.shield].name;
+            ctx.fillText(`Shield: ${shieldText}`, 40, 220);
 
             // Stats panel
             drawPanel(320, 60, 300, 200, 'Statistics');
@@ -785,14 +793,15 @@
 
                 // Item name
                 ctx.fillStyle = item.equipped ? CONFIG.COLORS.highlight : CONFIG.COLORS.text;
-                ctx.fillText(`${i + 1}. ${item.name}`, 60, y);
+                const nameExtra = (shopCategory === 'weapons' && item.twoHanded) ? ' (2H)' : '';
+                ctx.fillText(`${i + 1}. ${item.name}${nameExtra}`, 60, y);
 
                 // Stats
                 ctx.fillStyle = CONFIG.COLORS.textDim;
                 if (shopCategory === 'weapons') {
-                    ctx.fillText(`Damage: ${item.damage}`, 250, y);
+                    ctx.fillText(`Dmg: ${item.damage}`, 250, y);
                 } else {
-                    ctx.fillText(`AC: +${item.ac - (shopCategory === 'armor' ? 10 : 0)}`, 250, y);
+                    ctx.fillText(`Def: +${item.defense}`, 250, y);
                 }
 
                 // Price / Status
@@ -836,30 +845,38 @@
             drawPanel(20, 70, 280, 220, 'Party');
 
             party.forEach((char, i) => {
-                const y = 100 + i * 50;
+                const y = 100 + i * 55;
                 ctx.textAlign = 'left';
                 ctx.font = '14px Courier New';
                 ctx.fillStyle = CONFIG.COLORS.text;
                 ctx.fillText(char.name, 40, y);
-                drawHealthBar(40, y + 8, 150, 12, char.hp, char.maxHp);
+                // Stats line
                 ctx.fillStyle = CONFIG.COLORS.textDim;
-                ctx.font = '11px Courier New';
-                ctx.fillText(`${char.hp}/${char.maxHp}`, 200, y + 18);
+                ctx.font = '10px Courier New';
+                ctx.fillText(`Atk:+${char.attack} Def:+${char.defense} Dmg:${char.damage}`, 40, y + 14);
+                drawHealthBar(40, y + 20, 150, 10, char.hp, char.maxHp);
+                ctx.fillStyle = CONFIG.COLORS.textDim;
+                ctx.font = '10px Courier New';
+                ctx.fillText(`${char.hp}/${char.maxHp}`, 200, y + 28);
             });
 
             // Monster panel (right)
             drawPanel(340, 70, 280, 220, 'Monsters');
 
             monsters.forEach((mon, i) => {
-                const y = 100 + i * 50;
+                const y = 100 + i * 55;
                 ctx.textAlign = 'left';
                 ctx.font = '14px Courier New';
                 ctx.fillStyle = mon.boss ? CONFIG.COLORS.boss : CONFIG.COLORS.text;
                 ctx.fillText(mon.name, 360, y);
-                drawHealthBar(360, y + 8, 150, 12, mon.hp, mon.maxHp);
+                // Stats line
                 ctx.fillStyle = CONFIG.COLORS.textDim;
-                ctx.font = '11px Courier New';
-                ctx.fillText(`${mon.hp}/${mon.maxHp}`, 520, y + 18);
+                ctx.font = '10px Courier New';
+                ctx.fillText(`Atk:+${mon.attack} Def:+${mon.defense} Dmg:${mon.damage}`, 360, y + 14);
+                drawHealthBar(360, y + 20, 150, 10, mon.hp, mon.maxHp);
+                ctx.fillStyle = CONFIG.COLORS.textDim;
+                ctx.font = '10px Courier New';
+                ctx.fillText(`${mon.hp}/${mon.maxHp}`, 520, y + 28);
             });
 
             // Combat log
@@ -868,7 +885,7 @@
             ctx.textAlign = 'left';
             ctx.font = '12px Courier New';
             combatLog.slice(-5).forEach((msg, i) => {
-                ctx.fillStyle = msg.includes('slain') ? CONFIG.COLORS.damage :
+                ctx.fillStyle = msg.includes('Slain') ? CONFIG.COLORS.damage :
                                msg.includes('misses') ? CONFIG.COLORS.textDim : CONFIG.COLORS.text;
                 ctx.fillText(msg, 40, 335 + i * 18);
             });
