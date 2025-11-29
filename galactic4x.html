@@ -403,6 +403,16 @@
             colony: { name: 'Colony Ship', cost: 200, speed: 1, attack: 0, defense: 1, icon: 'C', colonize: true }
         };
 
+        // Get ship types in display order: Colony first, then descending by cost
+        function getShipTypeOrder() {
+            const types = Object.keys(SHIP_TYPES);
+            return types.sort((a, b) => {
+                if (a === 'colony') return -1;
+                if (b === 'colony') return 1;
+                return SHIP_TYPES[b].cost - SHIP_TYPES[a].cost;
+            });
+        }
+
         const RACES = [
             { id: 'terran', name: 'Terran Federation', color: '#4ecdc4', desc: 'Adaptable and expansionist humans' },
             { id: 'crystalline', name: 'Crystalline Collective', color: '#9932cc', desc: 'Silicon-based mineral lifeforms' },
@@ -1200,7 +1210,8 @@
                     html += `<button class="btn btn-danger btn-sm" onclick="cancelBuildingShip(${star.id})">Cancel</button>`;
                 } else {
                     html += `<div class="build-options">`;
-                    for (const [key, type] of Object.entries(SHIP_TYPES)) {
+                    for (const key of getShipTypeOrder()) {
+                        const type = SHIP_TYPES[key];
                         const existingProgress = star.shipProgress[key] || 0;
                         let label = `${type.name}<br>(${type.cost})`;
                         if (existingProgress > 0) {
@@ -1276,8 +1287,10 @@
                                 counts[ship.type] = (counts[ship.type] || 0) + 1;
                             }
                             const parts = [];
-                            for (const [type, count] of Object.entries(counts)) {
-                                parts.push(`${count} ${SHIP_TYPES[type].name}${count > 1 ? 's' : ''}`);
+                            for (const type of getShipTypeOrder()) {
+                                if (counts[type]) {
+                                    parts.push(`${counts[type]} ${SHIP_TYPES[type].name}${counts[type] > 1 ? 's' : ''}`);
+                                }
                             }
                             html += `<div style="font-size:10px;color:#888;">${parts.join(', ')}</div>`;
                         }
@@ -1291,8 +1304,10 @@
                                 maxEta = Math.max(maxEta, ship.turnsToArrival);
                             }
                             const parts = [];
-                            for (const [type, count] of Object.entries(counts)) {
-                                parts.push(`${count} ${SHIP_TYPES[type].name}${count > 1 ? 's' : ''}`);
+                            for (const type of getShipTypeOrder()) {
+                                if (counts[type]) {
+                                    parts.push(`${counts[type]} ${SHIP_TYPES[type].name}${counts[type] > 1 ? 's' : ''}`);
+                                }
                             }
                             html += `<div style="font-size:10px;color:#ffe66d;">→ ${parts.join(', ')} (${maxEta}t)</div>`;
                         }
@@ -1338,8 +1353,10 @@
                     <button class="btn btn-sm" onclick="toggleSelectAll()">${totalSelected === shipsHere.length ? 'Clear' : 'All'}</button>
                 </div>`;
 
-                // Show each ship type with selection controls
-                for (const [type, typeShips] of Object.entries(shipsByType)) {
+                // Show each ship type with selection controls (in display order)
+                for (const type of getShipTypeOrder()) {
+                    if (!shipsByType[type]) continue;
+                    const typeShips = shipsByType[type];
                     const shipType = SHIP_TYPES[type];
                     const count = typeShips.length;
                     const selected = selectedByType[type] || 0;
@@ -1379,7 +1396,9 @@
                     incomingByType[ship.type].count++;
                     incomingByType[ship.type].minTurns = Math.min(incomingByType[ship.type].minTurns, ship.turnsToArrival);
                 }
-                for (const [type, info] of Object.entries(incomingByType)) {
+                for (const type of getShipTypeOrder()) {
+                    if (!incomingByType[type]) continue;
+                    const info = incomingByType[type];
                     const shipType = SHIP_TYPES[type];
                     html += `<div class="ship-item">
                         <span>${info.count}x ${shipType.name}</span>
