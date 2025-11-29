@@ -328,10 +328,12 @@
         <div id="centerColumn">
             <canvas id="gameCanvas" width="640" height="550"></canvas>
             <div id="actionPanel" class="hidden">
-                <div style="display:flex;gap:10px;align-items:center;">
+                <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;">
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <button class="btn" onclick="window.showOverview()">Overview</button>
+                        <button class="btn" onclick="window.showHistory()">History</button>
+                    </div>
                     <button class="btn btn-primary" id="endTurnBtn" onclick="window.endTurn()">End Turn</button>
-                    <button class="btn" onclick="window.showOverview()">Overview</button>
-                    <button class="btn" onclick="window.showHistory()">History</button>
                 </div>
                 <div id="turnInfo" style="color:#888;font-size:11px;margin-top:6px;"></div>
             </div>
@@ -2012,6 +2014,13 @@
                 // Combat button
                 if (canCombat) {
                     actionsHtml += `<button class="btn btn-danger" onclick="startCombat(${star.id})">⚔️ Combat</button>`;
+                }
+
+                // Select All button
+                const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+                if (shipsHere.length > 0) {
+                    const allSelected = selectedShips.length === shipsHere.length;
+                    actionsHtml += `<button class="btn btn-sm" onclick="toggleSelectAll()">${allSelected ? 'Clear Selection' : 'Select All Ships'}</button>`;
                 }
 
                 // Move button
