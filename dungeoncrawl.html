@@ -419,6 +419,7 @@
                 return;
             }
             if (monsters.length === 0) {
+                collectLevelGold();
                 state = GameState.VICTORY;
                 AudioSystem.sfx.levelComplete();
                 return;
@@ -507,7 +508,6 @@
         }
 
         function nextLevel() {
-            collectLevelGold();
             dungeonLevel++;
             if (dungeonLevel > gameData.deepestLevel) {
                 gameData.deepestLevel = dungeonLevel;
@@ -1012,7 +1012,6 @@
                     if (button.text === 'Continue') {
                         nextLevel();
                     } else if (button.text === 'Return to Town') {
-                        collectLevelGold();
                         returnToTown();
                     }
                     break;
@@ -1061,7 +1060,6 @@
                     nextLevel();
                     AudioSystem.sfx.select();
                 } else if (e.key === 'Escape') {
-                    collectLevelGold();
                     returnToTown();
                 }
             } else if (state === GameState.DEFEAT) {
