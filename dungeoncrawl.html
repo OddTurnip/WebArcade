@@ -331,7 +331,6 @@
             SHOP: 'shop',
             DUNGEON: 'dungeon',
             COMBAT: 'combat',
-            VICTORY: 'victory',
             DEFEAT: 'defeat'
         };
 
@@ -420,8 +419,13 @@
             }
             if (monsters.length === 0) {
                 collectLevelGold();
-                state = GameState.VICTORY;
                 AudioSystem.sfx.levelComplete();
+                // Auto-continue to next level
+                dungeonLevel++;
+                if (dungeonLevel > gameData.deepestLevel) {
+                    gameData.deepestLevel = dungeonLevel;
+                }
+                startLevel();
                 return;
             }
 
@@ -505,14 +509,6 @@
             }
             runGold += gold;
             combatLog.push(`Level complete! +${gold} gold`);
-        }
-
-        function nextLevel() {
-            dungeonLevel++;
-            if (dungeonLevel > gameData.deepestLevel) {
-                gameData.deepestLevel = dungeonLevel;
-            }
-            startLevel();
         }
 
         function returnToTown() {
@@ -881,33 +877,6 @@
             drawButton(250, 440, 140, 35, 'Flee to Town', true);
         }
 
-        function renderVictory() {
-            ctx.fillStyle = CONFIG.COLORS.background;
-            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
-
-            buttons = [];
-
-            ctx.fillStyle = CONFIG.COLORS.health;
-            ctx.font = 'bold 32px Courier New';
-            ctx.textAlign = 'center';
-            ctx.fillText('LEVEL COMPLETE!', CONFIG.WIDTH/2, 150);
-
-            ctx.fillStyle = CONFIG.COLORS.gold;
-            ctx.font = '20px Courier New';
-            ctx.fillText(`Level ${dungeonLevel} cleared`, CONFIG.WIDTH/2, 200);
-            ctx.fillText(`Run Gold: ${runGold}`, CONFIG.WIDTH/2, 240);
-
-            // Show party status
-            ctx.fillStyle = CONFIG.COLORS.text;
-            ctx.font = '14px Courier New';
-            party.forEach((char, i) => {
-                ctx.fillText(`${char.name}: ${char.hp}/${char.maxHp} HP`, CONFIG.WIDTH/2, 290 + i * 25);
-            });
-
-            drawButton(150, 380, 150, 45, 'Continue', true);
-            drawButton(340, 380, 150, 45, 'Return to Town', true);
-        }
-
         function renderDefeat() {
             ctx.fillStyle = CONFIG.COLORS.background;
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
@@ -1008,14 +977,6 @@
                     }
                     break;
 
-                case GameState.VICTORY:
-                    if (button.text === 'Continue') {
-                        nextLevel();
-                    } else if (button.text === 'Return to Town') {
-                        returnToTown();
-                    }
-                    break;
-
                 case GameState.DEFEAT:
                     if (button.text === 'Return to Town') {
                         returnToTown();
@@ -1053,13 +1014,6 @@
                 }
             } else if (state === GameState.COMBAT) {
                 if (e.key === 'Escape') {
-                    returnToTown();
-                }
-            } else if (state === GameState.VICTORY) {
-                if (e.key === ' ' || e.key === 'Enter') {
-                    nextLevel();
-                    AudioSystem.sfx.select();
-                } else if (e.key === 'Escape') {
                     returnToTown();
                 }
             } else if (state === GameState.DEFEAT) {
@@ -1131,9 +1085,6 @@
                     break;
                 case GameState.COMBAT:
                     renderCombat();
-                    break;
-                case GameState.VICTORY:
-                    renderVictory();
                     break;
                 case GameState.DEFEAT:
                     renderDefeat();
