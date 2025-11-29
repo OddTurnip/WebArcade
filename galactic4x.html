@@ -486,7 +486,9 @@
                     location: s.location, destination: s.destination,
                     turnsToArrival: s.turnsToArrival
                 })),
-                nextShipId
+                nextShipId,
+                battleHistory,
+                eventHistory
             };
             try {
                 localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
@@ -524,6 +526,8 @@
                 });
                 ships = data.ships;
                 nextShipId = data.nextShipId;
+                battleHistory = data.battleHistory || [];
+                eventHistory = data.eventHistory || [];
                 return true;
             } catch (e) {
                 console.warn('Failed to load game:', e);
@@ -568,7 +572,9 @@
         let combatThisTurn = false; // Track if combat happened this turn
         let shipsInCombatThisTurn = new Set(); // Ships that fought can't move
         let battleHistory = []; // History of battles
+        let eventHistory = []; // History of events (scouting, colonization, ships built)
         let showingHistory = false; // Whether to show history panel
+        let shipsBuiltThisTurn = {}; // Track ships built this turn by type
 
         // DOM references
         const planetPanel = document.getElementById('planetPanel');
@@ -754,6 +760,10 @@
             selectedStar = null;
             selectedShips = [];
             destinationStar = null;
+            battleHistory = [];
+            eventHistory = [];
+            shipsBuiltThisTurn = {};
+            showingHistory = false;
             generateGalaxy();
             actionPanel.classList.remove('hidden');
             planetPanel.classList.remove('hidden');
@@ -794,7 +804,7 @@
             const devPercent = maxColonyProduction > 0 ? Math.round((totalProduction / maxColonyProduction) * 100) : 0;
             const conquestPercent = maxMapProduction > 0 ? Math.round((totalProduction / maxMapProduction) * 100) : 0;
 
-            turnInfo.textContent = `Turn ${turn} | Colonies: ${colonies.length} | Ships: ${totalShips} | Prod: ${Math.floor(totalProduction)}/turn | Dev: ${devPercent}% | Conquest: ${conquestPercent}%`;
+            turnInfo.textContent = `Year ${turn} | Colonies: ${colonies.length} | Ships: ${totalShips} | Prod: ${Math.floor(totalProduction)}/turn | Dev: ${devPercent}% | Conquest: ${conquestPercent}%`;
         }
 
         function getShipsAtStar(starId) {
@@ -987,6 +997,8 @@
                         });
                         star.shipProgress[shipTypeKey] -= shipType.cost;
                         shipsBuilt++;
+                        // Track ships built this turn
+                        shipsBuiltThisTurn[shipTypeKey] = (shipsBuiltThisTurn[shipTypeKey] || 0) + 1;
                     }
                     if (shipsBuilt > 0) {
                         AudioSystem.sfx.powerUp();
@@ -1061,13 +1073,39 @@
                         ship.location = ship.destination;
                         ship.destination = null;
                         const star = stars.find(s => s.id === ship.location);
-                        if (star && !star.explored) {
+                        if (star && !star.explored && ship.owner === 'player') {
                             star.explored = true;
+                            // Track scouting event
+                            eventHistory.unshift({
+                                year: turn + 1, // This happens at start of next turn
+                                type: 'scout',
+                                text: `Scouted ${star.name}`
+                            });
                             AudioSystem.sfx.select();
+                        } else if (star && !star.explored) {
+                            star.explored = true;
                         }
                     }
                 }
             }
+
+            // Record ships built this turn as event
+            const builtParts = [];
+            for (const type of getShipTypeOrder()) {
+                if (shipsBuiltThisTurn[type]) {
+                    const shipType = SHIP_TYPES[type];
+                    const count = shipsBuiltThisTurn[type];
+                    builtParts.push(`${count} ${shipType.name}${count > 1 ? 's' : ''}`);
+                }
+            }
+            if (builtParts.length > 0) {
+                eventHistory.unshift({
+                    year: turn,
+                    type: 'built',
+                    text: `Built ${builtParts.join(', ')}`
+                });
+            }
+            shipsBuiltThisTurn = {};
 
             // Reset combat state for new turn
             combatThisTurn = false;
@@ -1140,6 +1178,12 @@
             star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
             star.buildingShip = null;
             star.colonizedTurn = turn;
+            // Track colonization event
+            eventHistory.unshift({
+                year: turn,
+                type: 'colony',
+                text: `Established colony on ${star.name}`
+            });
             AudioSystem.sfx.levelComplete();
             updatePanels();
             updateTurnInfo();
@@ -1169,6 +1213,12 @@
             star.defenseProgress = 0;
             star.colonizedTurn = turn;
             star.aiPhase = undefined;
+            // Track conquest event
+            eventHistory.unshift({
+                year: turn,
+                type: 'conquest',
+                text: `Conquered ${star.name}`
+            });
             AudioSystem.sfx.levelComplete();
             updatePanels();
             updateTurnInfo();
@@ -1433,20 +1483,20 @@
 
         function updatePlanetPanel() {
             if (showingHistory) {
-                // Show battle history
-                let html = '<div class="panel-title">Battle History</div>';
+                let html = '<div style="max-height:450px;overflow-y:auto;">';
 
+                // Battle History section
+                html += '<div class="panel-title">Battle History</div>';
                 if (battleHistory.length === 0) {
                     html += '<div class="empty-state">No battles yet</div>';
                 } else {
-                    html += '<div style="max-height:400px;overflow-y:auto;">';
                     for (const battle of battleHistory) {
                         const resultColor = battle.victory ? '#4ecdc4' : '#ff6b6b';
                         const resultText = battle.victory ? 'VICTORY' : 'DEFEAT';
 
                         html += `<div style="padding:6px;margin:4px 0;background:#252540;border-radius:4px;border-left:3px solid ${resultColor};">`;
                         html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
-                        html += `<span style="color:#ffe66d;font-weight:bold;font-size:11px;">Turn ${battle.turn}</span>`;
+                        html += `<span style="color:#ffe66d;font-weight:bold;font-size:11px;">Year ${battle.turn}</span>`;
                         html += `<span style="color:${resultColor};font-weight:bold;font-size:10px;">${resultText}</span>`;
                         html += `</div>`;
                         html += `<div style="color:#888;font-size:10px;margin:2px 0;">${battle.location}</div>`;
@@ -1469,9 +1519,28 @@
 
                         html += `</div>`;
                     }
-                    html += '</div>';
                 }
 
+                // Events History section
+                html += '<div class="panel-title" style="margin-top:12px;">Events</div>';
+                if (eventHistory.length === 0) {
+                    html += '<div class="empty-state">No events yet</div>';
+                } else {
+                    for (const event of eventHistory) {
+                        let eventColor = '#888';
+                        if (event.type === 'colony') eventColor = '#4ecdc4';
+                        else if (event.type === 'conquest') eventColor = '#ffe66d';
+                        else if (event.type === 'scout') eventColor = '#9932cc';
+                        else if (event.type === 'built') eventColor = '#4a9fff';
+
+                        html += `<div style="padding:4px 6px;margin:2px 0;background:#252540;border-radius:4px;border-left:3px solid ${eventColor};">`;
+                        html += `<span style="color:#ffe66d;font-size:10px;">Year ${event.year}:</span> `;
+                        html += `<span style="color:${eventColor};font-size:10px;">${event.text}</span>`;
+                        html += `</div>`;
+                    }
+                }
+
+                html += '</div>';
                 planetContent.innerHTML = html;
                 return;
             }
