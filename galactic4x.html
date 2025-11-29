@@ -40,8 +40,8 @@
             border-radius: 4px;
             padding: 10px;
             display: flex;
-            gap: 10px;
-            align-items: center;
+            flex-direction: column;
+            gap: 4px;
         }
         #actionPanel.hidden { display: none; }
         .side-panel {
@@ -328,9 +328,11 @@
         <div id="centerColumn">
             <canvas id="gameCanvas" width="640" height="550"></canvas>
             <div id="actionPanel" class="hidden">
-                <button class="btn btn-primary" id="endTurnBtn" onclick="window.endTurn()">End Turn</button>
-                <button class="btn" onclick="window.showOverview()">Overview</button>
-                <span id="turnInfo" style="color:#888;font-size:11px;"></span>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <button class="btn btn-primary" id="endTurnBtn" onclick="window.endTurn()">End Turn</button>
+                    <button class="btn" onclick="window.showOverview()">Overview</button>
+                </div>
+                <div id="turnInfo" style="color:#888;font-size:11px;margin-top:6px;"></div>
             </div>
         </div>
         <div id="fleetPanel" class="side-panel hidden">
@@ -674,9 +676,20 @@
                 maxDev += planetInfo.maxPop + 100;
             }
 
-            const devPercent = maxDev > 0 ? Math.round((currentDev / maxDev) * 100) : 0;
+            // Calculate max possible production for entire map
+            let maxMapProduction = 0;
+            for (const star of stars) {
+                const planetInfo = PLANET_TYPES[star.planetType];
+                if (planetInfo.maxPop > 0) {
+                    // Max production = maxPop * 100% industry * industryMod
+                    maxMapProduction += planetInfo.maxPop * 1.0 * planetInfo.industryMod;
+                }
+            }
 
-            turnInfo.textContent = `Turn ${turn} | Colonies: ${colonies.length} | Ships: ${totalShips} | Production: ${Math.floor(totalProduction)}/turn | Dev: ${devPercent}%`;
+            const devPercent = maxDev > 0 ? Math.round((currentDev / maxDev) * 100) : 0;
+            const conquestPercent = maxMapProduction > 0 ? Math.round((totalProduction / maxMapProduction) * 100) : 0;
+
+            turnInfo.textContent = `Turn ${turn} | Colonies: ${colonies.length} | Ships: ${totalShips} | Prod: ${Math.floor(totalProduction)}/turn | Dev: ${devPercent}% | Conquest: ${conquestPercent}%`;
         }
 
         function getShipsAtStar(starId) {
