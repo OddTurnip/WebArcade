@@ -1054,22 +1054,22 @@
                         html += `Dev: ${devPercent}% | Def: ${colony.defense}`;
                         html += `</div>`;
 
-                        // Show ship production on separate row
+                        // Show ship production on separate row (only if producing)
                         if (colony.buildingShip) {
-                            const shipType = SHIP_TYPES[colony.buildingShip];
-                            const progress = colony.shipProgress[colony.buildingShip] || 0;
-                            const pct = Math.floor((progress / shipType.cost) * 100);
-
-                            // Calculate ships per turn
                             const prod = calculateProduction(colony);
-                            const shipsPerTurn = prod.ship / shipType.cost;
+                            if (prod.ship >= 1) {
+                                const shipType = SHIP_TYPES[colony.buildingShip];
+                                const progress = colony.shipProgress[colony.buildingShip] || 0;
+                                const pct = Math.floor((progress / shipType.cost) * 100);
+                                const shipsPerTurn = prod.ship / shipType.cost;
 
-                            html += `<div style="font-size:10px;color:#4ecdc4;">`;
-                            html += `${shipType.name}: ${pct}%`;
-                            if (shipsPerTurn >= 0.01) {
-                                html += ` (${shipsPerTurn.toFixed(2)}/turn)`;
+                                html += `<div style="font-size:10px;color:#4ecdc4;">`;
+                                html += `${shipType.name}: ${pct}%`;
+                                if (shipsPerTurn >= 0.01) {
+                                    html += ` (${shipsPerTurn.toFixed(2)}/turn)`;
+                                }
+                                html += `</div>`;
                             }
-                            html += `</div>`;
                         }
                         html += `</div>`;
                     }
