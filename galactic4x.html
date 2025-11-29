@@ -1890,7 +1890,10 @@
             if (star.explored) {
                 const enemyShipsHere = getShipsAtStar(star.id).filter(s => s.owner !== 'player');
                 if (enemyShipsHere.length > 0) {
-                    html += `<div style="margin-top:10px" class="panel-title" style="color:#ff6b6b">Enemy Fleet</div>`;
+                    const enemyOwner = enemyShipsHere[0].owner;
+                    const enemyRace = RACES.find(r => r.id === enemyOwner);
+                    const enemyColor = enemyRace?.color || '#ff6b6b';
+                    html += `<div style="margin-top:10px" class="panel-title" style="color:${enemyColor}">Enemy Fleet</div>`;
                     // Group by type
                     const enemyByType = {};
                     for (const ship of enemyShipsHere) {
@@ -1903,7 +1906,7 @@
                         if (!enemyByType[type]) continue;
                         const count = enemyByType[type];
                         const shipType = SHIP_TYPES[type];
-                        html += `<div class="ship-item" style="color:#ff6b6b;">
+                        html += `<div class="ship-item" style="color:${enemyColor};">
                             <span>${count}x ${shipType.name}</span>
                             <span style="color:#888;font-size:9px;">${shipType.attack} atk / ${shipType.health} hp</span>
                         </div>`;
@@ -2538,18 +2541,19 @@
                 ctx.font = 'bold 10px Courier New';
                 const hasPlayer = shipsHere.length > 0;
                 const hasEnemy = enemyShipsHere.length > 0;
+                const enemyColor = hasEnemy ? (RACES.find(r => r.id === enemyShipsHere[0].owner)?.color || '#ff6b6b') : '#ff6b6b';
 
                 if (hasPlayer && hasEnemy) {
                     // Both present - center the pair
                     ctx.fillStyle = player.color;
                     ctx.fillText(`[${shipsHere.length}]`, star.x - 13, star.y - 20);
-                    ctx.fillStyle = '#ff6b6b';
+                    ctx.fillStyle = enemyColor;
                     ctx.fillText(`[${enemyShipsHere.length}]`, star.x + 13, star.y - 20);
                 } else if (hasPlayer) {
                     ctx.fillStyle = player.color;
                     ctx.fillText(`[${shipsHere.length}]`, star.x, star.y - 20);
                 } else if (hasEnemy) {
-                    ctx.fillStyle = '#ff6b6b';
+                    ctx.fillStyle = enemyColor;
                     ctx.fillText(`[${enemyShipsHere.length}]`, star.x, star.y - 20);
                 }
 
