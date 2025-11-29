@@ -446,7 +446,8 @@
                     owner: s.owner, explored: s.explored,
                     population: s.population, industry: s.industry, defense: s.defense,
                     sliders: {...s.sliders}, lockedSliders: [...(s.lockedSliders || [])],
-                    shipProgress: {...s.shipProgress}, buildingShip: s.buildingShip
+                    shipProgress: {...s.shipProgress}, buildingShip: s.buildingShip,
+                    colonizedTurn: s.colonizedTurn
                 })),
                 ships: ships.map(s => ({
                     id: s.id, type: s.type, owner: s.owner,
@@ -527,6 +528,7 @@
         let hoveredStar = null;
         let raceSelectIndex = 0;
         let hasSaveGame = false;
+        let overviewSort = 'name'; // 'name', 'age', 'dev', 'defense'
 
         // DOM references
         const planetPanel = document.getElementById('planetPanel');
@@ -613,6 +615,7 @@
             homeStar.industry = 20;
             homeStar.defense = 5;
             homeStar.planetType = 'terran';
+            homeStar.colonizedTurn = 1;
 
             ships.push({
                 id: nextShipId++,
@@ -959,6 +962,7 @@
             star.defense = 0;
             star.lockedSliders = [];
             star.sliders = { ship: 0, def: 0, ind: 50, eco: 50 };
+            star.colonizedTurn = turn;
             AudioSystem.sfx.levelComplete();
             updatePanels();
             updateTurnInfo();
@@ -993,26 +997,61 @@
             updateFleetPanel();
         }
 
+        function getColonyDevPercent(colony) {
+            const planetInfo = PLANET_TYPES[colony.planetType];
+            const prod = colony.population * (colony.industry / 100) * planetInfo.industryMod;
+            const maxProd = planetInfo.maxPop * 1.0 * planetInfo.industryMod;
+            return maxProd > 0 ? Math.round((prod / maxProd) * 100) : 0;
+        }
+
         function updatePlanetPanel() {
             if (!selectedStar) {
                 // Show empire overview
-                const colonies = getPlayerColonies();
+                let colonies = getPlayerColonies();
                 let html = '<div class="panel-title">Empire Overview</div>';
 
                 if (colonies.length === 0) {
                     html += '<div class="empty-state">No colonies yet</div>';
                 } else {
+                    // Sort buttons
+                    html += '<div style="margin-bottom:6px;display:flex;gap:4px;flex-wrap:wrap;">';
+                    const sortOptions = [
+                        { key: 'name', label: 'Name' },
+                        { key: 'age', label: 'Age' },
+                        { key: 'dev', label: 'Dev' },
+                        { key: 'defense', label: 'Def' }
+                    ];
+                    for (const opt of sortOptions) {
+                        const active = overviewSort === opt.key ? 'background:#4ecdc4;color:#1a1a2e;' : '';
+                        html += `<button class="btn btn-sm" style="padding:2px 6px;font-size:9px;${active}" onclick="setOverviewSort('${opt.key}')">${opt.label}</button>`;
+                    }
+                    html += '</div>';
+
+                    // Sort colonies
+                    colonies = [...colonies].sort((a, b) => {
+                        switch (overviewSort) {
+                            case 'name':
+                                return a.name.localeCompare(b.name);
+                            case 'age':
+                                return (a.colonizedTurn || 1) - (b.colonizedTurn || 1);
+                            case 'dev':
+                                return getColonyDevPercent(b) - getColonyDevPercent(a);
+                            case 'defense':
+                                return b.defense - a.defense;
+                            default:
+                                return 0;
+                        }
+                    });
+
                     for (const colony of colonies) {
                         const planetInfo = PLANET_TYPES[colony.planetType];
-                        // Calculate development %
-                        const currentDev = colony.population + colony.industry;
-                        const maxDev = planetInfo.maxPop + 100;
-                        const devPercent = Math.round((currentDev / maxDev) * 100);
+                        const devPercent = getColonyDevPercent(colony);
+                        const age = turn - (colony.colonizedTurn || 1);
 
                         html += `<div class="empire-planet" onclick="selectStar(${colony.id})" style="cursor:pointer;padding:6px;margin:4px 0;background:#252540;border-radius:4px;">`;
                         html += `<div style="color:${planetInfo.color};font-weight:bold;font-size:11px;">${colony.name}</div>`;
                         html += `<div style="font-size:10px;color:#888;">`;
-                        html += `Dev: ${devPercent}% | Def: ${colony.defense}`;
+                        html += `Age: ${age} | Dev: ${devPercent}% | Def: ${colony.defense}`;
 
                         // Show ship progress if building
                         if (colony.buildingShip) {
@@ -1390,6 +1429,11 @@
             normalizeSliders(star, sliderKey, value);
             updatePanels();
             saveGameState();
+        };
+
+        window.setOverviewSort = function(sortKey) {
+            overviewSort = sortKey;
+            updatePanels();
         };
 
         window.toggleSliderLock = function(starId, sliderKey) {
