@@ -720,6 +720,86 @@
             }
         }
 
+        // When a slider becomes auto-locked (maxed), set it to 0 and redistribute
+        function redistributeAutoLockedSliders(star) {
+            const keys = ['ship', 'def', 'ind', 'eco'];
+            let changed = false;
+
+            for (const key of keys) {
+                const lockState = getSliderLockState(star, key);
+                // Only handle 'auto' locks (industry/population maxed)
+                if (lockState.type === 'auto' && star.sliders[key] > 0) {
+                    const valueToRedistribute = star.sliders[key];
+                    star.sliders[key] = 0;
+                    changed = true;
+
+                    // Find sliders that can receive this value
+                    // Priority: unlocked > noship > user-locked (override)
+                    const otherKeys = keys.filter(k => k !== key);
+
+                    // Get lock states for other sliders
+                    const otherLockStates = {};
+                    for (const k of otherKeys) {
+                        otherLockStates[k] = getSliderLockState(star, k);
+                    }
+
+                    // Try unlocked sliders first
+                    let receiverKeys = otherKeys.filter(k => !otherLockStates[k].locked);
+
+                    // If no unlocked, try noship sliders
+                    if (receiverKeys.length === 0) {
+                        receiverKeys = otherKeys.filter(k => otherLockStates[k].type === 'noship');
+                    }
+
+                    // If still nothing, override user locks
+                    if (receiverKeys.length === 0) {
+                        receiverKeys = otherKeys.filter(k => otherLockStates[k].type === 'user');
+                        // Remove the user lock since we're overriding it
+                        for (const k of receiverKeys) {
+                            if (star.lockedSliders) {
+                                star.lockedSliders = star.lockedSliders.filter(l => l !== k);
+                            }
+                        }
+                    }
+
+                    // If still nothing (all other sliders are also auto-locked), skip
+                    if (receiverKeys.length === 0) continue;
+
+                    // Redistribute proportionally to current values, or equally if all zero
+                    const receiverTotal = receiverKeys.reduce((sum, k) => sum + star.sliders[k], 0);
+                    if (receiverTotal === 0) {
+                        // Distribute equally
+                        const perSlider = Math.floor(valueToRedistribute / receiverKeys.length);
+                        let remainder = valueToRedistribute - (perSlider * receiverKeys.length);
+                        for (const k of receiverKeys) {
+                            star.sliders[k] += perSlider;
+                            if (remainder > 0) {
+                                star.sliders[k]++;
+                                remainder--;
+                            }
+                        }
+                    } else {
+                        // Distribute proportionally
+                        let distributed = 0;
+                        for (let i = 0; i < receiverKeys.length; i++) {
+                            const k = receiverKeys[i];
+                            if (i === receiverKeys.length - 1) {
+                                // Last one gets the remainder to ensure sum = 100
+                                star.sliders[k] += (valueToRedistribute - distributed);
+                            } else {
+                                const proportion = star.sliders[k] / receiverTotal;
+                                const amount = Math.round(valueToRedistribute * proportion);
+                                star.sliders[k] += amount;
+                                distributed += amount;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return changed;
+        }
+
         function processTurn() {
             state = GameState.END_TURN;
 
@@ -749,6 +829,8 @@
                         AudioSystem.sfx.powerUp();
                     }
                 }
+                // Redistribute sliders if industry or population just maxed
+                redistributeAutoLockedSliders(star);
             }
 
             for (const ship of ships) {
@@ -881,6 +963,9 @@
             }
 
             if (star.owner === 'player') {
+                // Ensure auto-locked sliders are at 0 and redistributed
+                redistributeAutoLockedSliders(star);
+
                 const planetInfo = PLANET_TYPES[star.planetType];
                 const prod = calculateProduction(star);
 
