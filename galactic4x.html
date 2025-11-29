@@ -1470,8 +1470,8 @@
 
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = e.clientX - rect.left - 4; // Account for 4px border
+            const y = e.clientY - rect.top - 4;
 
             AudioSystem.unlock();
 
@@ -1548,8 +1548,8 @@
 
         canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = e.clientX - rect.left - 4; // Account for 4px border
+            const y = e.clientY - rect.top - 4;
             if (state === GameState.PLAYING) {
                 hoveredStar = getStarAtPosition(x, y);
             }
