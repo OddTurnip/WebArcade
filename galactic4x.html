@@ -50,7 +50,7 @@
             border: 4px solid #4a4a6a;
             border-radius: 4px;
             padding: 12px;
-            height: 600px;
+            height: 620px;
             display: flex;
             flex-direction: column;
         }
@@ -655,7 +655,26 @@
         function updateTurnInfo() {
             const colonies = getPlayerColonies();
             const totalShips = ships.filter(s => s.owner === 'player').length;
-            turnInfo.textContent = `Turn ${turn} | Colonies: ${colonies.length} | Ships: ${totalShips}`;
+
+            // Calculate total production and development
+            let totalProduction = 0;
+            let currentDev = 0;
+            let maxDev = 0;
+
+            for (const colony of colonies) {
+                const planetInfo = PLANET_TYPES[colony.planetType];
+                // Production = population * (industry/100) * industryMod
+                const colonyProd = colony.population * (colony.industry / 100) * planetInfo.industryMod;
+                totalProduction += colonyProd;
+
+                // Development = current pop + industry vs max pop + 100 industry
+                currentDev += colony.population + colony.industry;
+                maxDev += planetInfo.maxPop + 100;
+            }
+
+            const devPercent = maxDev > 0 ? Math.round((currentDev / maxDev) * 100) : 0;
+
+            turnInfo.textContent = `Turn ${turn} | Colonies: ${colonies.length} | Ships: ${totalShips} | Production: ${Math.floor(totalProduction)}/turn | Dev: ${devPercent}%`;
         }
 
         function getShipsAtStar(starId) {
@@ -666,15 +685,17 @@
             return stars.filter(s => s.owner === 'player');
         }
 
-        function calculateProduction(star) {
+        function calculateProduction(star, overrideSliders = null) {
             if (star.owner !== 'player') return null;
             const planetInfo = PLANET_TYPES[star.planetType];
             const baseProduction = star.population * (star.industry / 100) * planetInfo.industryMod;
+            const sliders = overrideSliders || star.sliders;
             return {
-                ship: Math.floor(baseProduction * (star.sliders.ship / 100)),
-                def: Math.floor(baseProduction * (star.sliders.def / 100)),
-                ind: Math.floor(baseProduction * (star.sliders.ind / 100) * 0.5),
-                eco: Math.floor(baseProduction * (star.sliders.eco / 100) * planetInfo.ecoMod * 0.3)
+                ship: Math.floor(baseProduction * (sliders.ship / 100)),
+                def: Math.floor(baseProduction * (sliders.def / 100)),
+                ind: Math.floor(baseProduction * (sliders.ind / 100) * 0.5),
+                eco: baseProduction * (sliders.eco / 100) * planetInfo.ecoMod * 0.3, // Keep decimal for display
+                ecoRaw: baseProduction * (sliders.eco / 100) * planetInfo.ecoMod * 0.3
             };
         }
 
@@ -1012,21 +1033,36 @@
                     const lockBtnClass = isUserLocked ? 'lock-btn locked' : 'lock-btn';
                     const lockDisabled = lockState.type === 'auto' || lockState.type === 'noship';
 
-                    html += `<div class="${containerClass}">
+                    // Determine if we should show production (hide if maxed)
+                    const isMaxed = (slider.key === 'ind' && star.industry >= 100) ||
+                                   (slider.key === 'eco' && star.population >= planetInfo.maxPop);
+
+                    // Format production value (1 decimal for pop growth)
+                    let prodDisplay = '';
+                    if (!isMaxed) {
+                        if (slider.key === 'eco') {
+                            prodDisplay = `+${prod.eco.toFixed(1)} ${slider.prodLabel}/turn`;
+                        } else {
+                            prodDisplay = `+${prod[slider.prodKey]} ${slider.prodLabel}/turn`;
+                        }
+                    }
+
+                    html += `<div class="${containerClass}" data-slider="${slider.key}">
                         <div class="slider-header">
                             <span class="slider-label">${slider.label}</span>
-                            <span class="slider-value">${star.sliders[slider.key]}%</span>
+                            <span class="slider-value" id="slider-val-${star.id}-${slider.key}">${star.sliders[slider.key]}%</span>
                         </div>
                         <div class="slider-row">
                             <input type="range" min="0" max="100" step="5" value="${star.sliders[slider.key]}"
                                    ${lockState.locked ? 'disabled' : ''}
+                                   oninput="previewSlider(${star.id}, '${slider.key}', this.value)"
                                    onchange="adjustSlider(${star.id}, '${slider.key}', this.value)">
                             <button class="${lockBtnClass}" ${lockDisabled ? 'disabled' : ''}
                                     onclick="toggleSliderLock(${star.id}, '${slider.key}')">
                                 ${isUserLocked ? '🔒' : '🔓'}
                             </button>
                         </div>
-                        <div class="slider-production">+${prod[slider.prodKey]} ${slider.prodLabel}/turn</div>`;
+                        <div class="slider-production" id="slider-prod-${star.id}-${slider.key}">${prodDisplay}</div>`;
                     if (lockState.locked && lockState.reason) {
                         const reasonClass = lockState.type === 'noship' ? 'lock-reason warning' : 'lock-reason';
                         const prefix = lockState.type === 'noship' ? '⚠ ' : '';
@@ -1120,7 +1156,7 @@
                     const isSelected = selectedShips.includes(ship.id);
                     html += `<div class="ship-item ${isSelected ? 'selected' : ''}" onclick="toggleShipSelection(${ship.id})">
                         <span>${shipType.name}</span>
-                        <span style="color:#666">spd ${shipType.speed}</span>
+                        <span style="color:#666">move ${shipType.speed}</span>
                     </div>`;
                 }
             } else {
@@ -1164,6 +1200,76 @@
         }
 
         // Global functions for UI callbacks
+        window.previewSlider = function(starId, sliderKey, value) {
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+            value = parseInt(value);
+
+            // Create a temporary copy of sliders to calculate preview
+            const tempSliders = {...star.sliders};
+            tempSliders[sliderKey] = value;
+
+            // Calculate how other sliders would adjust
+            const lockStates = {};
+            for (const key of Object.keys(star.sliders)) {
+                lockStates[key] = getSliderLockState(star, key);
+            }
+            const unlockedKeys = Object.keys(star.sliders).filter(k =>
+                k !== sliderKey && !lockStates[k].locked
+            );
+            const total = Object.values(tempSliders).reduce((a, b) => a + b, 0);
+            const diff = total - 100;
+
+            if (diff !== 0 && unlockedKeys.length > 0) {
+                const unlockedTotal = unlockedKeys.reduce((sum, k) => sum + tempSliders[k], 0);
+                if (unlockedTotal === 0) {
+                    const perSlider = Math.floor(diff / unlockedKeys.length);
+                    for (const key of unlockedKeys) {
+                        tempSliders[key] = Math.max(0, -perSlider);
+                    }
+                } else {
+                    for (const key of unlockedKeys) {
+                        const proportion = tempSliders[key] / unlockedTotal;
+                        tempSliders[key] = Math.max(0, Math.round(tempSliders[key] - diff * proportion));
+                    }
+                }
+                // Fix rounding
+                const finalTotal = Object.values(tempSliders).reduce((a, b) => a + b, 0);
+                if (finalTotal !== 100 && unlockedKeys.length > 0) {
+                    tempSliders[unlockedKeys[0]] += (100 - finalTotal);
+                }
+            }
+
+            // Calculate preview production
+            const prod = calculateProduction(star, tempSliders);
+            const planetInfo = PLANET_TYPES[star.planetType];
+
+            // Update all slider displays
+            const sliderTypes = [
+                { key: 'ship', prodKey: 'ship', prodLabel: 'prod' },
+                { key: 'def', prodKey: 'def', prodLabel: 'def' },
+                { key: 'ind', prodKey: 'ind', prodLabel: '% ind' },
+                { key: 'eco', prodKey: 'eco', prodLabel: 'pop' }
+            ];
+
+            for (const slider of sliderTypes) {
+                const valEl = document.getElementById(`slider-val-${starId}-${slider.key}`);
+                const prodEl = document.getElementById(`slider-prod-${starId}-${slider.key}`);
+                if (valEl) valEl.textContent = `${tempSliders[slider.key]}%`;
+                if (prodEl) {
+                    const isMaxed = (slider.key === 'ind' && star.industry >= 100) ||
+                                   (slider.key === 'eco' && star.population >= planetInfo.maxPop);
+                    if (!isMaxed) {
+                        if (slider.key === 'eco') {
+                            prodEl.textContent = `+${prod.eco.toFixed(1)} ${slider.prodLabel}/turn`;
+                        } else {
+                            prodEl.textContent = `+${prod[slider.prodKey]} ${slider.prodLabel}/turn`;
+                        }
+                    }
+                }
+            }
+        };
+
         window.adjustSlider = function(starId, sliderKey, value) {
             const star = stars.find(s => s.id === starId);
             if (!star) return;
