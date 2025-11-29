@@ -694,9 +694,8 @@
             return {
                 ship: Math.floor(baseProduction * (sliders.ship / 100)),
                 def: Math.floor(baseProduction * (sliders.def / 100)),
-                ind: Math.floor(baseProduction * (sliders.ind / 100) * 0.5),
-                eco: baseProduction * (sliders.eco / 100) * planetInfo.ecoMod * 0.3, // Keep decimal for display
-                ecoRaw: baseProduction * (sliders.eco / 100) * planetInfo.ecoMod * 0.3
+                ind: baseProduction * (sliders.ind / 100) * 0.5, // Keep decimal for gradual growth
+                eco: baseProduction * (sliders.eco / 100) * planetInfo.ecoMod * 0.3
             };
         }
 
@@ -1010,7 +1009,7 @@
 
                 html += `<div style="margin-top:10px" class="panel-title">Colony</div>`;
                 html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${star.population.toFixed(1)}/${planetInfo.maxPop}</span></div>`;
-                html += `<div class="info-row"><span class="info-label">Industry:</span><span class="info-value">${star.industry}%</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Industry:</span><span class="info-value">${star.industry.toFixed(1)}%</span></div>`;
                 html += `<div class="info-row"><span class="info-label">Defense:</span><span class="info-value">${star.defense}</span></div>`;
 
                 html += `<div style="margin-top:10px" class="panel-title">Production</div>`;
@@ -1038,11 +1037,11 @@
                     const isMaxed = (slider.key === 'ind' && star.industry >= 100) ||
                                    (slider.key === 'eco' && star.population >= planetInfo.maxPop);
 
-                    // Format production value (1 decimal for pop growth)
+                    // Format production value (1 decimal for pop/industry growth)
                     let prodDisplay = '';
                     if (!isMaxed) {
-                        if (slider.key === 'eco') {
-                            prodDisplay = `+${prod.eco.toFixed(1)} ${slider.prodLabel}/turn`;
+                        if (slider.key === 'eco' || slider.key === 'ind') {
+                            prodDisplay = `+${prod[slider.prodKey].toFixed(1)} ${slider.prodLabel}/turn`;
                         } else {
                             prodDisplay = `+${prod[slider.prodKey]} ${slider.prodLabel}/turn`;
                         }
@@ -1261,8 +1260,8 @@
                     const isMaxed = (slider.key === 'ind' && star.industry >= 100) ||
                                    (slider.key === 'eco' && star.population >= planetInfo.maxPop);
                     if (!isMaxed) {
-                        if (slider.key === 'eco') {
-                            prodEl.textContent = `+${prod.eco.toFixed(1)} ${slider.prodLabel}/turn`;
+                        if (slider.key === 'eco' || slider.key === 'ind') {
+                            prodEl.textContent = `+${prod[slider.prodKey].toFixed(1)} ${slider.prodLabel}/turn`;
                         } else {
                             prodEl.textContent = `+${prod[slider.prodKey]} ${slider.prodLabel}/turn`;
                         }
