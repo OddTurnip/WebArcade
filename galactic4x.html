@@ -802,7 +802,7 @@
         }
 
         function calculateProduction(star, overrideSliders = null) {
-            if (star.owner !== 'player') return null;
+            if (!star.owner) return null; // Unowned stars have no production
             const planetInfo = PLANET_TYPES[star.planetType];
             const baseProduction = star.population * (star.industry / 100) * planetInfo.industryMod;
             const sliders = overrideSliders || star.sliders;
@@ -1000,8 +1000,9 @@
                 const planetInfo = PLANET_TYPES[star.planetType];
                 const maxPop = planetInfo.maxPop;
 
-                // AI phase logic: grow first, then build military
+                // Ensure AI colony has required properties
                 if (!star.aiPhase) star.aiPhase = 'growth';
+                if (!star.sliders) star.sliders = { ship: 0, def: 0, ind: 50, eco: 50 };
                 if (!star.shipProgress) star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
                 if (!star.defenseProgress) star.defenseProgress = 0;
 
@@ -1015,6 +1016,7 @@
                 }
 
                 const production = calculateProduction(star);
+                if (!production) continue; // Skip if production can't be calculated
 
                 // Apply production
                 star.industry = Math.min(100, star.industry + production.ind);
