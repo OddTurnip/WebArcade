@@ -18,6 +18,7 @@ WebArcade/
 ├── brickspinner.html    # Game: Brick Spinner (Tetris-style)
 ├── serpentine.html      # Game: Serpentine (Snake)
 ├── galacticdefense.html # Game: Galactic Defense (Space Invaders)
+├── galactic4x.html      # Game: Galactic 4X (turn-based space strategy)
 ├── pool.html            # Game: Pool (8-ball billiards)
 ├── grid.js              # Hex and triangle grid geometry library
 ├── sapper.js            # Shared game logic for square-grid Sapper games
