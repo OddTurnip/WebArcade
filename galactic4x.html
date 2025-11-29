@@ -660,20 +660,18 @@
             const colonies = getPlayerColonies();
             const totalShips = ships.filter(s => s.owner === 'player').length;
 
-            // Calculate total production and development
+            // Calculate total production and max production for player's colonies
             let totalProduction = 0;
-            let currentDev = 0;
-            let maxDev = 0;
+            let maxColonyProduction = 0;
 
             for (const colony of colonies) {
                 const planetInfo = PLANET_TYPES[colony.planetType];
-                // Production = population * (industry/100) * industryMod
+                // Current production = population * (industry/100) * industryMod
                 const colonyProd = colony.population * (colony.industry / 100) * planetInfo.industryMod;
                 totalProduction += colonyProd;
 
-                // Development = current pop + industry vs max pop + 100 industry
-                currentDev += colony.population + colony.industry;
-                maxDev += planetInfo.maxPop + 100;
+                // Max production for this colony if fully developed
+                maxColonyProduction += planetInfo.maxPop * 1.0 * planetInfo.industryMod;
             }
 
             // Calculate max possible production for entire map
@@ -681,12 +679,13 @@
             for (const star of stars) {
                 const planetInfo = PLANET_TYPES[star.planetType];
                 if (planetInfo.maxPop > 0) {
-                    // Max production = maxPop * 100% industry * industryMod
                     maxMapProduction += planetInfo.maxPop * 1.0 * planetInfo.industryMod;
                 }
             }
 
-            const devPercent = maxDev > 0 ? Math.round((currentDev / maxDev) * 100) : 0;
+            // Dev = how developed your colonies are (your prod / your max prod)
+            // Conquest = how much of map you control (your prod / map max prod)
+            const devPercent = maxColonyProduction > 0 ? Math.round((totalProduction / maxColonyProduction) * 100) : 0;
             const conquestPercent = maxMapProduction > 0 ? Math.round((totalProduction / maxMapProduction) * 100) : 0;
 
             turnInfo.textContent = `Turn ${turn} | Colonies: ${colonies.length} | Ships: ${totalShips} | Prod: ${Math.floor(totalProduction)}/turn | Dev: ${devPercent}% | Conquest: ${conquestPercent}%`;
