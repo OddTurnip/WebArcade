@@ -442,7 +442,7 @@
                     owner: s.owner, explored: s.explored,
                     population: s.population, industry: s.industry, defense: s.defense,
                     sliders: {...s.sliders}, lockedSliders: [...(s.lockedSliders || [])],
-                    shipProgress: s.shipProgress, buildingShip: s.buildingShip
+                    shipProgress: {...s.shipProgress}, buildingShip: s.buildingShip
                 })),
                 ships: ships.map(s => ({
                     id: s.id, type: s.type, owner: s.owner,
@@ -466,10 +466,21 @@
                 turn = data.turn;
                 player.race = data.player.race;
                 player.color = data.player.color;
-                stars = data.stars.map(s => ({
-                    ...s,
-                    lockedSliders: s.lockedSliders || []
-                }));
+                stars = data.stars.map(s => {
+                    // Backwards compatibility: convert old number shipProgress to object
+                    let shipProgress = s.shipProgress;
+                    if (typeof shipProgress === 'number') {
+                        shipProgress = { scout: 0, fighter: 0, destroyer: 0, colony: 0 };
+                        if (s.buildingShip && shipProgress[s.buildingShip] !== undefined) {
+                            shipProgress[s.buildingShip] = s.shipProgress;
+                        }
+                    }
+                    return {
+                        ...s,
+                        lockedSliders: s.lockedSliders || [],
+                        shipProgress: shipProgress || { scout: 0, fighter: 0, destroyer: 0, colony: 0 }
+                    };
+                });
                 ships = data.ships;
                 nextShipId = data.nextShipId;
                 return true;
@@ -583,7 +594,7 @@
                     // Default sliders: 50% eco, 50% industry (no ship production until queued)
                     sliders: { ship: 0, def: 0, ind: 50, eco: 50 },
                     lockedSliders: [],
-                    shipProgress: 0,
+                    shipProgress: { scout: 0, fighter: 0, destroyer: 0, colony: 0 },
                     buildingShip: null
                 });
             }
@@ -813,21 +824,27 @@
                 }
                 star.defense += production.def;
                 if (star.buildingShip) {
-                    star.shipProgress += production.ship;
-                    const shipType = SHIP_TYPES[star.buildingShip];
-                    if (star.shipProgress >= shipType.cost) {
+                    const shipTypeKey = star.buildingShip;
+                    star.shipProgress[shipTypeKey] += production.ship;
+                    const shipType = SHIP_TYPES[shipTypeKey];
+                    let shipsBuilt = 0;
+                    // Build as many ships as production allows (with carry-over)
+                    while (star.shipProgress[shipTypeKey] >= shipType.cost) {
                         ships.push({
                             id: nextShipId++,
-                            type: star.buildingShip,
+                            type: shipTypeKey,
                             owner: 'player',
                             location: star.id,
                             destination: null,
                             turnsToArrival: 0
                         });
-                        star.shipProgress = 0;
-                        star.buildingShip = null;
+                        star.shipProgress[shipTypeKey] -= shipType.cost;
+                        shipsBuilt++;
+                    }
+                    if (shipsBuilt > 0) {
                         AudioSystem.sfx.powerUp();
                     }
+                    // Keep building same ship type (no longer sets to null)
                 }
                 // Redistribute sliders if industry or population just maxed
                 redistributeAutoLockedSliders(star);
@@ -919,7 +936,7 @@
             const star = stars.find(s => s.id === starId);
             if (!star || star.owner !== 'player') return;
             star.buildingShip = shipType;
-            star.shipProgress = 0;
+            // Don't reset progress - keep existing progress for this ship type
             AudioSystem.sfx.select();
             updatePanels();
             saveGameState();
@@ -929,7 +946,7 @@
             const star = stars.find(s => s.id === starId);
             if (!star) return;
             star.buildingShip = null;
-            star.shipProgress = 0;
+            // Don't clear progress - it stays in the factories for later
             updatePanels();
             saveGameState();
         }
@@ -1020,18 +1037,44 @@
 
                 html += `<div style="margin-top:10px" class="panel-title">Shipyard</div>`;
                 if (star.buildingShip) {
-                    const shipType = SHIP_TYPES[star.buildingShip];
-                    const progress = Math.floor((star.shipProgress / shipType.cost) * 100);
-                    const remaining = shipType.cost - star.shipProgress;
-                    const turnsLeft = prod.ship > 0 ? Math.ceil(remaining / prod.ship) : '∞';
+                    const shipTypeKey = star.buildingShip;
+                    const shipType = SHIP_TYPES[shipTypeKey];
+                    const currentProgress = star.shipProgress[shipTypeKey] || 0;
+                    const progress = Math.floor((currentProgress / shipType.cost) * 100);
+                    const remaining = shipType.cost - currentProgress;
+
+                    // Calculate ships per turn and next turn output
+                    let shipsNextTurn = 0;
+                    let turnsLeft = '∞';
+                    if (prod.ship > 0) {
+                        const totalNextTurn = currentProgress + prod.ship;
+                        shipsNextTurn = Math.floor(totalNextTurn / shipType.cost);
+                        const leftoverAfterBuilding = totalNextTurn - (shipsNextTurn * shipType.cost);
+                        turnsLeft = Math.ceil(remaining / prod.ship);
+                    }
+
                     html += `<div class="info-row"><span class="info-label">Building:</span><span class="info-value">${shipType.name}</span></div>`;
-                    html += `<div class="info-row"><span class="info-label">Progress:</span><span class="info-value">${progress}%</span></div>`;
-                    html += `<div class="info-row"><span class="info-label">ETA:</span><span class="info-value">${turnsLeft} turns</span></div>`;
+                    html += `<div class="info-row"><span class="info-label">Progress:</span><span class="info-value">${currentProgress}/${shipType.cost} (${progress}%)</span></div>`;
+                    if (prod.ship > 0) {
+                        html += `<div class="info-row"><span class="info-label">+Production:</span><span class="info-value">+${prod.ship}/turn</span></div>`;
+                        if (shipsNextTurn > 0) {
+                            html += `<div class="info-row"><span class="info-label">Next turn:</span><span class="info-value" style="color:#4ecdc4">${shipsNextTurn} ship${shipsNextTurn > 1 ? 's' : ''}</span></div>`;
+                        } else {
+                            html += `<div class="info-row"><span class="info-label">ETA:</span><span class="info-value">${turnsLeft} turn${turnsLeft > 1 ? 's' : ''}</span></div>`;
+                        }
+                    } else {
+                        html += `<div class="info-row"><span class="info-label">ETA:</span><span class="info-value">∞ (0% allocated)</span></div>`;
+                    }
                     html += `<button class="btn btn-danger btn-sm" onclick="cancelBuildingShip(${star.id})">Cancel</button>`;
                 } else {
                     html += `<div class="build-options">`;
                     for (const [key, type] of Object.entries(SHIP_TYPES)) {
-                        html += `<button class="btn build-btn" onclick="startBuildingShip(${star.id}, '${key}')">${type.name}<br>(${type.cost})</button>`;
+                        const existingProgress = star.shipProgress[key] || 0;
+                        let label = `${type.name}<br>(${type.cost})`;
+                        if (existingProgress > 0) {
+                            label = `${type.name}<br>(${existingProgress}/${type.cost})`;
+                        }
+                        html += `<button class="btn build-btn" onclick="startBuildingShip(${star.id}, '${key}')">${label}</button>`;
                     }
                     html += `</div>`;
                 }
