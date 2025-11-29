@@ -300,6 +300,7 @@
     <script src="audio.js"></script>
     <script src="sudoku.js"></script>
     <script>
+    (function() {
         // ============================================
         // CONFIGURATION
         // ============================================
@@ -870,7 +871,14 @@
         // ============================================
         // INITIALIZE
         // ============================================
+
+        // Expose functions needed by HTML onclick handlers
+        window.startGame = startGame;
+        window.showTitleScreen = showTitleScreen;
+        window.revealHint = revealHint;
+
         console.log('Sudoku initialized');
+    })();
     </script>
 </body>
 </html>
