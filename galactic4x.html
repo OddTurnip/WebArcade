@@ -1376,6 +1376,14 @@
                     }
                     html += `</div>`;
                 }
+            } else if (star.owner) {
+                // Enemy colony
+                const enemyRace = RACES.find(r => r.id === star.owner);
+                const planetInfo = PLANET_TYPES[star.planetType];
+                html += `<div style="margin-top:10px" class="panel-title">Enemy Colony</div>`;
+                html += `<div class="info-row"><span class="info-label">Owner:</span><span class="info-value" style="color:${enemyRace?.color || '#ff6b6b'}">${enemyRace?.name || star.owner}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${Math.floor(star.population)}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Defense:</span><span class="info-value">${star.defense}</span></div>`;
             } else if (star.explored) {
                 const planetInfo = PLANET_TYPES[star.planetType];
                 html += `<div style="margin-top:10px;color:#888;font-size:10px">Unclaimed system</div>`;
@@ -2149,19 +2157,23 @@
                 ctx.textAlign = 'center';
                 ctx.fillText(star.name, star.x, star.y + 28);
 
-                // Ship count (player)
-                if (shipsHere.length > 0) {
-                    ctx.fillStyle = player.color;
-                    ctx.font = 'bold 10px Courier New';
-                    ctx.fillText(`[${shipsHere.length}]`, star.x, star.y - 20);
-                }
+                // Ship counts - center the pair if both present
+                ctx.font = 'bold 10px Courier New';
+                const hasPlayer = shipsHere.length > 0;
+                const hasEnemy = enemyShipsHere.length > 0;
 
-                // Ship count (enemy) - show in red on opposite side
-                if (enemyShipsHere.length > 0) {
+                if (hasPlayer && hasEnemy) {
+                    // Both present - center the pair
+                    ctx.fillStyle = player.color;
+                    ctx.fillText(`[${shipsHere.length}]`, star.x - 13, star.y - 20);
                     ctx.fillStyle = '#ff6b6b';
-                    ctx.font = 'bold 10px Courier New';
-                    const xOffset = shipsHere.length > 0 ? 25 : 0;
-                    ctx.fillText(`[${enemyShipsHere.length}]`, star.x + xOffset, star.y - 20);
+                    ctx.fillText(`[${enemyShipsHere.length}]`, star.x + 13, star.y - 20);
+                } else if (hasPlayer) {
+                    ctx.fillStyle = player.color;
+                    ctx.fillText(`[${shipsHere.length}]`, star.x, star.y - 20);
+                } else if (hasEnemy) {
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.fillText(`[${enemyShipsHere.length}]`, star.x, star.y - 20);
                 }
 
                 // Planet type (when selected)
