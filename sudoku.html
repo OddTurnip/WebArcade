@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sudoku</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+            padding: 20px;
+        }
+        h1 { margin-bottom: 10px; color: #4ecdc4; }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            display: none;
+            cursor: pointer;
+        }
+        #gameCanvas.visible { display: block; }
+        #statusDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: none;
+            gap: 40px;
+            justify-content: center;
+        }
+        #statusDisplay.visible { display: flex; }
+        .status-item { text-align: center; }
+        .status-label { font-size: 12px; color: #888; margin-bottom: 5px; }
+        .status-value { font-size: 24px; color: #4ecdc4; }
+        .time .status-value { color: #ffe66d; }
+        .difficulty .status-value { color: #ff6b6b; font-size: 16px; }
+        #controls {
+            margin-top: 15px;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+        #audioControls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        #audioControls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #4ecdc4;
+        }
+        #configPanel {
+            background: #2a2a4a;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-top: 15px;
+        }
+        .config-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .preset-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+        .preset-btn {
+            padding: 6px 12px;
+            background: #3a3a5a;
+            border: 2px solid #4a4a6a;
+            border-radius: 4px;
+            color: #aaa;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .preset-btn:hover {
+            background: #4a4a6a;
+            color: #fff;
+            border-color: #4ecdc4;
+        }
+        .preset-btn.active {
+            background: #4ecdc4;
+            color: #1a1a2e;
+            border-color: #4ecdc4;
+        }
+        .new-game-btn {
+            padding: 8px 20px;
+            background: #4ecdc4;
+            border: none;
+            border-radius: 4px;
+            color: #1a1a2e;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .new-game-btn:hover { background: #5fd9d1; }
+        #titleScreen {
+            text-align: center;
+            padding: 60px 40px;
+            background: #2a2a4a;
+            border-radius: 8px;
+            border: 4px solid #4a4a6a;
+        }
+        #titleScreen h2 { color: #4ecdc4; font-size: 28px; margin-bottom: 20px; }
+        #titleScreen p { color: #888; font-size: 14px; margin-bottom: 30px; line-height: 1.6; }
+        #titleScreen .start-btn {
+            padding: 15px 40px;
+            background: #4ecdc4;
+            border: none;
+            border-radius: 4px;
+            color: #1a1a2e;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 5px;
+        }
+        #titleScreen .start-btn:hover { background: #5fd9d1; transform: scale(1.05); }
+        .difficulty-info {
+            margin-top: 20px;
+            font-size: 11px;
+            color: #666;
+            line-height: 1.8;
+        }
+        .difficulty-info strong { color: #888; }
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 26, 46, 0.95);
+            z-index: 1000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #loadingOverlay.visible { display: flex; }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #3a3a5a;
+            border-top-color: #4ecdc4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #4ecdc4;
+            font-size: 18px;
+        }
+        #hintPanel {
+            background: #2a2a4a;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin-top: 15px;
+            display: none;
+        }
+        #hintPanel.visible { display: block; }
+        .hint-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .hint-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #aaa;
+            cursor: pointer;
+        }
+        .hint-toggle input {
+            cursor: pointer;
+            accent-color: #ffe66d;
+        }
+        .hint-btn {
+            padding: 6px 14px;
+            background: #ffe66d;
+            border: none;
+            border-radius: 4px;
+            color: #1a1a2e;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .hint-btn:hover { background: #fff085; }
+        .hint-btn:disabled {
+            background: #4a4a6a;
+            color: #666;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Generating puzzle...</div>
+    </div>
+
+    <h1>Sudoku</h1>
+
+    <div id="titleScreen">
+        <h2>Select Game Mode</h2>
+        <p>Click a cell and type 1-9 to fill it<br>Complete the grid following Sudoku rules</p>
+        <button class="start-btn" onclick="startGame(0)">Blank Grid</button>
+        <br>
+        <button class="start-btn" onclick="startGame(1)">Level 1</button>
+        <button class="start-btn" onclick="startGame(2)">Level 2</button>
+        <button class="start-btn" onclick="startGame(3)">Level 3</button>
+        <button class="start-btn" onclick="startGame(4)">Level 4</button>
+        <button class="start-btn" onclick="startGame(5)">Level 5</button>
+        <div class="difficulty-info">
+            <strong>Level 1:</strong> Singles only<br>
+            <strong>Level 2:</strong> Pairs and chains<br>
+            <strong>Level 3:</strong> X-wing, Y-wing<br>
+            <strong>Level 4:</strong> Forcing chains<br>
+            <strong>Level 5:</strong> Trial and error
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" width="450" height="450"></canvas>
+    <div id="statusDisplay">
+        <div class="status-item time">
+            <div class="status-label">Time</div>
+            <div class="status-value" id="timeDisplay">0:00</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">Filled</div>
+            <div class="status-value" id="filledCount">0/81</div>
+        </div>
+        <div class="status-item difficulty">
+            <div class="status-label">Difficulty</div>
+            <div class="status-value" id="difficultyDisplay">--</div>
+        </div>
+    </div>
+
+    <div id="configPanel" style="display:none;">
+        <div class="config-row">
+            <button class="new-game-btn" onclick="showTitleScreen()">New Game</button>
+        </div>
+    </div>
+
+    <div id="hintPanel">
+        <div class="hint-row">
+            <label class="hint-toggle">
+                <input type="checkbox" id="pencilMarksToggle"> Show Pencil Marks (1-4)
+            </label>
+            <label class="hint-toggle">
+                <input type="checkbox" id="forcedHighlightToggle"> Highlight Forced
+            </label>
+            <button class="hint-btn" id="revealBtn" onclick="revealHint()">Reveal Square</button>
+        </div>
+    </div>
+
+    <div id="controls">
+        <strong>Click:</strong> Select cell | <strong>1-9:</strong> Enter number | <strong>Backspace/Delete/0:</strong> Clear cell | <strong>Arrow keys:</strong> Navigate
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="audio.js"></script>
+    <script src="sudoku.js"></script>
+    <script>
+    (function() {
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        const CELL_SIZE = 50;
+        const GRID_SIZE = 9;
+        const BOX_SIZE = 3;
+        const COLORS = {
+            background: '#1a1a2e',
+            cellBg: '#2a2a4a',
+            cellBgSelected: '#3a3a6a',
+            cellBgHighlight: '#2d2d52',
+            cellBgError: '#4a2a3a',
+            cellBgFixed: '#252540',
+            cellBgForced: '#4a4a2a',  // Gold tint for forced cells
+            gridLine: '#4a4a6a',
+            boxLine: '#6a6a8a',
+            numberFixed: '#888',
+            numberUser: '#4ecdc4',
+            numberError: '#ff6b6b',
+            numberPencil: '#666',     // Grey pencil marks
+            selected: '#4ecdc4',
+            highlight: '#3a3a5a',
+            forcedBorder: '#ffe66d'   // Gold border for forced cells
+        };
+
+        const DIFFICULTY_NAMES = ['Blank', 'Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'];
+
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        const GAME_ID = 'sudoku';
+        let gameData = GameStorage.load(GAME_ID, {
+            bestTimes: {},
+            gamesPlayed: 0,
+            gamesWon: 0,
+            sfxEnabled: true
+        });
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        // ============================================
+        // DOM ELEMENTS
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const timeDisplayEl = document.getElementById('timeDisplay');
+        const filledCountEl = document.getElementById('filledCount');
+        const difficultyDisplayEl = document.getElementById('difficultyDisplay');
+        const titleScreen = document.getElementById('titleScreen');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const configPanel = document.getElementById('configPanel');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const hintPanel = document.getElementById('hintPanel');
+        const pencilMarksToggle = document.getElementById('pencilMarksToggle');
+        const forcedHighlightToggle = document.getElementById('forcedHighlightToggle');
+        const revealBtn = document.getElementById('revealBtn');
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        let grid = [];           // Current player grid
+        let fixedCells = [];     // Which cells are part of the puzzle (not editable)
+        let solution = [];       // The complete solution
+        let selectedCell = { x: -1, y: -1 };
+        let isPlaying = false;
+        let currentDifficulty = 0;
+        let startTime = 0;
+        let elapsedTime = 0;
+        let timerInterval = null;
+        let gameWon = false;
+
+        // Hint mode state
+        let showPencilMarks = false;
+        let showForcedHighlight = false;
+
+        // ============================================
+        // SUDOKU LOGIC (from sudoku.js)
+        // ============================================
+        const {
+            isValidPlacement,
+            getCandidates,
+            isSolved,
+            isValidSolution,
+            solveBacktracking,
+            getDifficultyLevel,
+            generatePuzzle
+        } = SudokuGame;
+
+        // ============================================
+        // UI FUNCTIONS
+        // ============================================
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateDisplays() {
+            timeDisplayEl.textContent = formatTime(elapsedTime);
+
+            let filled = 0;
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (grid[r][c] !== 0) filled++;
+                }
+            }
+            filledCountEl.textContent = `${filled}/81`;
+            difficultyDisplayEl.textContent = DIFFICULTY_NAMES[currentDifficulty];
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                updateDisplays();
+            }, 1000);
+        }
+
+        function showTitleScreen() {
+            clearInterval(timerInterval);
+            isPlaying = false;
+            gameWon = false;
+            titleScreen.style.display = 'block';
+            canvas.classList.remove('visible');
+            statusDisplay.classList.remove('visible');
+            configPanel.style.display = 'none';
+            hintPanel.classList.remove('visible');
+        }
+
+        // ============================================
+        // GAME FUNCTIONS
+        // ============================================
+
+        function startGame(difficulty) {
+            AudioSystem.unlock();
+            currentDifficulty = difficulty;
+
+            if (difficulty === 0) {
+                // Blank grid - no loading needed
+                grid = Array(9).fill(null).map(() => Array(9).fill(0));
+                fixedCells = Array(9).fill(null).map(() => Array(9).fill(false));
+                solution = null;
+                finishStartGame();
+            } else {
+                // Show loading overlay, then generate puzzle asynchronously
+                titleScreen.style.display = 'none';
+                loadingOverlay.classList.add('visible');
+
+                // Use setTimeout to allow the loading overlay to render before heavy computation
+                setTimeout(() => {
+                    const { puzzle, solution: sol } = generatePuzzle(difficulty);
+                    grid = puzzle.map(row => [...row]);
+                    solution = sol;
+                    fixedCells = puzzle.map(row => row.map(cell => cell !== 0));
+                    loadingOverlay.classList.remove('visible');
+                    finishStartGame();
+                }, 50);
+            }
+        }
+
+        function finishStartGame() {
+            selectedCell = { x: -1, y: -1 };
+            gameWon = false;
+            clearInterval(timerInterval);
+            elapsedTime = 0;
+            isPlaying = true;
+
+            titleScreen.style.display = 'none';
+            canvas.classList.add('visible');
+            statusDisplay.classList.add('visible');
+            configPanel.style.display = 'block';
+            hintPanel.classList.add('visible');
+
+            startTimer();
+            updateDisplays();
+            render();
+        }
+
+        function checkWin() {
+            // Check if all cells are filled
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (grid[r][c] === 0) return false;
+                }
+            }
+
+            // Validate all placements
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (!isValidPlacement(grid, r, c, grid[r][c])) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        function handleWin() {
+            clearInterval(timerInterval);
+            gameWon = true;
+            isPlaying = false;
+
+            updateDisplays(); // Final update before timer stops
+            AudioSystem.sfx.levelComplete();
+
+            if (currentDifficulty > 0) {
+                const key = `level${currentDifficulty}`;
+                if (!gameData.bestTimes[key] || elapsedTime < gameData.bestTimes[key]) {
+                    gameData.bestTimes[key] = elapsedTime;
+                }
+                gameData.gamesWon++;
+            }
+            gameData.gamesPlayed++;
+            saveGameData();
+
+            render();
+        }
+
+        // ============================================
+        // RENDERING
+        // ============================================
+
+        function render() {
+            ctx.fillStyle = COLORS.background;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw cells
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    renderCell(r, c);
+                }
+            }
+
+            // Draw grid lines
+            ctx.strokeStyle = COLORS.gridLine;
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 9; i++) {
+                // Horizontal
+                ctx.beginPath();
+                ctx.moveTo(0, i * CELL_SIZE);
+                ctx.lineTo(canvas.width, i * CELL_SIZE);
+                ctx.stroke();
+                // Vertical
+                ctx.beginPath();
+                ctx.moveTo(i * CELL_SIZE, 0);
+                ctx.lineTo(i * CELL_SIZE, canvas.height);
+                ctx.stroke();
+            }
+
+            // Draw box lines (thicker)
+            ctx.strokeStyle = COLORS.boxLine;
+            ctx.lineWidth = 3;
+            for (let i = 0; i <= 3; i++) {
+                // Horizontal
+                ctx.beginPath();
+                ctx.moveTo(0, i * 3 * CELL_SIZE);
+                ctx.lineTo(canvas.width, i * 3 * CELL_SIZE);
+                ctx.stroke();
+                // Vertical
+                ctx.beginPath();
+                ctx.moveTo(i * 3 * CELL_SIZE, 0);
+                ctx.lineTo(i * 3 * CELL_SIZE, canvas.height);
+                ctx.stroke();
+            }
+
+            // Draw selection
+            if (selectedCell.x >= 0 && selectedCell.y >= 0) {
+                ctx.strokeStyle = COLORS.selected;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(
+                    selectedCell.x * CELL_SIZE + 2,
+                    selectedCell.y * CELL_SIZE + 2,
+                    CELL_SIZE - 4,
+                    CELL_SIZE - 4
+                );
+            }
+
+            // Draw win overlay
+            if (gameWon) {
+                renderWinOverlay();
+            }
+        }
+
+        function renderCell(row, col) {
+            const x = col * CELL_SIZE;
+            const y = row * CELL_SIZE;
+            const value = grid[row][col];
+            const isFixed = fixedCells[row][col];
+            const isSelected = selectedCell.x === col && selectedCell.y === row;
+
+            // Get candidates for empty cells (used for hints)
+            const candidates = value === 0 ? getCandidates(grid, row, col) : [];
+            const isForced = value === 0 && candidates.length === 1;
+
+            // Determine cell background
+            let bgColor = COLORS.cellBg;
+            if (isFixed) {
+                bgColor = COLORS.cellBgFixed;
+            } else if (showForcedHighlight && isForced) {
+                bgColor = COLORS.cellBgForced;
+            } else if (isSelected) {
+                bgColor = COLORS.cellBgSelected;
+            }
+
+            // Check for errors (duplicate in row/col/box)
+            let hasError = false;
+            if (value !== 0 && !isValidPlacement(grid, row, col, value)) {
+                hasError = true;
+                bgColor = COLORS.cellBgError;
+            }
+
+            // Highlight same number
+            if (selectedCell.x >= 0 && selectedCell.y >= 0) {
+                const selectedValue = grid[selectedCell.y][selectedCell.x];
+                if (selectedValue !== 0 && value === selectedValue && !isSelected) {
+                    bgColor = COLORS.cellBgHighlight;
+                }
+            }
+
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+
+            // Draw forced cell gold border
+            if (showForcedHighlight && isForced) {
+                ctx.strokeStyle = COLORS.forcedBorder;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 3, y + 3, CELL_SIZE - 6, CELL_SIZE - 6);
+            }
+
+            // Draw number or pencil marks
+            if (value !== 0) {
+                ctx.font = 'bold 28px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                if (hasError) {
+                    ctx.fillStyle = COLORS.numberError;
+                } else if (isFixed) {
+                    ctx.fillStyle = COLORS.numberFixed;
+                } else {
+                    ctx.fillStyle = COLORS.numberUser;
+                }
+
+                ctx.fillText(value.toString(), x + CELL_SIZE / 2, y + CELL_SIZE / 2 + 2);
+            } else if (showPencilMarks && candidates.length >= 1 && candidates.length <= 4) {
+                // Draw pencil marks for cells with 1-4 possibilities
+                ctx.font = '10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = COLORS.numberPencil;
+
+                // Position pencil marks in a 3x3 grid within the cell
+                for (const num of candidates) {
+                    const pr = Math.floor((num - 1) / 3);
+                    const pc = (num - 1) % 3;
+                    const px = x + 10 + pc * 15;
+                    const py = y + 12 + pr * 14;
+                    ctx.fillText(num.toString(), px, py);
+                }
+            }
+        }
+
+        function renderWinOverlay() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = 'bold 48px Courier New';
+            ctx.fillText('SOLVED!', canvas.width / 2, canvas.height / 2 - 40);
+
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = '24px Courier New';
+            ctx.fillText(`Time: ${formatTime(elapsedTime)}`, canvas.width / 2, canvas.height / 2 + 20);
+
+            ctx.fillStyle = '#888';
+            ctx.font = '16px Courier New';
+            ctx.fillText('Click New Game to play again', canvas.width / 2, canvas.height / 2 + 70);
+        }
+
+        // ============================================
+        // INPUT HANDLING
+        // ============================================
+
+        function getCellFromEvent(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+            return {
+                x: Math.floor(mx / CELL_SIZE),
+                y: Math.floor(my / CELL_SIZE)
+            };
+        }
+
+        canvas.addEventListener('click', (e) => {
+            AudioSystem.unlock();
+
+            if (gameWon) return;
+            if (!isPlaying) return;
+
+            const cell = getCellFromEvent(e);
+            if (cell.x >= 0 && cell.x < 9 && cell.y >= 0 && cell.y < 9) {
+                selectedCell = cell;
+                AudioSystem.sfx.select();
+                render();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (!isPlaying || gameWon) return;
+            if (selectedCell.x < 0 || selectedCell.y < 0) return;
+
+            const { x, y } = selectedCell;
+
+            // Arrow key navigation
+            if (e.key === 'ArrowUp' && y > 0) {
+                selectedCell.y--;
+                AudioSystem.sfx.select();
+                render();
+                e.preventDefault();
+                return;
+            }
+            if (e.key === 'ArrowDown' && y < 8) {
+                selectedCell.y++;
+                AudioSystem.sfx.select();
+                render();
+                e.preventDefault();
+                return;
+            }
+            if (e.key === 'ArrowLeft' && x > 0) {
+                selectedCell.x--;
+                AudioSystem.sfx.select();
+                render();
+                e.preventDefault();
+                return;
+            }
+            if (e.key === 'ArrowRight' && x < 8) {
+                selectedCell.x++;
+                AudioSystem.sfx.select();
+                render();
+                e.preventDefault();
+                return;
+            }
+
+            // Don't allow editing fixed cells
+            if (fixedCells[y][x]) {
+                return;
+            }
+
+            // Number input (1-9)
+            const num = parseInt(e.key);
+            if (num >= 1 && num <= 9) {
+                // Check if this placement would be valid
+                const oldValue = grid[y][x];
+                grid[y][x] = 0; // Temporarily clear to check validity
+
+                if (isValidPlacement(grid, y, x, num)) {
+                    grid[y][x] = num;
+                    AudioSystem.sfx.hit();
+
+                    // Check for win
+                    if (checkWin()) {
+                        handleWin();
+                    }
+                } else {
+                    // Invalid move - restore and play error sound
+                    grid[y][x] = oldValue;
+                    AudioSystem.sfx.death();
+                }
+
+                updateDisplays();
+                render();
+                e.preventDefault();
+                return;
+            }
+
+            // Clear cell (Backspace, Delete, or 0)
+            if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+                grid[y][x] = 0;
+                AudioSystem.sfx.select();
+                updateDisplays();
+                render();
+                e.preventDefault();
+                return;
+            }
+        });
+
+        // ============================================
+        // AUDIO CONTROLS
+        // ============================================
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+
+        // ============================================
+        // HINT CONTROLS
+        // ============================================
+        pencilMarksToggle.addEventListener('change', (e) => {
+            showPencilMarks = e.target.checked;
+            render();
+        });
+
+        forcedHighlightToggle.addEventListener('change', (e) => {
+            showForcedHighlight = e.target.checked;
+            render();
+        });
+
+        function revealHint() {
+            if (!isPlaying || gameWon) return;
+
+            // Find all empty cells
+            const emptyCells = [];
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (grid[r][c] === 0) {
+                        emptyCells.push({ r, c });
+                    }
+                }
+            }
+
+            if (emptyCells.length === 0) return;
+
+            // If we don't have a solution yet (blank grid), generate one
+            if (!solution) {
+                // Create a copy of current grid and solve it
+                const gridCopy = grid.map(row => [...row]);
+                const solved = solveBacktracking(gridCopy);
+                if (solved) {
+                    solution = solved;
+                } else {
+                    // Current grid state is unsolvable
+                    AudioSystem.sfx.death();
+                    return;
+                }
+            }
+
+            // Pick a random empty cell
+            const randomIndex = Math.floor(Math.random() * emptyCells.length);
+            const { r, c } = emptyCells[randomIndex];
+
+            // Fill it with the correct answer and make it fixed (grey)
+            grid[r][c] = solution[r][c];
+            fixedCells[r][c] = true;
+
+            AudioSystem.sfx.powerUp();
+            updateDisplays();
+            render();
+
+            // Check for win
+            if (checkWin()) {
+                handleWin();
+            }
+        }
+
+        // ============================================
+        // INITIALIZE
+        // ============================================
+
+        // Expose functions needed by HTML onclick handlers
+        window.startGame = startGame;
+        window.showTitleScreen = showTitleScreen;
+        window.revealHint = revealHint;
+
+        console.log('Sudoku initialized');
+    })();
+    </script>
+</body>
+</html>
