@@ -354,6 +354,24 @@
         <p><strong>Population</strong> is your workforce. More population = more base production. Each planet has a max population based on its type.</p>
         <p><strong>Production Formula:</strong> Base = Population x (Industry/100) x Planet Modifier. This is split according to your sliders.</p>
         <p><strong>Slider Locks:</strong> Click 🔓 to lock a slider. Locked sliders won't change when you adjust others.</p>
+
+        <h4>Production Costs</h4>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;">
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Population</td><td style="padding:4px;text-align:right;">~3.3 Ecology</td></tr>
+            <tr><td style="padding:4px;">+1% Industry</td><td style="padding:4px;text-align:right;">~2 Industry</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Defense</td><td style="padding:4px;text-align:right;">10 Defense</td></tr>
+        </table>
+
+        <h4>Ship Stats</h4>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;">
+            <tr style="background:#2a2a4a;font-weight:bold;"><td style="padding:4px;">Ship</td><td style="padding:4px;">Cost</td><td style="padding:4px;">Move</td><td style="padding:4px;">Atk</td><td style="padding:4px;">HP</td></tr>
+            <tr><td style="padding:4px;">Colony Ship</td><td style="padding:4px;">200</td><td style="padding:4px;">1</td><td style="padding:4px;">0</td><td style="padding:4px;">1</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Battleship</td><td style="padding:4px;">1000</td><td style="padding:4px;">1</td><td style="padding:4px;">40</td><td style="padding:4px;">30</td></tr>
+            <tr><td style="padding:4px;">Cruiser</td><td style="padding:4px;">250</td><td style="padding:4px;">2</td><td style="padding:4px;">15</td><td style="padding:4px;">12</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Destroyer</td><td style="padding:4px;">120</td><td style="padding:4px;">2</td><td style="padding:4px;">8</td><td style="padding:4px;">6</td></tr>
+            <tr><td style="padding:4px;">Fighter</td><td style="padding:4px;">60</td><td style="padding:4px;">2</td><td style="padding:4px;">4</td><td style="padding:4px;">3</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Scout</td><td style="padding:4px;">30</td><td style="padding:4px;">3</td><td style="padding:4px;">1</td><td style="padding:4px;">1</td></tr>
+        </table>
     </div>
 
     <script src="controller.js"></script>
@@ -397,10 +415,12 @@
         };
 
         const SHIP_TYPES = {
-            scout: { name: 'Scout', cost: 30, speed: 3, attack: 1, defense: 1, icon: 'S' },
-            fighter: { name: 'Fighter', cost: 60, speed: 2, attack: 4, defense: 2, icon: 'F' },
-            destroyer: { name: 'Destroyer', cost: 120, speed: 2, attack: 8, defense: 6, icon: 'D' },
-            colony: { name: 'Colony Ship', cost: 200, speed: 1, attack: 0, defense: 1, icon: 'C', colonize: true }
+            scout: { name: 'Scout', cost: 30, speed: 3, attack: 1, health: 1, icon: 'S', military: false },
+            fighter: { name: 'Fighter', cost: 60, speed: 2, attack: 4, health: 3, icon: 'F', military: true },
+            destroyer: { name: 'Destroyer', cost: 120, speed: 2, attack: 8, health: 6, icon: 'D', military: true },
+            cruiser: { name: 'Cruiser', cost: 250, speed: 2, attack: 15, health: 12, icon: 'R', military: true },
+            battleship: { name: 'Battleship', cost: 1000, speed: 1, attack: 40, health: 30, icon: 'B', military: true },
+            colony: { name: 'Colony Ship', cost: 200, speed: 1, attack: 0, health: 1, icon: 'C', colonize: true, military: false }
         };
 
         // Get ship types in display order: Colony first, then descending by cost
@@ -455,9 +475,10 @@
                     starType: s.starType, planetType: s.planetType,
                     owner: s.owner, explored: s.explored,
                     population: s.population, industry: s.industry, defense: s.defense,
+                    defenseProgress: s.defenseProgress || 0,
                     sliders: {...s.sliders}, lockedSliders: [...(s.lockedSliders || [])],
                     shipProgress: {...s.shipProgress}, buildingShip: s.buildingShip,
-                    colonizedTurn: s.colonizedTurn
+                    colonizedTurn: s.colonizedTurn, aiPhase: s.aiPhase
                 })),
                 ships: ships.map(s => ({
                     id: s.id, type: s.type, owner: s.owner,
@@ -485,15 +506,19 @@
                     // Backwards compatibility: convert old number shipProgress to object
                     let shipProgress = s.shipProgress;
                     if (typeof shipProgress === 'number') {
-                        shipProgress = { scout: 0, fighter: 0, destroyer: 0, colony: 0 };
+                        shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
                         if (s.buildingShip && shipProgress[s.buildingShip] !== undefined) {
                             shipProgress[s.buildingShip] = s.shipProgress;
                         }
                     }
+                    // Ensure new ship types exist in shipProgress
+                    const defaultProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+                    shipProgress = { ...defaultProgress, ...(shipProgress || {}) };
                     return {
                         ...s,
                         lockedSliders: s.lockedSliders || [],
-                        shipProgress: shipProgress || { scout: 0, fighter: 0, destroyer: 0, colony: 0 }
+                        shipProgress: shipProgress,
+                        defenseProgress: s.defenseProgress || 0
                     };
                 });
                 ships = data.ships;
@@ -607,10 +632,11 @@
                     population: 0,
                     industry: 0,
                     defense: 0,
+                    defenseProgress: 0,
                     // Default sliders: 50% eco, 50% industry (no ship production until queued)
                     sliders: { ship: 0, def: 0, ind: 50, eco: 50 },
                     lockedSliders: [],
-                    shipProgress: { scout: 0, fighter: 0, destroyer: 0, colony: 0 },
+                    shipProgress: { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 },
                     buildingShip: null
                 });
             }
@@ -651,6 +677,69 @@
                 destination: null,
                 turnsToArrival: 0
             });
+
+            // Get enemy factions (all races except player's)
+            const enemyRaces = RACES.filter(r => r.id !== player.race.id);
+            const militaryShipTypes = Object.keys(SHIP_TYPES).filter(k => SHIP_TYPES[k].military);
+
+            // Add random military ship guardians to each non-player planet
+            for (const star of stars) {
+                if (star.id === homeStar.id) continue; // Skip player's home
+                if (PLANET_TYPES[star.planetType].maxPop === 0) continue; // Skip uninhabitable
+
+                const randomEnemy = enemyRaces[Math.floor(Math.random() * enemyRaces.length)];
+                const randomShipType = militaryShipTypes[Math.floor(Math.random() * militaryShipTypes.length)];
+
+                ships.push({
+                    id: nextShipId++,
+                    type: randomShipType,
+                    owner: randomEnemy.id,
+                    location: star.id,
+                    destination: null,
+                    turnsToArrival: 0
+                });
+            }
+
+            // Pick one enemy faction to get a homeworld
+            const enemyWithHomeworld = enemyRaces[Math.floor(Math.random() * enemyRaces.length)];
+
+            // Find a good planet for enemy homeworld (prefer terran/ocean, away from player)
+            const candidatePlanets = stars.filter(s =>
+                s.id !== homeStar.id &&
+                PLANET_TYPES[s.planetType].maxPop >= 80
+            );
+
+            if (candidatePlanets.length > 0) {
+                // Sort by distance from player (prefer far away)
+                candidatePlanets.sort((a, b) => {
+                    const distA = Math.hypot(a.x - homeStar.x, a.y - homeStar.y);
+                    const distB = Math.hypot(b.x - homeStar.x, b.y - homeStar.y);
+                    return distB - distA;
+                });
+
+                const enemyHome = candidatePlanets[0];
+                enemyHome.owner = enemyWithHomeworld.id;
+                enemyHome.explored = true;
+                enemyHome.population = 40;
+                enemyHome.industry = 20;
+                enemyHome.defense = 5;
+                enemyHome.colonizedTurn = 1;
+                enemyHome.sliders = { ship: 0, def: 0, ind: 50, eco: 50 }; // Start with industry/eco
+                enemyHome.aiPhase = 'growth'; // Track AI production phase
+
+                // Remove any guardian ship at enemy homeworld (they own it)
+                ships = ships.filter(s => !(s.location === enemyHome.id && s.owner !== 'player'));
+
+                // Give enemy a starting fleet at their homeworld
+                ships.push({
+                    id: nextShipId++,
+                    type: 'destroyer',
+                    owner: enemyWithHomeworld.id,
+                    location: enemyHome.id,
+                    destination: null,
+                    turnsToArrival: 0
+                });
+            }
         }
 
         // ============================================
@@ -861,6 +950,7 @@
         function processTurn() {
             state = GameState.END_TURN;
 
+            // Process player colonies
             for (const star of getPlayerColonies()) {
                 const production = calculateProduction(star);
                 const planetInfo = PLANET_TYPES[star.planetType];
@@ -869,7 +959,13 @@
                 if (star.population < maxPop) {
                     star.population = Math.min(maxPop, star.population + production.eco);
                 }
-                star.defense += production.def;
+                // Defense uses defenseProgress for partial construction
+                if (!star.defenseProgress) star.defenseProgress = 0;
+                star.defenseProgress += production.def;
+                while (star.defenseProgress >= 10) {
+                    star.defense++;
+                    star.defenseProgress -= 10;
+                }
                 if (star.buildingShip) {
                     const shipTypeKey = star.buildingShip;
                     star.shipProgress[shipTypeKey] += production.ship;
@@ -895,6 +991,61 @@
                 }
                 // Redistribute sliders if industry or population just maxed
                 redistributeAutoLockedSliders(star);
+            }
+
+            // Process AI colonies
+            for (const star of stars) {
+                if (star.owner === 'player' || !star.owner) continue;
+
+                const planetInfo = PLANET_TYPES[star.planetType];
+                const maxPop = planetInfo.maxPop;
+
+                // AI phase logic: grow first, then build military
+                if (!star.aiPhase) star.aiPhase = 'growth';
+                if (!star.shipProgress) star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+                if (!star.defenseProgress) star.defenseProgress = 0;
+
+                // Check if growth phase is complete
+                if (star.aiPhase === 'growth') {
+                    if (star.industry >= 100 && star.population >= maxPop) {
+                        star.aiPhase = 'military';
+                        star.sliders = { ship: 50, def: 50, ind: 0, eco: 0 };
+                        star.buildingShip = 'destroyer';
+                    }
+                }
+
+                const production = calculateProduction(star);
+
+                // Apply production
+                star.industry = Math.min(100, star.industry + production.ind);
+                if (star.population < maxPop) {
+                    star.population = Math.min(maxPop, star.population + production.eco);
+                }
+
+                // Defense with partial construction
+                star.defenseProgress += production.def;
+                while (star.defenseProgress >= 10) {
+                    star.defense++;
+                    star.defenseProgress -= 10;
+                }
+
+                // Ship building
+                if (star.buildingShip) {
+                    const shipTypeKey = star.buildingShip;
+                    star.shipProgress[shipTypeKey] += production.ship;
+                    const shipType = SHIP_TYPES[shipTypeKey];
+                    while (star.shipProgress[shipTypeKey] >= shipType.cost) {
+                        ships.push({
+                            id: nextShipId++,
+                            type: shipTypeKey,
+                            owner: star.owner,
+                            location: star.id,
+                            destination: null,
+                            turnsToArrival: 0
+                        });
+                        star.shipProgress[shipTypeKey] -= shipType.cost;
+                    }
+                }
             }
 
             for (const ship of ships) {
@@ -970,8 +1121,11 @@
             star.population = 10;
             star.industry = 5;
             star.defense = 0;
+            star.defenseProgress = 0;
             star.lockedSliders = [];
             star.sliders = { ship: 0, def: 0, ind: 50, eco: 50 };
+            star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+            star.buildingShip = null;
             star.colonizedTurn = turn;
             AudioSystem.sfx.levelComplete();
             updatePanels();
