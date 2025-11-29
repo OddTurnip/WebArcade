@@ -369,8 +369,8 @@
             <tr style="background:#2a2a4a;"><td style="padding:4px;">Battleship</td><td style="padding:4px;">1000</td><td style="padding:4px;">1</td><td style="padding:4px;">40</td><td style="padding:4px;">30</td></tr>
             <tr><td style="padding:4px;">Cruiser</td><td style="padding:4px;">250</td><td style="padding:4px;">2</td><td style="padding:4px;">15</td><td style="padding:4px;">12</td></tr>
             <tr style="background:#2a2a4a;"><td style="padding:4px;">Destroyer</td><td style="padding:4px;">120</td><td style="padding:4px;">2</td><td style="padding:4px;">8</td><td style="padding:4px;">6</td></tr>
-            <tr><td style="padding:4px;">Fighter</td><td style="padding:4px;">60</td><td style="padding:4px;">2</td><td style="padding:4px;">4</td><td style="padding:4px;">3</td></tr>
-            <tr style="background:#2a2a4a;"><td style="padding:4px;">Scout</td><td style="padding:4px;">30</td><td style="padding:4px;">3</td><td style="padding:4px;">1</td><td style="padding:4px;">1</td></tr>
+            <tr><td style="padding:4px;">Fighter</td><td style="padding:4px;">60</td><td style="padding:4px;">3</td><td style="padding:4px;">4</td><td style="padding:4px;">3</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Scout</td><td style="padding:4px;">30</td><td style="padding:4px;">3</td><td style="padding:4px;">1</td><td style="padding:4px;">3</td></tr>
         </table>
     </div>
 
@@ -415,8 +415,8 @@
         };
 
         const SHIP_TYPES = {
-            scout: { name: 'Scout', cost: 30, speed: 3, attack: 1, health: 1, icon: 'S', military: false },
-            fighter: { name: 'Fighter', cost: 60, speed: 2, attack: 4, health: 3, icon: 'F', military: true },
+            scout: { name: 'Scout', cost: 30, speed: 3, attack: 1, health: 3, icon: 'S', military: false },
+            fighter: { name: 'Fighter', cost: 60, speed: 3, attack: 4, health: 3, icon: 'F', military: true },
             destroyer: { name: 'Destroyer', cost: 120, speed: 2, attack: 8, health: 6, icon: 'D', military: true },
             cruiser: { name: 'Cruiser', cost: 250, speed: 2, attack: 15, health: 12, icon: 'R', military: true },
             battleship: { name: 'Battleship', cost: 1000, speed: 1, attack: 40, health: 30, icon: 'B', military: true },
@@ -564,6 +564,8 @@
         let raceSelectIndex = 0;
         let hasSaveGame = false;
         let overviewSort = 'name'; // 'name', 'age', 'dev', 'defense'
+        let combatThisTurn = false; // Track if combat happened this turn
+        let shipsInCombatThisTurn = new Set(); // Ships that fought can't move
 
         // DOM references
         const planetPanel = document.getElementById('planetPanel');
@@ -1064,6 +1066,10 @@
                 }
             }
 
+            // Reset combat state for new turn
+            combatThisTurn = false;
+            shipsInCombatThisTurn.clear();
+
             turn++;
             state = GameState.PLAYING;
             updatePanels();
@@ -1116,6 +1122,9 @@
             if (!ship || !star || ship.type !== 'colony' || star.owner !== null) return false;
             const planetInfo = PLANET_TYPES[star.planetType];
             if (planetInfo.maxPop === 0) return false;
+            // Can't colonize if enemies present
+            const enemiesHere = getShipsAtStar(starId).filter(s => s.owner !== 'player');
+            if (enemiesHere.length > 0) return false;
             ships = ships.filter(s => s.id !== shipId);
             star.owner = 'player';
             star.explored = true;
@@ -1134,6 +1143,181 @@
             saveGameState();
             return true;
         }
+
+        function conquerStar(starId) {
+            const star = stars.find(s => s.id === starId);
+            if (!star || star.owner === 'player' || !star.owner) return false;
+            // Can't conquer if enemies or defense remain
+            const enemiesHere = getShipsAtStar(starId).filter(s => s.owner !== 'player');
+            if (enemiesHere.length > 0 || star.defense > 0) return false;
+            // Must have player ships present
+            const playerShipsHere = getShipsAtStar(starId).filter(s => s.owner === 'player');
+            if (playerShipsHere.length === 0) return false;
+
+            // Conquer - halve population and industry
+            star.owner = 'player';
+            star.population = Math.floor(star.population / 2);
+            star.industry = Math.floor(star.industry / 2);
+            star.explored = true;
+            star.lockedSliders = [];
+            star.sliders = { ship: 0, def: 0, ind: 50, eco: 50 };
+            star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+            star.buildingShip = null;
+            star.defenseProgress = 0;
+            star.colonizedTurn = turn;
+            star.aiPhase = undefined;
+            AudioSystem.sfx.levelComplete();
+            updatePanels();
+            updateTurnInfo();
+            saveGameState();
+            return true;
+        }
+
+        function startCombat(starId) {
+            if (combatThisTurn) return; // Only one combat per turn
+
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+
+            // Get all ships at location
+            const allShipsHere = getShipsAtStar(starId);
+            const playerMilitary = allShipsHere.filter(s => s.owner === 'player' && SHIP_TYPES[s.type].military);
+            const enemyMilitary = allShipsHere.filter(s => s.owner !== 'player' && SHIP_TYPES[s.type].military);
+
+            if (playerMilitary.length === 0 || enemyMilitary.length === 0) return;
+
+            // Create combat units with current health
+            let playerUnits = playerMilitary.map(s => ({
+                id: s.id,
+                type: s.type,
+                owner: s.owner,
+                hp: SHIP_TYPES[s.type].health,
+                attack: SHIP_TYPES[s.type].attack,
+                speed: SHIP_TYPES[s.type].speed
+            }));
+
+            let enemyUnits = enemyMilitary.map(s => ({
+                id: s.id,
+                type: s.type,
+                owner: s.owner,
+                hp: SHIP_TYPES[s.type].health,
+                attack: SHIP_TYPES[s.type].attack,
+                speed: SHIP_TYPES[s.type].speed
+            }));
+
+            // Add colony defense as units at speed 0
+            if (star.owner && star.owner !== 'player' && star.defense > 0) {
+                for (let i = 0; i < star.defense; i++) {
+                    enemyUnits.push({
+                        id: `def_${i}`,
+                        type: 'defense',
+                        owner: star.owner,
+                        hp: 1,
+                        attack: 1,
+                        speed: 0,
+                        isDefense: true
+                    });
+                }
+            } else if (star.owner === 'player' && star.defense > 0) {
+                for (let i = 0; i < star.defense; i++) {
+                    playerUnits.push({
+                        id: `def_${i}`,
+                        type: 'defense',
+                        owner: 'player',
+                        hp: 1,
+                        attack: 1,
+                        speed: 0,
+                        isDefense: true
+                    });
+                }
+            }
+
+            // Get all unique speeds, sorted descending
+            const allUnits = [...playerUnits, ...enemyUnits];
+            const speeds = [...new Set(allUnits.map(u => u.speed))].sort((a, b) => b - a);
+
+            // Combat log
+            let combatLog = [];
+
+            // Process each speed tier
+            for (const speed of speeds) {
+                const attackersThisRound = allUnits.filter(u => u.speed === speed && u.hp > 0);
+
+                // All attackers at this speed attack simultaneously
+                const attacks = [];
+                for (const attacker of attackersThisRound) {
+                    const isPlayer = attacker.owner === 'player';
+                    const targets = isPlayer
+                        ? enemyUnits.filter(u => u.hp > 0)
+                        : playerUnits.filter(u => u.hp > 0);
+
+                    if (targets.length > 0) {
+                        const target = targets[Math.floor(Math.random() * targets.length)];
+                        attacks.push({ attacker, target, damage: attacker.attack });
+                    }
+                }
+
+                // Apply all damage simultaneously
+                for (const atk of attacks) {
+                    atk.target.hp -= atk.damage;
+                }
+
+                // Log this round
+                if (attacks.length > 0) {
+                    combatLog.push(`Speed ${speed}: ${attacks.length} attacks`);
+                }
+            }
+
+            // Determine casualties
+            const playerLosses = playerUnits.filter(u => u.hp <= 0);
+            const enemyLosses = enemyUnits.filter(u => u.hp <= 0);
+
+            // Remove destroyed ships
+            const destroyedShipIds = new Set([
+                ...playerLosses.filter(u => !u.isDefense).map(u => u.id),
+                ...enemyLosses.filter(u => !u.isDefense).map(u => u.id)
+            ]);
+            ships = ships.filter(s => !destroyedShipIds.has(s.id));
+
+            // Update defense count
+            const enemyDefenseLosses = enemyLosses.filter(u => u.isDefense).length;
+            const playerDefenseLosses = playerLosses.filter(u => u.isDefense).length;
+            if (star.owner && star.owner !== 'player') {
+                star.defense = Math.max(0, star.defense - enemyDefenseLosses);
+            } else if (star.owner === 'player') {
+                star.defense = Math.max(0, star.defense - playerDefenseLosses);
+            }
+
+            // Mark ships that fought
+            const survivingPlayerShips = playerUnits.filter(u => u.hp > 0 && !u.isDefense);
+            for (const unit of survivingPlayerShips) {
+                shipsInCombatThisTurn.add(unit.id);
+            }
+
+            combatThisTurn = true;
+
+            // Play sound
+            AudioSystem.sfx.explosion();
+
+            // Show results
+            const playerShipLosses = playerLosses.filter(u => !u.isDefense).length;
+            const enemyShipLosses = enemyLosses.filter(u => !u.isDefense).length;
+            const playerSurvivors = playerUnits.filter(u => u.hp > 0 && !u.isDefense).length;
+            const enemySurvivors = enemyUnits.filter(u => u.hp > 0 && !u.isDefense).length;
+
+            let resultMsg = `⚔️ Combat at ${star.name}!\n\n`;
+            resultMsg += `Your losses: ${playerShipLosses} ships` + (playerDefenseLosses > 0 ? `, ${playerDefenseLosses} defense` : '') + `\n`;
+            resultMsg += `Enemy losses: ${enemyShipLosses} ships` + (enemyDefenseLosses > 0 ? `, ${enemyDefenseLosses} defense` : '') + `\n\n`;
+            resultMsg += `Survivors: You ${playerSurvivors}, Enemy ${enemySurvivors}`;
+
+            alert(resultMsg);
+
+            updatePanels();
+            updateTurnInfo();
+            saveGameState();
+        }
+        window.startCombat = startCombat;
+        window.conquerStar = conquerStar;
 
         function startBuildingShip(starId, shipType) {
             const star = stars.find(s => s.id === starId);
@@ -1384,13 +1568,23 @@
                 html += `<div class="info-row"><span class="info-label">Owner:</span><span class="info-value" style="color:${enemyRace?.color || '#ff6b6b'}">${enemyRace?.name || star.owner}</span></div>`;
                 html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${Math.floor(star.population)}</span></div>`;
                 html += `<div class="info-row"><span class="info-label">Defense:</span><span class="info-value">${star.defense}</span></div>`;
+
+                // Check if can conquer (no enemies, no defense, have ships)
+                const enemyShipsHere = getShipsAtStar(star.id).filter(s => s.owner !== 'player');
+                const playerShipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+                if (enemyShipsHere.length === 0 && star.defense === 0 && playerShipsHere.length > 0) {
+                    html += `<button class="btn btn-primary" style="margin-top:8px" onclick="conquerStar(${star.id})">🏴 Conquer</button>`;
+                }
             } else if (star.explored) {
                 const planetInfo = PLANET_TYPES[star.planetType];
                 html += `<div style="margin-top:10px;color:#888;font-size:10px">Unclaimed system</div>`;
                 const playerShips = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+                const enemyShips = getShipsAtStar(star.id).filter(s => s.owner !== 'player');
                 const colonyShip = playerShips.find(s => s.type === 'colony');
-                if (colonyShip && planetInfo.maxPop > 0) {
+                if (colonyShip && planetInfo.maxPop > 0 && enemyShips.length === 0) {
                     html += `<button class="btn" style="margin-top:8px" onclick="colonizeStar(${colonyShip.id}, ${star.id})">Colonize</button>`;
+                } else if (colonyShip && planetInfo.maxPop > 0 && enemyShips.length > 0) {
+                    html += `<div style="color:#ff6b6b;font-size:10px;margin-top:5px">Clear enemies to colonize</div>`;
                 } else if (planetInfo.maxPop === 0) {
                     html += `<div style="color:#ff6b6b;font-size:10px;margin-top:5px">Uninhabitable</div>`;
                 }
@@ -1601,7 +1795,17 @@
             let actionsHtml = '';
             const hasSelection = selectedShips.length > 0;
 
-            if (destinationStar && hasSelection) {
+            // Check for enemy military ships
+            const enemyMilitaryHere = star.explored
+                ? getShipsAtStar(star.id).filter(s => s.owner !== 'player' && SHIP_TYPES[s.type].military)
+                : [];
+            const playerMilitaryHere = getShipsAtStar(star.id).filter(s => s.owner === 'player' && SHIP_TYPES[s.type].military);
+            const canCombat = enemyMilitaryHere.length > 0 && playerMilitaryHere.length > 0 && !combatThisTurn;
+
+            // Check if selected ships can move (not in combat this turn)
+            const selectedCanMove = hasSelection && !selectedShips.some(id => shipsInCombatThisTurn.has(id));
+
+            if (destinationStar && selectedCanMove) {
                 const travelInfo = calculateTravelInfo(selectedStar, destinationStar, selectedShips);
                 actionsHtml += `<div class="destination-highlight">
                     <div>To: <strong>${destinationStar.name}</strong></div>
@@ -1611,8 +1815,18 @@
                 actionsHtml += `<button class="btn btn-primary" onclick="confirmMove()">Confirm Move</button>`;
                 actionsHtml += `<button class="btn btn-danger btn-sm" onclick="cancelMove()">Cancel</button>`;
             } else {
-                actionsHtml += `<button class="btn" ${hasSelection ? '' : 'disabled'} onclick="window.focus()">Move ${hasSelection ? selectedShips.length + ' Ship' + (selectedShips.length > 1 ? 's' : '') : 'Ships'}</button>`;
-                if (hasSelection) {
+                // Combat button
+                if (canCombat) {
+                    actionsHtml += `<button class="btn btn-danger" onclick="startCombat(${star.id})">⚔️ Combat</button>`;
+                }
+
+                // Move button
+                const moveDisabled = !selectedCanMove;
+                actionsHtml += `<button class="btn" ${moveDisabled ? 'disabled' : ''} onclick="window.focus()">Move ${hasSelection ? selectedShips.length + ' Ship' + (selectedShips.length > 1 ? 's' : '') : 'Ships'}</button>`;
+
+                if (hasSelection && shipsInCombatThisTurn.has(selectedShips[0])) {
+                    actionsHtml += `<div style="font-size:9px;color:#ff6b6b;margin-top:4px">Ships in combat can't move</div>`;
+                } else if (hasSelection) {
                     actionsHtml += `<div style="font-size:9px;color:#888;margin-top:4px">Click a destination star</div>`;
                 }
             }
@@ -1827,7 +2041,11 @@
 
         window.confirmMove = function() {
             if (destinationStar && selectedShips.length > 0) {
-                moveShips(selectedShips, destinationStar.id);
+                // Filter out ships that were in combat this turn
+                const movableShips = selectedShips.filter(id => !shipsInCombatThisTurn.has(id));
+                if (movableShips.length > 0) {
+                    moveShips(movableShips, destinationStar.id);
+                }
             }
         };
 
