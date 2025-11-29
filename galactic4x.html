@@ -331,6 +331,7 @@
                 <div style="display:flex;gap:10px;align-items:center;">
                     <button class="btn btn-primary" id="endTurnBtn" onclick="window.endTurn()">End Turn</button>
                     <button class="btn" onclick="window.showOverview()">Overview</button>
+                    <button class="btn" onclick="window.showHistory()">History</button>
                 </div>
                 <div id="turnInfo" style="color:#888;font-size:11px;margin-top:6px;"></div>
             </div>
@@ -359,18 +360,18 @@
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;">
             <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Population</td><td style="padding:4px;text-align:right;">~3.3 Ecology</td></tr>
             <tr><td style="padding:4px;">+1% Industry</td><td style="padding:4px;text-align:right;">~2 Industry</td></tr>
-            <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Defense</td><td style="padding:4px;text-align:right;">10 Defense</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Defense</td><td style="padding:4px;text-align:right;">20 Defense</td></tr>
         </table>
 
         <h4>Ship Stats</h4>
         <table style="width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;">
             <tr style="background:#2a2a4a;font-weight:bold;"><td style="padding:4px;">Ship</td><td style="padding:4px;">Cost</td><td style="padding:4px;">Move</td><td style="padding:4px;">Atk</td><td style="padding:4px;">HP</td></tr>
             <tr><td style="padding:4px;">Colony Ship</td><td style="padding:4px;">200</td><td style="padding:4px;">1</td><td style="padding:4px;">0</td><td style="padding:4px;">1</td></tr>
-            <tr style="background:#2a2a4a;"><td style="padding:4px;">Battleship</td><td style="padding:4px;">1000</td><td style="padding:4px;">1</td><td style="padding:4px;">40</td><td style="padding:4px;">30</td></tr>
-            <tr><td style="padding:4px;">Cruiser</td><td style="padding:4px;">250</td><td style="padding:4px;">2</td><td style="padding:4px;">15</td><td style="padding:4px;">12</td></tr>
-            <tr style="background:#2a2a4a;"><td style="padding:4px;">Destroyer</td><td style="padding:4px;">120</td><td style="padding:4px;">2</td><td style="padding:4px;">8</td><td style="padding:4px;">6</td></tr>
-            <tr><td style="padding:4px;">Fighter</td><td style="padding:4px;">60</td><td style="padding:4px;">3</td><td style="padding:4px;">4</td><td style="padding:4px;">3</td></tr>
-            <tr style="background:#2a2a4a;"><td style="padding:4px;">Scout</td><td style="padding:4px;">30</td><td style="padding:4px;">3</td><td style="padding:4px;">1</td><td style="padding:4px;">3</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Battleship</td><td style="padding:4px;">500</td><td style="padding:4px;">1</td><td style="padding:4px;">30</td><td style="padding:4px;">100</td></tr>
+            <tr><td style="padding:4px;">Cruiser</td><td style="padding:4px;">250</td><td style="padding:4px;">2</td><td style="padding:4px;">10</td><td style="padding:4px;">30</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Destroyer</td><td style="padding:4px;">100</td><td style="padding:4px;">2</td><td style="padding:4px;">6</td><td style="padding:4px;">12</td></tr>
+            <tr><td style="padding:4px;">Fighter</td><td style="padding:4px;">50</td><td style="padding:4px;">3</td><td style="padding:4px;">2</td><td style="padding:4px;">4</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Scout</td><td style="padding:4px;">25</td><td style="padding:4px;">3</td><td style="padding:4px;">1</td><td style="padding:4px;">2</td></tr>
         </table>
     </div>
 
@@ -415,11 +416,11 @@
         };
 
         const SHIP_TYPES = {
-            scout: { name: 'Scout', cost: 30, speed: 3, attack: 1, health: 3, icon: 'S', military: false },
-            fighter: { name: 'Fighter', cost: 60, speed: 3, attack: 4, health: 3, icon: 'F', military: true },
-            destroyer: { name: 'Destroyer', cost: 120, speed: 2, attack: 8, health: 6, icon: 'D', military: true },
-            cruiser: { name: 'Cruiser', cost: 250, speed: 2, attack: 15, health: 12, icon: 'R', military: true },
-            battleship: { name: 'Battleship', cost: 1000, speed: 1, attack: 40, health: 30, icon: 'B', military: true },
+            scout: { name: 'Scout', cost: 25, speed: 3, attack: 1, health: 2, icon: 'S', military: false },
+            fighter: { name: 'Fighter', cost: 50, speed: 3, attack: 2, health: 4, icon: 'F', military: true },
+            destroyer: { name: 'Destroyer', cost: 100, speed: 2, attack: 6, health: 12, icon: 'D', military: true },
+            cruiser: { name: 'Cruiser', cost: 250, speed: 2, attack: 10, health: 30, icon: 'R', military: true },
+            battleship: { name: 'Battleship', cost: 500, speed: 1, attack: 30, health: 100, icon: 'B', military: true },
             colony: { name: 'Colony Ship', cost: 200, speed: 1, attack: 0, health: 1, icon: 'C', colonize: true, military: false }
         };
 
@@ -566,6 +567,8 @@
         let overviewSort = 'name'; // 'name', 'age', 'dev', 'defense'
         let combatThisTurn = false; // Track if combat happened this turn
         let shipsInCombatThisTurn = new Set(); // Ships that fought can't move
+        let battleHistory = []; // History of battles
+        let showingHistory = false; // Whether to show history panel
 
         // DOM references
         const planetPanel = document.getElementById('planetPanel');
@@ -963,9 +966,9 @@
                 // Defense uses defenseProgress for partial construction
                 if (!star.defenseProgress) star.defenseProgress = 0;
                 star.defenseProgress += production.def;
-                while (star.defenseProgress >= 10) {
+                while (star.defenseProgress >= 20) {
                     star.defense++;
-                    star.defenseProgress -= 10;
+                    star.defenseProgress -= 20;
                 }
                 if (star.buildingShip) {
                     const shipTypeKey = star.buildingShip;
@@ -1027,9 +1030,9 @@
 
                 // Defense with partial construction
                 star.defenseProgress += production.def;
-                while (star.defenseProgress >= 10) {
+                while (star.defenseProgress >= 20) {
                     star.defense++;
-                    star.defenseProgress -= 10;
+                    star.defenseProgress -= 20;
                 }
 
                 // Ship building
@@ -1186,6 +1189,16 @@
 
             if (playerMilitary.length === 0 || enemyMilitary.length === 0) return;
 
+            // Track starting counts for history
+            const startingPlayerCounts = {};
+            const startingEnemyCounts = {};
+            for (const s of playerMilitary) {
+                startingPlayerCounts[s.type] = (startingPlayerCounts[s.type] || 0) + 1;
+            }
+            for (const s of enemyMilitary) {
+                startingEnemyCounts[s.type] = (startingEnemyCounts[s.type] || 0) + 1;
+            }
+
             // Create combat units with current health
             let playerUnits = playerMilitary.map(s => ({
                 id: s.id,
@@ -1205,110 +1218,175 @@
                 speed: SHIP_TYPES[s.type].speed
             }));
 
-            // Add colony defense as units at speed 0
-            if (star.owner && star.owner !== 'player' && star.defense > 0) {
-                for (let i = 0; i < star.defense; i++) {
-                    enemyUnits.push({
-                        id: `def_${i}`,
-                        type: 'defense',
-                        owner: star.owner,
-                        hp: 1,
-                        attack: 1,
-                        speed: 0,
-                        isDefense: true
-                    });
-                }
-            } else if (star.owner === 'player' && star.defense > 0) {
-                for (let i = 0; i < star.defense; i++) {
-                    playerUnits.push({
-                        id: `def_${i}`,
-                        type: 'defense',
-                        owner: 'player',
-                        hp: 1,
-                        attack: 1,
-                        speed: 0,
-                        isDefense: true
-                    });
-                }
-            }
+            // Track defense pools (attacks against defense destroy Attack amount)
+            let playerDefensePool = (star.owner === 'player') ? star.defense : 0;
+            let enemyDefensePool = (star.owner && star.owner !== 'player') ? star.defense : 0;
+            const startingPlayerDefense = playerDefensePool;
+            const startingEnemyDefense = enemyDefensePool;
 
-            // Get all unique speeds, sorted descending
-            const allUnits = [...playerUnits, ...enemyUnits];
-            const speeds = [...new Set(allUnits.map(u => u.speed))].sort((a, b) => b - a);
-
-            // Combat log
-            let combatLog = [];
+            // Get all unique speeds including defense (0), sorted descending
+            const shipSpeeds = [...new Set([...playerUnits, ...enemyUnits].map(u => u.speed))];
+            const speeds = [...new Set([...shipSpeeds, 0])].sort((a, b) => b - a);
 
             // Process each speed tier
             for (const speed of speeds) {
-                const attackersThisRound = allUnits.filter(u => u.speed === speed && u.hp > 0);
+                // Ships attacking at this speed
+                const shipAttackers = [...playerUnits, ...enemyUnits].filter(u => u.speed === speed && u.hp > 0);
 
-                // All attackers at this speed attack simultaneously
-                const attacks = [];
-                for (const attacker of attackersThisRound) {
+                // Defense attacks at speed 0
+                const playerDefenseAttacks = (speed === 0) ? playerDefensePool : 0;
+                const enemyDefenseAttacks = (speed === 0) ? enemyDefensePool : 0;
+
+                // Collect all attacks for simultaneous resolution
+                const damageToShips = new Map(); // shipId -> damage
+                let damageToPlayerDefense = 0;
+                let damageToEnemyDefense = 0;
+
+                // Ship attacks
+                for (const attacker of shipAttackers) {
                     const isPlayer = attacker.owner === 'player';
-                    const targets = isPlayer
+                    const enemyShipTargets = isPlayer
                         ? enemyUnits.filter(u => u.hp > 0)
                         : playerUnits.filter(u => u.hp > 0);
+                    const enemyDefenseAvailable = isPlayer ? enemyDefensePool : playerDefensePool;
 
+                    // Build target pool: ships + defense (if any)
+                    const totalTargets = enemyShipTargets.length + (enemyDefenseAvailable > 0 ? 1 : 0);
+                    if (totalTargets === 0) continue;
+
+                    const roll = Math.floor(Math.random() * totalTargets);
+                    if (roll < enemyShipTargets.length) {
+                        // Target a ship
+                        const target = enemyShipTargets[roll];
+                        damageToShips.set(target.id, (damageToShips.get(target.id) || 0) + attacker.attack);
+                    } else {
+                        // Target defense - destroy Attack amount
+                        if (isPlayer) {
+                            damageToEnemyDefense += attacker.attack;
+                        } else {
+                            damageToPlayerDefense += attacker.attack;
+                        }
+                    }
+                }
+
+                // Defense attacks (1 attack per defense point, each deals 1 damage)
+                for (let i = 0; i < playerDefenseAttacks; i++) {
+                    const targets = enemyUnits.filter(u => u.hp > 0);
                     if (targets.length > 0) {
                         const target = targets[Math.floor(Math.random() * targets.length)];
-                        attacks.push({ attacker, target, damage: attacker.attack });
+                        damageToShips.set(target.id, (damageToShips.get(target.id) || 0) + 1);
+                    }
+                }
+                for (let i = 0; i < enemyDefenseAttacks; i++) {
+                    const targets = playerUnits.filter(u => u.hp > 0);
+                    if (targets.length > 0) {
+                        const target = targets[Math.floor(Math.random() * targets.length)];
+                        damageToShips.set(target.id, (damageToShips.get(target.id) || 0) + 1);
                     }
                 }
 
                 // Apply all damage simultaneously
-                for (const atk of attacks) {
-                    atk.target.hp -= atk.damage;
+                for (const unit of [...playerUnits, ...enemyUnits]) {
+                    if (damageToShips.has(unit.id)) {
+                        unit.hp -= damageToShips.get(unit.id);
+                    }
                 }
-
-                // Log this round
-                if (attacks.length > 0) {
-                    combatLog.push(`Speed ${speed}: ${attacks.length} attacks`);
-                }
+                playerDefensePool = Math.max(0, playerDefensePool - damageToPlayerDefense);
+                enemyDefensePool = Math.max(0, enemyDefensePool - damageToEnemyDefense);
             }
 
             // Determine casualties
-            const playerLosses = playerUnits.filter(u => u.hp <= 0);
-            const enemyLosses = enemyUnits.filter(u => u.hp <= 0);
+            const playerShipLosses = playerUnits.filter(u => u.hp <= 0);
+            const enemyShipLosses = enemyUnits.filter(u => u.hp <= 0);
 
             // Remove destroyed ships
             const destroyedShipIds = new Set([
-                ...playerLosses.filter(u => !u.isDefense).map(u => u.id),
-                ...enemyLosses.filter(u => !u.isDefense).map(u => u.id)
+                ...playerShipLosses.map(u => u.id),
+                ...enemyShipLosses.map(u => u.id)
             ]);
             ships = ships.filter(s => !destroyedShipIds.has(s.id));
 
-            // Update defense count
-            const enemyDefenseLosses = enemyLosses.filter(u => u.isDefense).length;
-            const playerDefenseLosses = playerLosses.filter(u => u.isDefense).length;
-            if (star.owner && star.owner !== 'player') {
-                star.defense = Math.max(0, star.defense - enemyDefenseLosses);
-            } else if (star.owner === 'player') {
-                star.defense = Math.max(0, star.defense - playerDefenseLosses);
+            // Update defense count on star
+            const playerDefenseLost = startingPlayerDefense - playerDefensePool;
+            const enemyDefenseLost = startingEnemyDefense - enemyDefensePool;
+            if (star.owner === 'player') {
+                star.defense = playerDefensePool;
+            } else if (star.owner) {
+                star.defense = enemyDefensePool;
+            }
+
+            // Destroy unprotected colony ships
+            const playerMilitarySurvivors = playerUnits.filter(u => u.hp > 0);
+            const enemyMilitarySurvivors = enemyUnits.filter(u => u.hp > 0);
+
+            if (playerMilitarySurvivors.length === 0 && enemyMilitarySurvivors.length > 0) {
+                // Enemy wins - destroy player colony ships
+                const playerColonyShips = allShipsHere.filter(s => s.owner === 'player' && s.type === 'colony');
+                for (const cs of playerColonyShips) {
+                    destroyedShipIds.add(cs.id);
+                }
+                ships = ships.filter(s => !playerColonyShips.some(cs => cs.id === s.id));
+            } else if (enemyMilitarySurvivors.length === 0 && playerMilitarySurvivors.length > 0) {
+                // Player wins - destroy enemy colony ships
+                const enemyColonyShips = allShipsHere.filter(s => s.owner !== 'player' && s.type === 'colony');
+                for (const cs of enemyColonyShips) {
+                    destroyedShipIds.add(cs.id);
+                }
+                ships = ships.filter(s => !enemyColonyShips.some(cs => cs.id === s.id));
             }
 
             // Mark ships that fought
-            const survivingPlayerShips = playerUnits.filter(u => u.hp > 0 && !u.isDefense);
-            for (const unit of survivingPlayerShips) {
+            for (const unit of playerMilitarySurvivors) {
                 shipsInCombatThisTurn.add(unit.id);
             }
 
             combatThisTurn = true;
 
+            // Count survivors by type
+            const playerSurvivorCounts = {};
+            const enemySurvivorCounts = {};
+            for (const u of playerMilitarySurvivors) {
+                playerSurvivorCounts[u.type] = (playerSurvivorCounts[u.type] || 0) + 1;
+            }
+            for (const u of enemyMilitarySurvivors) {
+                enemySurvivorCounts[u.type] = (enemySurvivorCounts[u.type] || 0) + 1;
+            }
+
+            // Format survivor strings
+            const formatSurvivors = (counts) => {
+                const parts = [];
+                for (const type of getShipTypeOrder()) {
+                    if (counts[type]) {
+                        parts.push(`${counts[type]} ${SHIP_TYPES[type].name}${counts[type] > 1 ? 's' : ''}`);
+                    }
+                }
+                return parts.length > 0 ? parts.join(', ') : 'None';
+            };
+
             // Play sound
             AudioSystem.sfx.explosion();
 
-            // Show results
-            const playerShipLosses = playerLosses.filter(u => !u.isDefense).length;
-            const enemyShipLosses = enemyLosses.filter(u => !u.isDefense).length;
-            const playerSurvivors = playerUnits.filter(u => u.hp > 0 && !u.isDefense).length;
-            const enemySurvivors = enemyUnits.filter(u => u.hp > 0 && !u.isDefense).length;
-
+            // Build result message
             let resultMsg = `⚔️ Combat at ${star.name}!\n\n`;
-            resultMsg += `Your losses: ${playerShipLosses} ships` + (playerDefenseLosses > 0 ? `, ${playerDefenseLosses} defense` : '') + `\n`;
-            resultMsg += `Enemy losses: ${enemyShipLosses} ships` + (enemyDefenseLosses > 0 ? `, ${enemyDefenseLosses} defense` : '') + `\n\n`;
-            resultMsg += `Survivors: You ${playerSurvivors}, Enemy ${enemySurvivors}`;
+            resultMsg += `Your losses: ${playerShipLosses.length} ships`;
+            if (playerDefenseLost > 0) resultMsg += `, ${playerDefenseLost} defense`;
+            resultMsg += `\nEnemy losses: ${enemyShipLosses.length} ships`;
+            if (enemyDefenseLost > 0) resultMsg += `, ${enemyDefenseLost} defense`;
+            resultMsg += `\n\nYour survivors: ${formatSurvivors(playerSurvivorCounts)}`;
+            resultMsg += `\nEnemy survivors: ${formatSurvivors(enemySurvivorCounts)}`;
+
+            // Add to battle history
+            battleHistory.unshift({
+                turn: turn,
+                location: star.name,
+                playerLosses: playerShipLosses.length,
+                enemyLosses: enemyShipLosses.length,
+                playerDefenseLost,
+                enemyDefenseLost,
+                playerSurvivors: formatSurvivors(playerSurvivorCounts),
+                enemySurvivors: formatSurvivors(enemySurvivorCounts),
+                victory: enemyMilitarySurvivors.length === 0 && playerMilitarySurvivors.length > 0
+            });
 
             alert(resultMsg);
 
@@ -1354,6 +1432,50 @@
         }
 
         function updatePlanetPanel() {
+            if (showingHistory) {
+                // Show battle history
+                let html = '<div class="panel-title">Battle History</div>';
+
+                if (battleHistory.length === 0) {
+                    html += '<div class="empty-state">No battles yet</div>';
+                } else {
+                    html += '<div style="max-height:400px;overflow-y:auto;">';
+                    for (const battle of battleHistory) {
+                        const resultColor = battle.victory ? '#4ecdc4' : '#ff6b6b';
+                        const resultText = battle.victory ? 'VICTORY' : 'DEFEAT';
+
+                        html += `<div style="padding:6px;margin:4px 0;background:#252540;border-radius:4px;border-left:3px solid ${resultColor};">`;
+                        html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                        html += `<span style="color:#ffe66d;font-weight:bold;font-size:11px;">Turn ${battle.turn}</span>`;
+                        html += `<span style="color:${resultColor};font-weight:bold;font-size:10px;">${resultText}</span>`;
+                        html += `</div>`;
+                        html += `<div style="color:#888;font-size:10px;margin:2px 0;">${battle.location}</div>`;
+
+                        // Losses
+                        html += `<div style="font-size:10px;margin-top:4px;">`;
+                        html += `<div style="color:#4ecdc4;">Your losses: ${battle.playerLosses} ships`;
+                        if (battle.playerDefenseLost > 0) html += `, ${battle.playerDefenseLost} defense`;
+                        html += `</div>`;
+                        html += `<div style="color:#ff6b6b;">Enemy losses: ${battle.enemyLosses} ships`;
+                        if (battle.enemyDefenseLost > 0) html += `, ${battle.enemyDefenseLost} defense`;
+                        html += `</div>`;
+                        html += `</div>`;
+
+                        // Survivors
+                        html += `<div style="font-size:9px;margin-top:4px;color:#888;">`;
+                        html += `<div>Your survivors: ${battle.playerSurvivors}</div>`;
+                        html += `<div>Enemy survivors: ${battle.enemySurvivors}</div>`;
+                        html += `</div>`;
+
+                        html += `</div>`;
+                    }
+                    html += '</div>';
+                }
+
+                planetContent.innerHTML = html;
+                return;
+            }
+
             if (!selectedStar) {
                 // Show empire overview
                 let colonies = getPlayerColonies();
@@ -1939,6 +2061,7 @@
             selectedStar = star;
             selectedShips = [];
             destinationStar = null;
+            showingHistory = false;
             updatePanels();
             draw();
         };
@@ -1947,6 +2070,16 @@
             selectedStar = null;
             selectedShips = [];
             destinationStar = null;
+            showingHistory = false;
+            updatePanels();
+            draw();
+        };
+
+        window.showHistory = function() {
+            selectedStar = null;
+            selectedShips = [];
+            destinationStar = null;
+            showingHistory = true;
             updatePanels();
             draw();
         };
