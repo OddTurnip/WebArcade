@@ -1049,18 +1049,29 @@
                         const age = turn - (colony.colonizedTurn || 1);
 
                         html += `<div class="empire-planet" onclick="selectStar(${colony.id})" style="cursor:pointer;padding:6px;margin:4px 0;background:#252540;border-radius:4px;">`;
-                        html += `<div style="color:${planetInfo.color};font-weight:bold;font-size:11px;">${colony.name}</div>`;
+                        html += `<div style="color:${planetInfo.color};font-weight:bold;font-size:11px;">${colony.name} <span style="color:#888;font-weight:normal;">(${age} turns)</span></div>`;
                         html += `<div style="font-size:10px;color:#888;">`;
-                        html += `Age: ${age} | Dev: ${devPercent}% | Def: ${colony.defense}`;
+                        html += `Dev: ${devPercent}% | Def: ${colony.defense}`;
+                        html += `</div>`;
 
-                        // Show ship progress if building
+                        // Show ship production on separate row
                         if (colony.buildingShip) {
                             const shipType = SHIP_TYPES[colony.buildingShip];
                             const progress = colony.shipProgress[colony.buildingShip] || 0;
                             const pct = Math.floor((progress / shipType.cost) * 100);
-                            html += ` | ${shipType.icon}: ${pct}%`;
+
+                            // Calculate ships per turn
+                            const prod = calculateProduction(colony);
+                            const shipsPerTurn = prod.ship / shipType.cost;
+
+                            html += `<div style="font-size:10px;color:#4ecdc4;">`;
+                            html += `${shipType.name}: ${pct}%`;
+                            if (shipsPerTurn >= 0.01) {
+                                html += ` (${shipsPerTurn.toFixed(2)}/turn)`;
+                            }
+                            html += `</div>`;
                         }
-                        html += `</div></div>`;
+                        html += `</div>`;
                     }
                 }
 
