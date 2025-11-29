@@ -575,7 +575,7 @@
         let shipsInCombatThisTurn = new Set(); // Ships that fought can't move
         let battleHistory = []; // History of battles
         let eventHistory = []; // History of events (scouting, colonization, ships built)
-        let showingHistory = false; // Whether to show history panel
+        let currentView = 'overview'; // 'overview', 'planet', 'history'
         let shipsBuiltThisTurn = {}; // Track ships built this turn by type
 
         // DOM references
@@ -765,7 +765,7 @@
             battleHistory = [];
             eventHistory = [];
             shipsBuiltThisTurn = {};
-            showingHistory = false;
+            currentView = 'overview';
             generateGalaxy();
             actionPanel.classList.remove('hidden');
             planetPanel.classList.remove('hidden');
@@ -1484,47 +1484,10 @@
         }
 
         function updatePlanetPanel() {
-            if (showingHistory) {
-                let html = '<div style="max-height:450px;overflow-y:auto;">';
-
-                // Battle History section
-                html += '<div class="panel-title">Battle History</div>';
-                if (battleHistory.length === 0) {
-                    html += '<div class="empty-state">No battles yet</div>';
-                } else {
-                    for (const battle of battleHistory) {
-                        const resultColor = battle.victory ? '#4ecdc4' : '#ff6b6b';
-                        const resultText = battle.victory ? 'VICTORY' : 'DEFEAT';
-
-                        html += `<div style="padding:6px;margin:4px 0;background:#252540;border-radius:4px;border-left:3px solid ${resultColor};">`;
-                        html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
-                        html += `<span style="color:#ffe66d;font-weight:bold;font-size:11px;">Year ${battle.turn}</span>`;
-                        html += `<span style="color:${resultColor};font-weight:bold;font-size:10px;">${resultText}</span>`;
-                        html += `</div>`;
-                        html += `<div style="color:#888;font-size:10px;margin:2px 0;">${battle.location}</div>`;
-
-                        // Losses
-                        html += `<div style="font-size:10px;margin-top:4px;">`;
-                        html += `<div style="color:#4ecdc4;">Your losses: ${battle.playerLosses} ships`;
-                        if (battle.playerDefenseLost > 0) html += `, ${battle.playerDefenseLost} defense`;
-                        html += `</div>`;
-                        html += `<div style="color:#ff6b6b;">Enemy losses: ${battle.enemyLosses} ships`;
-                        if (battle.enemyDefenseLost > 0) html += `, ${battle.enemyDefenseLost} defense`;
-                        html += `</div>`;
-                        html += `</div>`;
-
-                        // Survivors
-                        html += `<div style="font-size:9px;margin-top:4px;color:#888;">`;
-                        html += `<div>Your survivors: ${battle.playerSurvivors}</div>`;
-                        html += `<div>Enemy survivors: ${battle.enemySurvivors}</div>`;
-                        html += `</div>`;
-
-                        html += `</div>`;
-                    }
-                }
-
-                // Events History section
-                html += '<div class="panel-title" style="margin-top:12px;">Events</div>';
+            // History view - show Event History only
+            if (currentView === 'history') {
+                let html = '<div class="panel-title">Event History</div>';
+                html += '<div style="max-height:450px;overflow-y:auto;">';
                 if (eventHistory.length === 0) {
                     html += '<div class="empty-state">No events yet</div>';
                 } else {
@@ -1536,19 +1499,18 @@
                         else if (event.type === 'built') eventColor = '#4a9fff';
 
                         html += `<div style="padding:4px 6px;margin:2px 0;background:#252540;border-radius:4px;border-left:3px solid ${eventColor};">`;
-                        html += `<span style="color:#ffe66d;font-size:10px;">Year ${event.year}:</span> `;
-                        html += `<span style="color:${eventColor};font-size:10px;">${event.text}</span>`;
+                        html += `<span style="color:#ffe66d;font-size:12px;">Year ${event.year}:</span> `;
+                        html += `<span style="color:${eventColor};font-size:12px;">${event.text}</span>`;
                         html += `</div>`;
                     }
                 }
-
                 html += '</div>';
                 planetContent.innerHTML = html;
                 return;
             }
 
-            if (!selectedStar) {
-                // Show empire overview
+            // Overview view - show Empire Overview
+            if (currentView === 'overview') {
                 let colonies = getPlayerColonies();
                 let html = '<div class="panel-title">Empire Overview</div>';
 
@@ -1621,10 +1583,12 @@
                 return;
             }
 
-            const star = selectedStar;
-            let html = '';
+            // Planet view - show selected planet details
+            if (currentView === 'planet' && selectedStar) {
+                const star = selectedStar;
+                let html = '';
 
-            html += `<div class="panel-subtitle">${star.name}</div>`;
+                html += `<div class="panel-subtitle">${star.name}</div>`;
 
             if (star.explored) {
                 const planetInfo = PLANET_TYPES[star.planetType];
@@ -1785,12 +1749,56 @@
                 html += `<div style="margin-top:10px;color:#888;font-size:10px">Unexplored - send a ship</div>`;
             }
 
-            planetContent.innerHTML = html;
+                planetContent.innerHTML = html;
+            }
         }
 
         function updateFleetPanel() {
-            if (!selectedStar) {
-                // Show fleet overview grouped by location
+            // History view - show Battle History
+            if (currentView === 'history') {
+                let html = '<div class="panel-title">Battle History</div>';
+                html += '<div style="max-height:450px;overflow-y:auto;">';
+                if (battleHistory.length === 0) {
+                    html += '<div class="empty-state">No battles yet</div>';
+                } else {
+                    for (const battle of battleHistory) {
+                        const resultColor = battle.victory ? '#4ecdc4' : '#ff6b6b';
+                        const resultText = battle.victory ? 'VICTORY' : 'DEFEAT';
+
+                        html += `<div style="padding:6px;margin:4px 0;background:#252540;border-radius:4px;border-left:3px solid ${resultColor};">`;
+                        html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                        html += `<span style="color:#ffe66d;font-weight:bold;font-size:11px;">Year ${battle.turn}</span>`;
+                        html += `<span style="color:${resultColor};font-weight:bold;font-size:10px;">${resultText}</span>`;
+                        html += `</div>`;
+                        html += `<div style="color:#888;font-size:10px;margin:2px 0;">${battle.location}</div>`;
+
+                        // Losses
+                        html += `<div style="font-size:10px;margin-top:4px;">`;
+                        html += `<div style="color:#4ecdc4;">Your losses: ${battle.playerLosses} ships`;
+                        if (battle.playerDefenseLost > 0) html += `, ${battle.playerDefenseLost} defense`;
+                        html += `</div>`;
+                        html += `<div style="color:#ff6b6b;">Enemy losses: ${battle.enemyLosses} ships`;
+                        if (battle.enemyDefenseLost > 0) html += `, ${battle.enemyDefenseLost} defense`;
+                        html += `</div>`;
+                        html += `</div>`;
+
+                        // Survivors
+                        html += `<div style="font-size:9px;margin-top:4px;color:#888;">`;
+                        html += `<div>Your survivors: ${battle.playerSurvivors}</div>`;
+                        html += `<div>Enemy survivors: ${battle.enemySurvivors}</div>`;
+                        html += `</div>`;
+
+                        html += `</div>`;
+                    }
+                }
+                html += '</div>';
+                fleetContent.innerHTML = html;
+                fleetActions.innerHTML = '';
+                return;
+            }
+
+            // Overview view - show Fleet Overview
+            if (currentView === 'overview') {
                 const playerShips = ships.filter(s => s.owner === 'player');
                 let html = '<div class="panel-title">Fleet Overview</div>';
 
@@ -1871,12 +1879,14 @@
                 return;
             }
 
-            const star = selectedStar;
-            const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
-            const incomingShips = ships.filter(s => s.destination === star.id && s.owner === 'player');
+            // Planet view - show fleets at selected planet
+            if (currentView === 'planet' && selectedStar) {
+                const star = selectedStar;
+                const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+                const incomingShips = ships.filter(s => s.destination === star.id && s.owner === 'player');
 
-            let html = '';
-            html += `<div class="panel-subtitle">${star.name}</div>`;
+                let html = '';
+                html += `<div class="panel-subtitle">${star.name}</div>`;
 
             if (shipsHere.length > 0) {
                 // Group ships by type
@@ -2034,7 +2044,8 @@
                 }
             }
 
-            fleetActions.innerHTML = actionsHtml;
+                fleetActions.innerHTML = actionsHtml;
+            }
         }
 
         // Global functions for UI callbacks
@@ -2142,7 +2153,7 @@
             selectedStar = star;
             selectedShips = [];
             destinationStar = null;
-            showingHistory = false;
+            currentView = 'planet';
             updatePanels();
             draw();
         };
@@ -2151,7 +2162,7 @@
             selectedStar = null;
             selectedShips = [];
             destinationStar = null;
-            showingHistory = false;
+            currentView = 'overview';
             updatePanels();
             draw();
         };
@@ -2160,7 +2171,7 @@
             selectedStar = null;
             selectedShips = [];
             destinationStar = null;
-            showingHistory = true;
+            currentView = 'history';
             updatePanels();
             draw();
         };
