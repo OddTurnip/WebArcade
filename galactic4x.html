@@ -1570,6 +1570,31 @@
                 }
             }
 
+            // Show enemy fleets (only for explored planets)
+            if (star.explored) {
+                const enemyShipsHere = getShipsAtStar(star.id).filter(s => s.owner !== 'player');
+                if (enemyShipsHere.length > 0) {
+                    html += `<div style="margin-top:10px" class="panel-title" style="color:#ff6b6b">Enemy Fleet</div>`;
+                    // Group by type
+                    const enemyByType = {};
+                    for (const ship of enemyShipsHere) {
+                        if (!enemyByType[ship.type]) {
+                            enemyByType[ship.type] = 0;
+                        }
+                        enemyByType[ship.type]++;
+                    }
+                    for (const type of getShipTypeOrder()) {
+                        if (!enemyByType[type]) continue;
+                        const count = enemyByType[type];
+                        const shipType = SHIP_TYPES[type];
+                        html += `<div class="ship-item" style="color:#ff6b6b;">
+                            <span>${count}x ${shipType.name}</span>
+                            <span style="color:#888;font-size:9px;">${shipType.attack} atk / ${shipType.health} hp</span>
+                        </div>`;
+                    }
+                }
+            }
+
             fleetContent.innerHTML = html;
 
             // Fleet actions
@@ -2086,7 +2111,8 @@
                 const isDestination = destinationStar && destinationStar.id === star.id;
                 const isHovered = hoveredStar && hoveredStar.id === star.id;
                 const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
-                const enemyShipsHere = getShipsAtStar(star.id).filter(s => s.owner !== 'player');
+                // Only show enemy ships for explored planets
+                const enemyShipsHere = star.explored ? getShipsAtStar(star.id).filter(s => s.owner !== 'player') : [];
 
                 // Destination ring
                 if (isDestination) {
