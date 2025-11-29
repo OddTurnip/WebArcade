@@ -23,7 +23,7 @@
             gap: 10px;
             align-items: flex-start;
         }
-        #leftColumn {
+        #centerColumn {
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -44,35 +44,45 @@
             align-items: center;
         }
         #actionPanel.hidden { display: none; }
-        #sidePanel {
-            width: 300px;
+        .side-panel {
+            width: 240px;
             background: #1a1a2e;
             border: 4px solid #4a4a6a;
             border-radius: 4px;
-            padding: 15px;
-            min-height: 480px;
-            max-height: 550px;
-            overflow-y: auto;
+            padding: 12px;
+            height: 530px;
+            display: flex;
+            flex-direction: column;
         }
+        .side-panel.hidden { display: none; }
         .panel-title {
             color: #4ecdc4;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             border-bottom: 1px solid #4a4a6a;
-            padding-bottom: 5px;
+            padding-bottom: 4px;
+        }
+        .panel-subtitle {
+            color: #888;
+            font-size: 10px;
+            margin-bottom: 8px;
+        }
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
         }
         .info-row {
             display: flex;
             justify-content: space-between;
-            margin: 4px 0;
-            font-size: 11px;
+            margin: 3px 0;
+            font-size: 10px;
         }
         .info-label { color: #888; }
         .info-value { color: #ffe66d; }
         .slider-container {
-            margin: 8px 0;
-            padding: 8px;
+            margin: 6px 0;
+            padding: 6px;
             background: #252540;
             border-radius: 4px;
         }
@@ -92,29 +102,29 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
         .slider-label {
-            font-size: 11px;
+            font-size: 10px;
             color: #888;
         }
         .slider-value {
             color: #4ecdc4;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
         }
         .slider-row {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
         .lock-btn {
             background: none;
             border: 1px solid #666;
             color: #666;
-            width: 20px;
-            height: 20px;
-            font-size: 10px;
+            width: 18px;
+            height: 18px;
+            font-size: 9px;
             cursor: pointer;
             border-radius: 3px;
             padding: 0;
@@ -126,22 +136,22 @@
         .lock-btn.locked { border-color: #aaa; color: #aaa; background: #3a3a4a; }
         .lock-btn:disabled { cursor: not-allowed; opacity: 0.5; }
         .slider-production {
-            font-size: 10px;
+            font-size: 9px;
             color: #4a9;
-            margin-top: 4px;
+            margin-top: 2px;
         }
         .lock-reason {
-            font-size: 9px;
+            font-size: 8px;
             color: #888;
             font-style: italic;
-            margin-top: 2px;
+            margin-top: 1px;
         }
         .lock-reason.warning {
             color: #cc8800;
         }
         input[type="range"] {
             flex: 1;
-            height: 16px;
+            height: 14px;
             -webkit-appearance: none;
             background: #2a2a4a;
             border-radius: 4px;
@@ -153,8 +163,8 @@
         }
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
             background: #4ecdc4;
             border-radius: 2px;
             cursor: pointer;
@@ -166,77 +176,78 @@
             background: #2a2a4a;
             border: 2px solid #4ecdc4;
             color: #4ecdc4;
-            padding: 8px 16px;
+            padding: 6px 12px;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
             border-radius: 4px;
-            margin: 5px 2px;
+            margin: 3px 2px;
             transition: all 0.2s;
         }
-        .btn:hover {
+        .btn:hover:not(:disabled) {
             background: #4ecdc4;
             color: #1a1a2e;
         }
         .btn:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
+        }
+        .btn-sm {
+            padding: 3px 6px;
+            font-size: 9px;
+            margin: 2px;
         }
         .btn-primary {
             background: #4ecdc4;
             color: #1a1a2e;
             font-weight: bold;
         }
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             background: #6fefe6;
         }
         .btn-danger {
             border-color: #ff6b6b;
             color: #ff6b6b;
         }
-        .btn-danger:hover {
+        .btn-danger:hover:not(:disabled) {
             background: #ff6b6b;
             color: #1a1a2e;
-        }
-        .ship-list {
-            max-height: 80px;
-            overflow-y: auto;
-            border: 1px solid #4a4a6a;
-            padding: 5px;
-            margin: 5px 0;
-            font-size: 11px;
         }
         .ship-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 2px 0;
-            border-bottom: 1px solid #2a2a4a;
-        }
-        .ship-item:last-child { border-bottom: none; }
-        .build-options {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin: 10px 0;
-        }
-        .build-btn {
-            flex: 1;
-            min-width: 70px;
-            padding: 5px;
+            padding: 4px 6px;
+            margin: 2px 0;
+            background: #252540;
+            border-radius: 3px;
             font-size: 10px;
         }
+        .ship-item.selected {
+            background: #2a4a4a;
+            border: 1px solid #4ecdc4;
+        }
+        .build-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            margin: 8px 0;
+        }
+        .build-btn {
+            padding: 4px;
+            font-size: 9px;
+        }
         #controls {
-            margin-top: 15px;
-            font-size: 11px;
+            margin-top: 10px;
+            font-size: 10px;
             color: #888;
             text-align: center;
             max-width: 950px;
-            line-height: 1.6;
+            line-height: 1.5;
         }
         #audioControls {
-            margin-top: 10px;
-            font-size: 12px;
+            margin-top: 8px;
+            font-size: 11px;
             color: #888;
             display: flex;
             gap: 20px;
@@ -253,23 +264,23 @@
             accent-color: #4ecdc4;
         }
         #aboutSection {
-            margin-top: 15px;
+            margin-top: 10px;
             max-width: 700px;
             background: #1a1a2e;
             border: 2px solid #4a4a6a;
             border-radius: 4px;
-            padding: 15px;
+            padding: 12px;
         }
         #aboutSection h3 {
             color: #4ecdc4;
-            font-size: 14px;
-            margin-bottom: 10px;
+            font-size: 12px;
+            margin-bottom: 8px;
         }
         #aboutSection p {
-            font-size: 11px;
+            font-size: 10px;
             color: #aaa;
-            line-height: 1.5;
-            margin-bottom: 8px;
+            line-height: 1.4;
+            margin-bottom: 6px;
         }
         #aboutSection strong {
             color: #ffe66d;
@@ -278,32 +289,56 @@
             background: #252540;
             border: 1px solid #4a4a6a;
             border-radius: 4px;
-            padding: 8px;
-            margin: 10px 0;
-            font-size: 11px;
+            padding: 6px;
+            margin: 6px 0;
+            font-size: 10px;
         }
         .travel-info .distance { color: #4a9fff; }
         .travel-info .turns { color: #ffe66d; }
+        .fleet-actions {
+            margin-top: auto;
+            padding-top: 8px;
+            border-top: 1px solid #4a4a6a;
+        }
+        .empty-state {
+            color: #666;
+            font-size: 10px;
+            text-align: center;
+            padding: 20px 10px;
+        }
+        .destination-highlight {
+            color: #ffe66d;
+            font-size: 10px;
+            margin: 6px 0;
+            padding: 6px;
+            background: #2a2520;
+            border-radius: 4px;
+        }
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <h1>Galactic 4X</h1>
     <div id="gameContainer">
-        <div id="leftColumn">
+        <div id="planetPanel" class="side-panel hidden">
+            <div class="panel-title">Planet</div>
+            <div id="planetContent" class="panel-content"></div>
+        </div>
+        <div id="centerColumn">
             <canvas id="gameCanvas" width="640" height="480"></canvas>
             <div id="actionPanel" class="hidden">
                 <button class="btn btn-primary" id="endTurnBtn" onclick="window.endTurn()">End Turn</button>
-                <span id="turnInfo" style="color:#888;font-size:12px;"></span>
+                <span id="turnInfo" style="color:#888;font-size:11px;"></span>
             </div>
         </div>
-        <div id="sidePanel" class="hidden">
-            <div id="panelContent"></div>
+        <div id="fleetPanel" class="side-panel hidden">
+            <div class="panel-title">Fleets</div>
+            <div id="fleetContent" class="panel-content"></div>
+            <div class="fleet-actions" id="fleetActions"></div>
         </div>
     </div>
     <div id="controls">
-        <strong>Mouse:</strong> Click stars to select | Click destination to move ships | Drag sliders to adjust production<br>
-        <strong>Keyboard:</strong> Enter = End Turn | Escape = Deselect
+        <strong>Mouse:</strong> Click stars to select | Select ships, then click destination | <strong>Keyboard:</strong> Enter = End Turn | Escape = Deselect
     </div>
     <div id="audioControls">
         <label><input type="checkbox" id="musicToggle" checked> Music</label>
@@ -311,10 +346,10 @@
     </div>
     <div id="aboutSection">
         <h3>How to Play</h3>
-        <p><strong>Industry</strong> represents your colony's manufacturing capacity (0-100%). Higher industry means more production output per turn. Allocate production to "Industry Growth" to build up your capacity.</p>
-        <p><strong>Population</strong> is your workforce. More population = more base production. Population grows based on your "Ecology/Growth" slider allocation and planet type. Each planet has a maximum population based on its type (Terran=100, Ocean=90, etc).</p>
-        <p><strong>Production Formula:</strong> Base Production = Population x (Industry/100) x Planet Modifier. This base is then split according to your sliders.</p>
-        <p><strong>Slider Locks:</strong> Click the lock icon to prevent a slider from changing when you adjust others. Some sliders auto-lock when maxed out or not applicable.</p>
+        <p><strong>Industry</strong> represents your colony's manufacturing capacity (0-100%). Higher industry = more production output per turn.</p>
+        <p><strong>Population</strong> is your workforce. More population = more base production. Each planet has a max population based on its type.</p>
+        <p><strong>Production Formula:</strong> Base = Population x (Industry/100) x Planet Modifier. This is split according to your sliders.</p>
+        <p><strong>Slider Locks:</strong> Click 🔓 to lock a slider. Locked sliders won't change when you adjust others.</p>
     </div>
 
     <script src="controller.js"></script>
@@ -329,7 +364,7 @@
             HEIGHT: 480,
             STAR_COUNT: 24,
             MIN_STAR_DISTANCE: 60,
-            PARSEC_SCALE: 10, // pixels per light year
+            PARSEC_SCALE: 10,
             COLORS: {
                 background: '#0a0a1a',
                 grid: '#1a1a2e',
@@ -340,11 +375,11 @@
                 text: '#ffffff',
                 textHighlight: '#ffe66d',
                 playerHighlight: '#4ecdc4',
-                unexplored: '#666666'
+                unexplored: '#666666',
+                destination: '#ffe66d'
             }
         };
 
-        // Planet types with production modifiers
         const PLANET_TYPES = {
             terran: { name: 'Terran', maxPop: 100, industryMod: 1.0, ecoMod: 1.0, color: '#4ecdc4' },
             ocean: { name: 'Ocean', maxPop: 90, industryMod: 0.9, ecoMod: 1.1, color: '#4a9fff' },
@@ -357,7 +392,6 @@
             toxic: { name: 'Toxic', maxPop: 15, industryMod: 0.3, ecoMod: 0.1, color: '#7cfc00' }
         };
 
-        // Ship types (preset, no customization)
         const SHIP_TYPES = {
             scout: { name: 'Scout', cost: 30, speed: 3, attack: 1, defense: 1, icon: 'S' },
             fighter: { name: 'Fighter', cost: 60, speed: 2, attack: 4, defense: 2, icon: 'F' },
@@ -365,7 +399,6 @@
             colony: { name: 'Colony Ship', cost: 200, speed: 1, attack: 0, defense: 1, icon: 'C', colonize: true }
         };
 
-        // Alien races (no mechanical differences yet)
         const RACES = [
             { id: 'terran', name: 'Terran Federation', color: '#4ecdc4', desc: 'Adaptable and expansionist humans' },
             { id: 'crystalline', name: 'Crystalline Collective', color: '#9932cc', desc: 'Silicon-based mineral lifeforms' },
@@ -375,7 +408,6 @@
             { id: 'saurian', name: 'Saurian Empire', color: '#ff6b6b', desc: 'Ancient reptilian warriors' }
         ];
 
-        // Star names
         const STAR_NAMES = [
             'Sol', 'Alpha', 'Proxima', 'Vega', 'Sirius', 'Rigel', 'Deneb', 'Altair',
             'Polaris', 'Arcturus', 'Capella', 'Betelgeuse', 'Aldebaran', 'Antares',
@@ -401,7 +433,6 @@
 
         function saveGameState() {
             if (state !== GameState.PLAYING) return;
-
             const saveData = {
                 turn,
                 player: { race: player.race, color: player.color },
@@ -420,7 +451,6 @@
                 })),
                 nextShipId
             };
-
             try {
                 localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
             } catch (e) {
@@ -432,9 +462,7 @@
             try {
                 const saved = localStorage.getItem(SAVE_KEY);
                 if (!saved) return false;
-
                 const data = JSON.parse(saved);
-
                 turn = data.turn;
                 player.race = data.player.race;
                 player.color = data.player.color;
@@ -444,7 +472,6 @@
                 }));
                 ships = data.ships;
                 nextShipId = data.nextShipId;
-
                 return true;
             } catch (e) {
                 console.warn('Failed to load game:', e);
@@ -469,13 +496,11 @@
         let state = GameState.TITLE;
         let turn = 1;
 
-        // Player state
         let player = {
             race: null,
             color: '#4ecdc4'
         };
 
-        // Galaxy state
         let stars = [];
         let ships = [];
         let nextShipId = 1;
@@ -483,20 +508,19 @@
         // UI state
         let selectedStar = null;
         let selectedShips = [];
-        let movingFleet = false;
+        let destinationStar = null; // NEW: target for move
         let hoveredStar = null;
         let raceSelectIndex = 0;
         let hasSaveGame = false;
 
-        // Side panel reference
-        const sidePanel = document.getElementById('sidePanel');
-        const panelContent = document.getElementById('panelContent');
+        // DOM references
+        const planetPanel = document.getElementById('planetPanel');
+        const planetContent = document.getElementById('planetContent');
+        const fleetPanel = document.getElementById('fleetPanel');
+        const fleetContent = document.getElementById('fleetContent');
+        const fleetActions = document.getElementById('fleetActions');
         const actionPanel = document.getElementById('actionPanel');
         const turnInfo = document.getElementById('turnInfo');
-
-        // ============================================
-        // CANVAS SETUP
-        // ============================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -509,7 +533,6 @@
             nextShipId = 1;
             const shuffledNames = [...STAR_NAMES].sort(() => Math.random() - 0.5);
 
-            // Generate stars with minimum distance
             for (let i = 0; i < CONFIG.STAR_COUNT; i++) {
                 let attempts = 0;
                 let x, y, valid;
@@ -518,7 +541,6 @@
                     x = 50 + Math.random() * (CONFIG.WIDTH - 100);
                     y = 50 + Math.random() * (CONFIG.HEIGHT - 100);
                     valid = true;
-
                     for (const star of stars) {
                         const dist = Math.sqrt((x - star.x) ** 2 + (y - star.y) ** 2);
                         if (dist < CONFIG.MIN_STAR_DISTANCE) {
@@ -534,7 +556,6 @@
                 const starTypes = ['yellow', 'red', 'blue', 'white'];
                 const starType = starTypes[Math.floor(Math.random() * starTypes.length)];
 
-                // Weight planet types (better planets less common)
                 let planetType;
                 const roll = Math.random();
                 if (roll < 0.1) planetType = 'terran';
@@ -556,20 +577,17 @@
                     planetType: planetType,
                     owner: null,
                     explored: false,
-                    // Colony data (populated when colonized)
                     population: 0,
                     industry: 0,
                     defense: 0,
-                    // Production sliders (%)
-                    sliders: { ship: 25, def: 0, ind: 50, eco: 25 },
-                    lockedSliders: [], // User-locked sliders
-                    // Ship building
+                    // Default sliders: 50% eco, 50% industry (no ship production until queued)
+                    sliders: { ship: 0, def: 0, ind: 50, eco: 50 },
+                    lockedSliders: [],
                     shipProgress: 0,
                     buildingShip: null
                 });
             }
 
-            // Give player a starting system (find a good one)
             let homeStar = stars.find(s => s.planetType === 'terran') ||
                            stars.find(s => s.planetType === 'ocean') ||
                            stars[0];
@@ -579,9 +597,8 @@
             homeStar.population = 40;
             homeStar.industry = 20;
             homeStar.defense = 5;
-            homeStar.planetType = 'terran'; // Home world is always terran
+            homeStar.planetType = 'terran';
 
-            // Give player starting ships
             ships.push({
                 id: nextShipId++,
                 type: 'scout',
@@ -606,8 +623,6 @@
                 destination: null,
                 turnsToArrival: 0
             });
-
-            // Only home star is explored initially - no nearby stars auto-explored
         }
 
         // ============================================
@@ -617,10 +632,13 @@
             turn = 1;
             selectedStar = null;
             selectedShips = [];
-            movingFleet = false;
+            destinationStar = null;
             generateGalaxy();
             actionPanel.classList.remove('hidden');
+            planetPanel.classList.remove('hidden');
+            fleetPanel.classList.remove('hidden');
             updateTurnInfo();
+            updatePanels();
         }
 
         function updateTurnInfo() {
@@ -633,20 +651,14 @@
             return ships.filter(s => s.location === starId && s.destination === null);
         }
 
-        function getShipsInTransit() {
-            return ships.filter(s => s.destination !== null);
-        }
-
         function getPlayerColonies() {
             return stars.filter(s => s.owner === 'player');
         }
 
         function calculateProduction(star) {
             if (star.owner !== 'player') return null;
-
             const planetInfo = PLANET_TYPES[star.planetType];
             const baseProduction = star.population * (star.industry / 100) * planetInfo.industryMod;
-
             return {
                 ship: Math.floor(baseProduction * (star.sliders.ship / 100)),
                 def: Math.floor(baseProduction * (star.sliders.def / 100)),
@@ -656,14 +668,10 @@
         }
 
         function getSliderLockState(star, sliderKey) {
-            // Check user lock first
             if (star.lockedSliders && star.lockedSliders.includes(sliderKey)) {
                 return { locked: true, type: 'user', reason: 'Locked by you' };
             }
-
             const planetInfo = PLANET_TYPES[star.planetType];
-
-            // Auto-lock conditions
             if (sliderKey === 'ind' && star.industry >= 100) {
                 return { locked: true, type: 'auto', reason: 'Industry maxed' };
             }
@@ -673,7 +681,6 @@
             if (sliderKey === 'ship' && !star.buildingShip) {
                 return { locked: true, type: 'noship', reason: 'No ship queued' };
             }
-
             return { locked: false, type: null, reason: null };
         }
 
@@ -682,39 +689,25 @@
             for (const key of Object.keys(star.sliders)) {
                 lockStates[key] = getSliderLockState(star, key);
             }
-
-            // Set the changed slider
             star.sliders[changedKey] = newValue;
-
-            // Get unlocked sliders (excluding the one we just changed)
             const unlockedKeys = Object.keys(star.sliders).filter(k =>
                 k !== changedKey && !lockStates[k].locked
             );
-
-            // Calculate how much we need to adjust
             const total = Object.values(star.sliders).reduce((a, b) => a + b, 0);
             const diff = total - 100;
-
             if (diff === 0 || unlockedKeys.length === 0) return;
-
-            // Distribute the difference among unlocked sliders
             const unlockedTotal = unlockedKeys.reduce((sum, k) => sum + star.sliders[k], 0);
-
             if (unlockedTotal === 0) {
-                // All unlocked are 0, just reduce equally
                 const perSlider = Math.floor(diff / unlockedKeys.length);
                 for (const key of unlockedKeys) {
                     star.sliders[key] = Math.max(0, -perSlider);
                 }
             } else {
-                // Distribute proportionally
                 for (const key of unlockedKeys) {
                     const proportion = star.sliders[key] / unlockedTotal;
                     star.sliders[key] = Math.max(0, Math.round(star.sliders[key] - diff * proportion));
                 }
             }
-
-            // Final normalization pass
             const finalTotal = Object.values(star.sliders).reduce((a, b) => a + b, 0);
             if (finalTotal !== 100 && unlockedKeys.length > 0) {
                 const adjustment = 100 - finalTotal;
@@ -730,30 +723,19 @@
         function processTurn() {
             state = GameState.END_TURN;
 
-            // Process each colony
             for (const star of getPlayerColonies()) {
                 const production = calculateProduction(star);
                 const planetInfo = PLANET_TYPES[star.planetType];
-
-                // Industry growth
                 star.industry = Math.min(100, star.industry + production.ind);
-
-                // Population growth
                 const maxPop = planetInfo.maxPop;
                 if (star.population < maxPop) {
                     star.population = Math.min(maxPop, star.population + production.eco);
                 }
-
-                // Defense growth
                 star.defense += production.def;
-
-                // Ship production
                 if (star.buildingShip) {
                     star.shipProgress += production.ship;
                     const shipType = SHIP_TYPES[star.buildingShip];
-
                     if (star.shipProgress >= shipType.cost) {
-                        // Ship completed!
                         ships.push({
                             id: nextShipId++,
                             type: star.buildingShip,
@@ -769,17 +751,12 @@
                 }
             }
 
-            // Process ship movement
             for (const ship of ships) {
                 if (ship.destination !== null) {
                     ship.turnsToArrival--;
-
                     if (ship.turnsToArrival <= 0) {
-                        // Ship arrived
                         ship.location = ship.destination;
                         ship.destination = null;
-
-                        // Explore the star
                         const star = stars.find(s => s.id === ship.location);
                         if (star && !star.explored) {
                             star.explored = true;
@@ -791,7 +768,7 @@
 
             turn++;
             state = GameState.PLAYING;
-            updateSidePanel();
+            updatePanels();
             updateTurnInfo();
             saveGameState();
         }
@@ -799,11 +776,8 @@
         function calculateTravelInfo(originStar, destStar, shipIds) {
             const dist = Math.sqrt((destStar.x - originStar.x) ** 2 + (destStar.y - originStar.y) ** 2);
             const lightYears = Math.round(dist / CONFIG.PARSEC_SCALE * 10) / 10;
-
-            // Find slowest ship in selection
             let slowestSpeed = Infinity;
             let slowestShipName = '';
-
             for (const shipId of shipIds) {
                 const ship = ships.find(s => s.id === shipId);
                 if (ship) {
@@ -814,65 +788,46 @@
                     }
                 }
             }
-
             const turns = Math.max(1, Math.ceil(dist / (50 * slowestSpeed)));
-
-            return {
-                lightYears,
-                turns,
-                slowestShipName,
-                slowestSpeed
-            };
+            return { lightYears, turns, slowestShipName, slowestSpeed };
         }
 
         function moveShips(shipIds, destinationId) {
             const destStar = stars.find(s => s.id === destinationId);
             if (!destStar) return;
-
             for (const shipId of shipIds) {
                 const ship = ships.find(s => s.id === shipId);
                 if (!ship || ship.destination !== null) continue;
-
                 const originStar = stars.find(s => s.id === ship.location);
                 const shipType = SHIP_TYPES[ship.type];
-
-                // Calculate distance and travel time
                 const dist = Math.sqrt((destStar.x - originStar.x) ** 2 + (destStar.y - originStar.y) ** 2);
                 const turns = Math.ceil(dist / (50 * shipType.speed));
-
                 ship.destination = destinationId;
                 ship.turnsToArrival = Math.max(1, turns);
             }
-
             AudioSystem.sfx.select();
-            movingFleet = false;
             selectedShips = [];
-            updateSidePanel();
+            destinationStar = null;
+            updatePanels();
             saveGameState();
         }
 
         function colonizeStar(shipId, starId) {
             const ship = ships.find(s => s.id === shipId);
             const star = stars.find(s => s.id === starId);
-
             if (!ship || !star || ship.type !== 'colony' || star.owner !== null) return false;
-
             const planetInfo = PLANET_TYPES[star.planetType];
-            if (planetInfo.maxPop === 0) return false; // Can't colonize dead worlds
-
-            // Remove colony ship
+            if (planetInfo.maxPop === 0) return false;
             ships = ships.filter(s => s.id !== shipId);
-
-            // Establish colony
             star.owner = 'player';
             star.explored = true;
             star.population = 10;
             star.industry = 5;
             star.defense = 0;
             star.lockedSliders = [];
-
+            star.sliders = { ship: 0, def: 0, ind: 50, eco: 50 };
             AudioSystem.sfx.levelComplete();
-            updateSidePanel();
+            updatePanels();
             updateTurnInfo();
             saveGameState();
             return true;
@@ -881,70 +836,66 @@
         function startBuildingShip(starId, shipType) {
             const star = stars.find(s => s.id === starId);
             if (!star || star.owner !== 'player') return;
-
             star.buildingShip = shipType;
             star.shipProgress = 0;
             AudioSystem.sfx.select();
-            updateSidePanel();
+            updatePanels();
             saveGameState();
         }
 
         function cancelBuildingShip(starId) {
             const star = stars.find(s => s.id === starId);
             if (!star) return;
-
             star.buildingShip = null;
             star.shipProgress = 0;
-            updateSidePanel();
+            updatePanels();
             saveGameState();
         }
 
         // ============================================
         // UI UPDATES
         // ============================================
-        function updateSidePanel() {
+        function updatePanels() {
+            updatePlanetPanel();
+            updateFleetPanel();
+        }
+
+        function updatePlanetPanel() {
             if (!selectedStar) {
-                sidePanel.classList.add('hidden');
+                planetContent.innerHTML = '<div class="empty-state">Select a star to view planet details</div>';
                 return;
             }
 
-            sidePanel.classList.remove('hidden');
             const star = selectedStar;
-            const shipsHere = getShipsAtStar(star.id);
-            const playerShips = shipsHere.filter(s => s.owner === 'player');
-
             let html = '';
 
-            // Star info
-            html += `<div class="panel-title">${star.name}</div>`;
+            html += `<div class="panel-subtitle">${star.name}</div>`;
 
             if (star.explored) {
                 const planetInfo = PLANET_TYPES[star.planetType];
-                html += `<div class="info-row"><span class="info-label">Planet Type:</span><span class="info-value" style="color:${planetInfo.color}">${planetInfo.name}</span></div>`;
-                html += `<div class="info-row"><span class="info-label">Max Population:</span><span class="info-value">${planetInfo.maxPop}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Type:</span><span class="info-value" style="color:${planetInfo.color}">${planetInfo.name}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Max Pop:</span><span class="info-value">${planetInfo.maxPop}</span></div>`;
             } else {
-                html += `<div class="info-row"><span class="info-label">Planet Type:</span><span class="info-value" style="color:#666">Unknown</span></div>`;
-                html += `<div class="info-row"><span class="info-label">Max Population:</span><span class="info-value" style="color:#666">???</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Type:</span><span class="info-value" style="color:#666">Unknown</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Max Pop:</span><span class="info-value" style="color:#666">???</span></div>`;
             }
 
             if (star.owner === 'player') {
                 const planetInfo = PLANET_TYPES[star.planetType];
+                const prod = calculateProduction(star);
 
-                // Colony info
-                html += `<div style="margin-top:12px" class="panel-title">Colony Status</div>`;
-                html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${star.population} / ${planetInfo.maxPop}</span></div>`;
+                html += `<div style="margin-top:10px" class="panel-title">Colony</div>`;
+                html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${star.population}/${planetInfo.maxPop}</span></div>`;
                 html += `<div class="info-row"><span class="info-label">Industry:</span><span class="info-value">${star.industry}%</span></div>`;
                 html += `<div class="info-row"><span class="info-label">Defense:</span><span class="info-value">${star.defense}</span></div>`;
 
-                // Production sliders with per-turn info
-                const prod = calculateProduction(star);
-                html += `<div style="margin-top:12px" class="panel-title">Production Allocation</div>`;
+                html += `<div style="margin-top:10px" class="panel-title">Production</div>`;
 
                 const sliderTypes = [
-                    { key: 'ship', label: 'Ship Production', prodKey: 'ship', prodLabel: 'production' },
-                    { key: 'def', label: 'Defense', prodKey: 'def', prodLabel: 'defense' },
-                    { key: 'ind', label: 'Industry Growth', prodKey: 'ind', prodLabel: '% industry' },
-                    { key: 'eco', label: 'Ecology/Growth', prodKey: 'eco', prodLabel: 'population' }
+                    { key: 'ship', label: 'Ships', prodKey: 'ship', prodLabel: 'prod' },
+                    { key: 'def', label: 'Defense', prodKey: 'def', prodLabel: 'def' },
+                    { key: 'ind', label: 'Industry', prodKey: 'ind', prodLabel: '% ind' },
+                    { key: 'eco', label: 'Growth', prodKey: 'eco', prodLabel: 'pop' }
                 ];
 
                 for (const slider of sliderTypes) {
@@ -955,7 +906,6 @@
                         else if (lockState.type === 'noship') containerClass += ' locked-noship';
                         else if (lockState.type === 'user') containerClass += ' locked-user';
                     }
-
                     const isUserLocked = star.lockedSliders && star.lockedSliders.includes(slider.key);
                     const lockBtnClass = isUserLocked ? 'lock-btn locked' : 'lock-btn';
                     const lockDisabled = lockState.type === 'auto' || lockState.type === 'noship';
@@ -970,131 +920,142 @@
                                    ${lockState.locked ? 'disabled' : ''}
                                    onchange="adjustSlider(${star.id}, '${slider.key}', this.value)">
                             <button class="${lockBtnClass}" ${lockDisabled ? 'disabled' : ''}
-                                    onclick="toggleSliderLock(${star.id}, '${slider.key}')"
-                                    title="${isUserLocked ? 'Unlock' : 'Lock'}">
+                                    onclick="toggleSliderLock(${star.id}, '${slider.key}')">
                                 ${isUserLocked ? '🔒' : '🔓'}
                             </button>
                         </div>
                         <div class="slider-production">+${prod[slider.prodKey]} ${slider.prodLabel}/turn</div>`;
-
                     if (lockState.locked && lockState.reason) {
                         const reasonClass = lockState.type === 'noship' ? 'lock-reason warning' : 'lock-reason';
                         const prefix = lockState.type === 'noship' ? '⚠ ' : '';
                         html += `<div class="${reasonClass}">${prefix}${lockState.reason}</div>`;
                     }
-
                     html += `</div>`;
                 }
 
-                // Ship building
-                html += `<div style="margin-top:12px" class="panel-title">Shipyard</div>`;
-
+                html += `<div style="margin-top:10px" class="panel-title">Shipyard</div>`;
                 if (star.buildingShip) {
                     const shipType = SHIP_TYPES[star.buildingShip];
                     const progress = Math.floor((star.shipProgress / shipType.cost) * 100);
                     const remaining = shipType.cost - star.shipProgress;
                     const turnsLeft = prod.ship > 0 ? Math.ceil(remaining / prod.ship) : '∞';
-
                     html += `<div class="info-row"><span class="info-label">Building:</span><span class="info-value">${shipType.name}</span></div>`;
-                    html += `<div class="info-row"><span class="info-label">Progress:</span><span class="info-value">${progress}% (${star.shipProgress}/${shipType.cost})</span></div>`;
+                    html += `<div class="info-row"><span class="info-label">Progress:</span><span class="info-value">${progress}%</span></div>`;
                     html += `<div class="info-row"><span class="info-label">ETA:</span><span class="info-value">${turnsLeft} turns</span></div>`;
-                    html += `<button class="btn btn-danger" onclick="cancelBuildingShip(${star.id})">Cancel Build</button>`;
+                    html += `<button class="btn btn-danger btn-sm" onclick="cancelBuildingShip(${star.id})">Cancel</button>`;
                 } else {
                     html += `<div class="build-options">`;
                     for (const [key, type] of Object.entries(SHIP_TYPES)) {
-                        html += `<button class="btn build-btn" onclick="startBuildingShip(${star.id}, '${key}')">${type.name}<br><span style="font-size:9px">(${type.cost})</span></button>`;
+                        html += `<button class="btn build-btn" onclick="startBuildingShip(${star.id}, '${key}')">${type.name}<br>(${type.cost})</button>`;
                     }
                     html += `</div>`;
                 }
             } else if (star.explored) {
                 const planetInfo = PLANET_TYPES[star.planetType];
-                html += `<div style="margin-top:12px;color:#888;font-size:11px">Unclaimed system</div>`;
-
-                // Check if player has colony ship here
+                html += `<div style="margin-top:10px;color:#888;font-size:10px">Unclaimed system</div>`;
+                const playerShips = getShipsAtStar(star.id).filter(s => s.owner === 'player');
                 const colonyShip = playerShips.find(s => s.type === 'colony');
                 if (colonyShip && planetInfo.maxPop > 0) {
-                    html += `<button class="btn" style="margin-top:10px" onclick="colonizeStar(${colonyShip.id}, ${star.id})">Colonize Planet</button>`;
+                    html += `<button class="btn" style="margin-top:8px" onclick="colonizeStar(${colonyShip.id}, ${star.id})">Colonize</button>`;
                 } else if (planetInfo.maxPop === 0) {
-                    html += `<div style="color:#ff6b6b;font-size:11px;margin-top:5px">Planet cannot be colonized</div>`;
+                    html += `<div style="color:#ff6b6b;font-size:10px;margin-top:5px">Uninhabitable</div>`;
                 }
             } else {
-                html += `<div style="margin-top:12px;color:#888;font-size:11px">Unexplored - send a ship to scout</div>`;
+                html += `<div style="margin-top:10px;color:#888;font-size:10px">Unexplored - send a ship</div>`;
             }
 
-            // Ships at this location
-            if (playerShips.length > 0) {
-                html += `<div style="margin-top:12px" class="panel-title">Ships Here</div>`;
-                html += `<div class="ship-list">`;
-                for (const ship of playerShips) {
+            planetContent.innerHTML = html;
+        }
+
+        function updateFleetPanel() {
+            if (!selectedStar) {
+                fleetContent.innerHTML = '<div class="empty-state">Select a star to view ships</div>';
+                fleetActions.innerHTML = '';
+                return;
+            }
+
+            const star = selectedStar;
+            const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+            const incomingShips = ships.filter(s => s.destination === star.id && s.owner === 'player');
+
+            let html = '';
+            html += `<div class="panel-subtitle">${star.name}</div>`;
+
+            if (shipsHere.length > 0) {
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                    <span style="font-size:10px;color:#888">Ships here: ${shipsHere.length}</span>
+                    <button class="btn btn-sm" onclick="toggleSelectAll()">${selectedShips.length === shipsHere.length ? 'Deselect All' : 'Select All'}</button>
+                </div>`;
+
+                for (const ship of shipsHere) {
                     const shipType = SHIP_TYPES[ship.type];
-                    const selected = selectedShips.includes(ship.id);
-                    html += `<div class="ship-item" style="${selected ? 'background:#2a4a4a' : ''}">
-                        <span>${shipType.name} <span style="color:#666">(spd ${shipType.speed})</span></span>
-                        <button class="btn" style="padding:2px 6px;font-size:9px" onclick="toggleShipSelection(${ship.id})">${selected ? '✓' : 'Sel'}</button>
+                    const isSelected = selectedShips.includes(ship.id);
+                    html += `<div class="ship-item ${isSelected ? 'selected' : ''}" onclick="toggleShipSelection(${ship.id})">
+                        <span>${shipType.name}</span>
+                        <span style="color:#666">spd ${shipType.speed}</span>
                     </div>`;
                 }
-                html += `</div>`;
-
-                if (selectedShips.length > 0) {
-                    if (movingFleet) {
-                        // Show travel info for hovered star
-                        if (hoveredStar && hoveredStar !== selectedStar) {
-                            const travelInfo = calculateTravelInfo(selectedStar, hoveredStar, selectedShips);
-                            html += `<div class="travel-info">
-                                <div>Distance: <span class="distance">${travelInfo.lightYears} LY</span></div>
-                                <div>Travel time: <span class="turns">${travelInfo.turns} turns</span></div>
-                                ${selectedShips.length > 1 ? `<div style="color:#888;font-size:10px">Slowest: ${travelInfo.slowestShipName} (speed ${travelInfo.slowestSpeed})</div>` : ''}
-                            </div>`;
-                        } else {
-                            html += `<div style="color:#ffe66d;font-size:11px;margin-top:8px">Click a destination star...</div>`;
-                        }
-                        html += `<button class="btn btn-danger" onclick="cancelMove()">Cancel Move</button>`;
-                    } else {
-                        html += `<button class="btn" onclick="startMove()">Move ${selectedShips.length} Ship${selectedShips.length > 1 ? 's' : ''}</button>`;
-                    }
-                }
+            } else {
+                html += `<div class="empty-state">No ships at this location</div>`;
             }
 
-            // Ships in transit to this star
-            const incomingShips = ships.filter(s => s.destination === star.id && s.owner === 'player');
             if (incomingShips.length > 0) {
-                html += `<div style="margin-top:10px" class="panel-title">Incoming Ships</div>`;
-                html += `<div class="ship-list">`;
+                html += `<div style="margin-top:10px" class="panel-title">Incoming</div>`;
                 for (const ship of incomingShips) {
                     const shipType = SHIP_TYPES[ship.type];
-                    html += `<div class="ship-item"><span>${shipType.name}</span><span>${ship.turnsToArrival} turns</span></div>`;
+                    html += `<div class="ship-item">
+                        <span>${shipType.name}</span>
+                        <span style="color:#ffe66d">${ship.turnsToArrival}t</span>
+                    </div>`;
                 }
-                html += `</div>`;
             }
 
-            panelContent.innerHTML = html;
+            fleetContent.innerHTML = html;
+
+            // Fleet actions
+            let actionsHtml = '';
+            const hasSelection = selectedShips.length > 0;
+
+            if (destinationStar && hasSelection) {
+                const travelInfo = calculateTravelInfo(selectedStar, destinationStar, selectedShips);
+                actionsHtml += `<div class="destination-highlight">
+                    <div>To: <strong>${destinationStar.name}</strong></div>
+                    <div><span class="distance">${travelInfo.lightYears} LY</span> - <span class="turns">${travelInfo.turns} turns</span></div>
+                    ${selectedShips.length > 1 ? `<div style="font-size:9px;color:#888">Slowest: ${travelInfo.slowestShipName}</div>` : ''}
+                </div>`;
+                actionsHtml += `<button class="btn btn-primary" onclick="confirmMove()">Confirm Move</button>`;
+                actionsHtml += `<button class="btn btn-danger btn-sm" onclick="cancelMove()">Cancel</button>`;
+            } else {
+                actionsHtml += `<button class="btn" ${hasSelection ? '' : 'disabled'} onclick="window.focus()">Move ${hasSelection ? selectedShips.length + ' Ship' + (selectedShips.length > 1 ? 's' : '') : 'Ships'}</button>`;
+                if (hasSelection) {
+                    actionsHtml += `<div style="font-size:9px;color:#888;margin-top:4px">Click a destination star</div>`;
+                }
+            }
+
+            fleetActions.innerHTML = actionsHtml;
         }
 
         // Global functions for UI callbacks
         window.adjustSlider = function(starId, sliderKey, value) {
             const star = stars.find(s => s.id === starId);
             if (!star) return;
-
             value = parseInt(value);
             normalizeSliders(star, sliderKey, value);
-            updateSidePanel();
+            updatePanels();
             saveGameState();
         };
 
         window.toggleSliderLock = function(starId, sliderKey) {
             const star = stars.find(s => s.id === starId);
             if (!star) return;
-
             if (!star.lockedSliders) star.lockedSliders = [];
-
             const idx = star.lockedSliders.indexOf(sliderKey);
             if (idx >= 0) {
                 star.lockedSliders.splice(idx, 1);
             } else {
                 star.lockedSliders.push(sliderKey);
             }
-
-            updateSidePanel();
+            updatePanels();
             saveGameState();
         };
 
@@ -1105,17 +1066,31 @@
             } else {
                 selectedShips.push(shipId);
             }
-            updateSidePanel();
+            // Clear destination when selection changes
+            destinationStar = null;
+            updatePanels();
         };
 
-        window.startMove = function() {
-            movingFleet = true;
-            updateSidePanel();
+        window.toggleSelectAll = function() {
+            const shipsHere = getShipsAtStar(selectedStar.id).filter(s => s.owner === 'player');
+            if (selectedShips.length === shipsHere.length) {
+                selectedShips = [];
+            } else {
+                selectedShips = shipsHere.map(s => s.id);
+            }
+            destinationStar = null;
+            updatePanels();
+        };
+
+        window.confirmMove = function() {
+            if (destinationStar && selectedShips.length > 0) {
+                moveShips(selectedShips, destinationStar.id);
+            }
         };
 
         window.cancelMove = function() {
-            movingFleet = false;
-            updateSidePanel();
+            destinationStar = null;
+            updatePanels();
         };
 
         window.endTurn = function() {
@@ -1148,24 +1123,24 @@
             AudioSystem.unlock();
 
             if (state === GameState.TITLE) {
-                // Check for continue button
                 if (hasSaveGame && y >= CONFIG.HEIGHT / 2 + 30 && y <= CONFIG.HEIGHT / 2 + 60) {
                     if (loadGameState()) {
                         state = GameState.PLAYING;
                         actionPanel.classList.remove('hidden');
+                        planetPanel.classList.remove('hidden');
+                        fleetPanel.classList.remove('hidden');
                         updateTurnInfo();
+                        updatePanels();
                         AudioSystem.sfx.select();
                         return;
                     }
                 }
-                // Check for new game button
-                if (y >= CONFIG.HEIGHT / 2 + 70 && y <= CONFIG.HEIGHT / 2 + 100) {
+                if (hasSaveGame && y >= CONFIG.HEIGHT / 2 + 70 && y <= CONFIG.HEIGHT / 2 + 100) {
                     clearSaveGame();
                     state = GameState.RACE_SELECT;
                     AudioSystem.sfx.select();
                     return;
                 }
-                // Default: if no save, go to race select
                 if (!hasSaveGame) {
                     state = GameState.RACE_SELECT;
                     AudioSystem.sfx.select();
@@ -1174,7 +1149,6 @@
             }
 
             if (state === GameState.RACE_SELECT) {
-                // Check if clicked on a race
                 const raceY = 120;
                 const raceHeight = 50;
                 for (let i = 0; i < RACES.length; i++) {
@@ -1195,23 +1169,26 @@
             if (state === GameState.PLAYING) {
                 const clickedStar = getStarAtPosition(x, y);
 
-                if (movingFleet && clickedStar && clickedStar !== selectedStar) {
-                    // Move ships to clicked star
-                    moveShips(selectedShips, clickedStar.id);
+                // If ships are selected and we click a different star, set it as destination
+                if (selectedShips.length > 0 && clickedStar && clickedStar !== selectedStar) {
+                    destinationStar = clickedStar;
+                    AudioSystem.sfx.select();
+                    updatePanels();
                     return;
                 }
 
+                // Otherwise, select the star (or deselect if clicking empty space)
                 if (clickedStar) {
                     selectedStar = clickedStar;
                     selectedShips = [];
-                    movingFleet = false;
+                    destinationStar = null;
                     AudioSystem.sfx.select();
-                    updateSidePanel();
+                    updatePanels();
                 } else {
                     selectedStar = null;
                     selectedShips = [];
-                    movingFleet = false;
-                    updateSidePanel();
+                    destinationStar = null;
+                    updatePanels();
                 }
             }
         });
@@ -1220,15 +1197,8 @@
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-
             if (state === GameState.PLAYING) {
-                const prevHovered = hoveredStar;
                 hoveredStar = getStarAtPosition(x, y);
-
-                // Update panel if hovering during move to show travel info
-                if (movingFleet && hoveredStar !== prevHovered) {
-                    updateSidePanel();
-                }
             }
         });
 
@@ -1240,7 +1210,10 @@
                     if (hasSaveGame && loadGameState()) {
                         state = GameState.PLAYING;
                         actionPanel.classList.remove('hidden');
+                        planetPanel.classList.remove('hidden');
+                        fleetPanel.classList.remove('hidden');
                         updateTurnInfo();
+                        updatePanels();
                         AudioSystem.sfx.select();
                     } else {
                         state = GameState.RACE_SELECT;
@@ -1270,13 +1243,21 @@
 
             if (state === GameState.PLAYING) {
                 if (e.key === 'Enter') {
-                    processTurn();
+                    if (destinationStar && selectedShips.length > 0) {
+                        moveShips(selectedShips, destinationStar.id);
+                    } else {
+                        processTurn();
+                    }
                     AudioSystem.sfx.select();
                 } else if (e.key === 'Escape') {
-                    selectedStar = null;
-                    selectedShips = [];
-                    movingFleet = false;
-                    updateSidePanel();
+                    if (destinationStar) {
+                        destinationStar = null;
+                    } else if (selectedShips.length > 0) {
+                        selectedShips = [];
+                    } else {
+                        selectedStar = null;
+                    }
+                    updatePanels();
                 }
             }
         });
@@ -1287,8 +1268,6 @@
         function renderBackground() {
             ctx.fillStyle = CONFIG.COLORS.background;
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
-
-            // Draw subtle grid
             ctx.strokeStyle = CONFIG.COLORS.grid;
             ctx.lineWidth = 0.5;
             for (let x = 0; x < CONFIG.WIDTH; x += 40) {
@@ -1303,8 +1282,6 @@
                 ctx.lineTo(CONFIG.WIDTH, y);
                 ctx.stroke();
             }
-
-            // Draw distant stars
             ctx.fillStyle = '#333';
             for (let i = 0; i < 100; i++) {
                 const x = (i * 97 + 23) % CONFIG.WIDTH;
@@ -1342,24 +1319,24 @@
             }
             ctx.setLineDash([]);
 
-            // Draw move preview line
-            if (movingFleet && selectedStar && hoveredStar && hoveredStar !== selectedStar) {
-                ctx.strokeStyle = '#ffe66d';
+            // Draw destination preview line
+            if (destinationStar && selectedStar && selectedShips.length > 0) {
+                ctx.strokeStyle = CONFIG.COLORS.destination;
                 ctx.setLineDash([3, 3]);
+                ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.moveTo(selectedStar.x, selectedStar.y);
-                ctx.lineTo(hoveredStar.x, hoveredStar.y);
+                ctx.lineTo(destinationStar.x, destinationStar.y);
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                // Draw travel time near cursor
-                const travelInfo = calculateTravelInfo(selectedStar, hoveredStar, selectedShips);
-                const midX = (selectedStar.x + hoveredStar.x) / 2;
-                const midY = (selectedStar.y + hoveredStar.y) / 2;
-
+                // Travel time label
+                const travelInfo = calculateTravelInfo(selectedStar, destinationStar, selectedShips);
+                const midX = (selectedStar.x + destinationStar.x) / 2;
+                const midY = (selectedStar.y + destinationStar.y) / 2;
                 ctx.fillStyle = 'rgba(0,0,0,0.8)';
                 ctx.fillRect(midX - 35, midY - 10, 70, 20);
-                ctx.fillStyle = '#ffe66d';
+                ctx.fillStyle = CONFIG.COLORS.destination;
                 ctx.font = '10px Courier New';
                 ctx.textAlign = 'center';
                 ctx.fillText(`${travelInfo.turns} turns`, midX, midY + 4);
@@ -1367,8 +1344,18 @@
 
             for (const star of stars) {
                 const isSelected = selectedStar && selectedStar.id === star.id;
+                const isDestination = destinationStar && destinationStar.id === star.id;
                 const isHovered = hoveredStar && hoveredStar.id === star.id;
                 const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+
+                // Destination ring
+                if (isDestination) {
+                    ctx.strokeStyle = CONFIG.COLORS.destination;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, 24, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
 
                 // Selection ring
                 if (isSelected) {
@@ -1380,7 +1367,7 @@
                 }
 
                 // Hover ring
-                if (isHovered && !isSelected) {
+                if (isHovered && !isSelected && !isDestination) {
                     ctx.strokeStyle = '#666';
                     ctx.lineWidth = 1;
                     ctx.beginPath();
@@ -1397,7 +1384,7 @@
                     ctx.stroke();
                 }
 
-                // Star glow (only for explored stars)
+                // Star glow
                 if (star.explored) {
                     const gradient = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, 15);
                     gradient.addColorStop(0, getStarColor(star));
@@ -1420,14 +1407,14 @@
                 ctx.textAlign = 'center';
                 ctx.fillText(star.name, star.x, star.y + 28);
 
-                // Ship count indicator
+                // Ship count
                 if (shipsHere.length > 0) {
                     ctx.fillStyle = player.color;
                     ctx.font = 'bold 10px Courier New';
                     ctx.fillText(`[${shipsHere.length}]`, star.x, star.y - 20);
                 }
 
-                // Planet type indicator (only if explored AND selected)
+                // Planet type (when selected)
                 if (star.explored && isSelected) {
                     const planetInfo = PLANET_TYPES[star.planetType];
                     ctx.fillStyle = planetInfo.color;
@@ -1439,27 +1426,22 @@
 
         function renderTitle() {
             renderBackground();
-
             ctx.fillStyle = 'rgba(0,0,0,0.7)';
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
 
-            // Title
             ctx.fillStyle = '#4ecdc4';
             ctx.font = 'bold 48px Courier New';
             ctx.textAlign = 'center';
             ctx.fillText('GALACTIC 4X', CONFIG.WIDTH / 2, 150);
 
-            // Subtitle
             ctx.fillStyle = '#888';
             ctx.font = '16px Courier New';
             ctx.fillText('Explore, Expand, Exploit, Exterminate', CONFIG.WIDTH / 2, 190);
 
-            // Menu options
             if (hasSaveGame) {
                 ctx.fillStyle = '#ffe66d';
                 ctx.font = '16px Courier New';
                 ctx.fillText('[ Continue ]', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
-
                 ctx.fillStyle = '#4ecdc4';
                 ctx.fillText('[ New Game ]', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 90);
             } else {
@@ -1468,26 +1450,21 @@
                 ctx.fillText('Click to begin', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
             }
 
-            // Description
             ctx.fillStyle = '#666';
             ctx.font = '12px Courier New';
             ctx.fillText('Build your galactic empire across the stars', CONFIG.WIDTH / 2, CONFIG.HEIGHT - 100);
-            ctx.fillText('Colonize planets, build ships, and dominate the galaxy', CONFIG.WIDTH / 2, CONFIG.HEIGHT - 80);
         }
 
         function renderRaceSelect() {
             renderBackground();
-
             ctx.fillStyle = 'rgba(0,0,0,0.85)';
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
 
-            // Title
             ctx.fillStyle = '#4ecdc4';
             ctx.font = 'bold 28px Courier New';
             ctx.textAlign = 'center';
             ctx.fillText('SELECT YOUR RACE', CONFIG.WIDTH / 2, 80);
 
-            // Race options
             const raceY = 120;
             const raceHeight = 50;
 
@@ -1496,51 +1473,45 @@
                 const y = raceY + i * raceHeight;
                 const isHovered = i === raceSelectIndex;
 
-                // Background
                 if (isHovered) {
                     ctx.fillStyle = 'rgba(78, 205, 196, 0.2)';
                     ctx.fillRect(100, y, CONFIG.WIDTH - 200, raceHeight - 5);
                 }
 
-                // Race name
                 ctx.fillStyle = race.color;
                 ctx.font = isHovered ? 'bold 16px Courier New' : '14px Courier New';
                 ctx.textAlign = 'left';
                 ctx.fillText(race.name, 120, y + 20);
 
-                // Description
                 ctx.fillStyle = '#888';
                 ctx.font = '11px Courier New';
                 ctx.fillText(race.desc, 120, y + 36);
 
-                // Selection indicator
                 if (isHovered) {
                     ctx.fillStyle = race.color;
                     ctx.fillText('>', 105, y + 20);
                 }
             }
 
-            // Instructions
             ctx.fillStyle = '#666';
             ctx.font = '12px Courier New';
             ctx.textAlign = 'center';
-            ctx.fillText('Use arrows to select, Enter to confirm, or click a race', CONFIG.WIDTH / 2, CONFIG.HEIGHT - 40);
+            ctx.fillText('Use arrows or click to select, Enter to confirm', CONFIG.WIDTH / 2, CONFIG.HEIGHT - 40);
         }
 
         function renderPlaying() {
             renderBackground();
             renderStars();
 
-            // Turn counter (top right)
+            // Turn counter
             ctx.fillStyle = 'rgba(0,0,0,0.8)';
-            ctx.fillRect(CONFIG.WIDTH - 120, 10, 110, 35);
+            ctx.fillRect(CONFIG.WIDTH - 100, 10, 90, 30);
             ctx.strokeStyle = '#4a4a6a';
-            ctx.strokeRect(CONFIG.WIDTH - 120, 10, 110, 35);
-
+            ctx.strokeRect(CONFIG.WIDTH - 100, 10, 90, 30);
             ctx.fillStyle = '#ffe66d';
-            ctx.font = 'bold 14px Courier New';
+            ctx.font = 'bold 12px Courier New';
             ctx.textAlign = 'center';
-            ctx.fillText('Turn ' + turn, CONFIG.WIDTH - 65, 32);
+            ctx.fillText('Turn ' + turn, CONFIG.WIDTH - 55, 30);
         }
 
         // ============================================
@@ -1558,7 +1529,6 @@
             saveGameData();
         });
 
-        // Load audio preferences
         AudioSystem.musicEnabled = gameData.musicEnabled;
         AudioSystem.sfxEnabled = gameData.sfxEnabled;
         document.getElementById('musicToggle').checked = gameData.musicEnabled;
@@ -1594,9 +1564,7 @@
         // ============================================
         // START
         // ============================================
-        // Check for existing save game
         hasSaveGame = localStorage.getItem(SAVE_KEY) !== null;
-
         console.log('Galactic 4X initialized');
         requestAnimationFrame(gameLoop);
     </script>
