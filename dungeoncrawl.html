@@ -312,9 +312,19 @@
 
         let gameData = GameStorage.load(GAME_ID, defaultData);
 
-        // Initialize party if needed
+        // Initialize party if needed, or migrate old save data
         if (!gameData.party) {
             gameData.party = [createCharacter('Hero', 'Fighter')];
+        } else if (gameData.party[0].baseAc !== undefined || gameData.party[0].baseDefense === undefined) {
+            // Migrate from old D&D-style stats to new Fate dice stats
+            const oldChar = gameData.party[0];
+            const newChar = createCharacter(oldChar.name || 'Hero', oldChar.class || 'Fighter');
+            // Preserve equipment if valid
+            if (WEAPONS[oldChar.weapon]) newChar.weapon = oldChar.weapon;
+            if (ARMOR[oldChar.armor]) newChar.armor = oldChar.armor;
+            if (SHIELDS[oldChar.shield]) newChar.shield = oldChar.shield;
+            gameData.party = [newChar];
+            GameStorage.save(GAME_ID, gameData);
         }
 
         function saveGameData() {
