@@ -1009,7 +1009,7 @@
                 const prod = calculateProduction(star);
 
                 html += `<div style="margin-top:10px" class="panel-title">Colony</div>`;
-                html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${star.population}/${planetInfo.maxPop}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${star.population.toFixed(1)}/${planetInfo.maxPop}</span></div>`;
                 html += `<div class="info-row"><span class="info-label">Industry:</span><span class="info-value">${star.industry}%</span></div>`;
                 html += `<div class="info-row"><span class="info-label">Defense:</span><span class="info-value">${star.defense}</span></div>`;
 
