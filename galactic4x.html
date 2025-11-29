@@ -1298,18 +1298,55 @@
             html += `<div class="panel-subtitle">${star.name}</div>`;
 
             if (shipsHere.length > 0) {
-                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                    <span style="font-size:10px;color:#888">Ships here: ${shipsHere.length}</span>
-                    <button class="btn btn-sm" onclick="toggleSelectAll()">${selectedShips.length === shipsHere.length ? 'Deselect All' : 'Select All'}</button>
+                // Group ships by type
+                const shipsByType = {};
+                for (const ship of shipsHere) {
+                    if (!shipsByType[ship.type]) {
+                        shipsByType[ship.type] = [];
+                    }
+                    shipsByType[ship.type].push(ship);
+                }
+
+                // Count selected by type
+                const selectedByType = {};
+                for (const shipId of selectedShips) {
+                    const ship = shipsHere.find(s => s.id === shipId);
+                    if (ship) {
+                        selectedByType[ship.type] = (selectedByType[ship.type] || 0) + 1;
+                    }
+                }
+
+                const totalSelected = selectedShips.length;
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <span style="font-size:10px;color:#888">Selected: ${totalSelected}/${shipsHere.length}</span>
+                    <button class="btn btn-sm" onclick="toggleSelectAll()">${totalSelected === shipsHere.length ? 'Clear' : 'All'}</button>
                 </div>`;
 
-                for (const ship of shipsHere) {
-                    const shipType = SHIP_TYPES[ship.type];
-                    const isSelected = selectedShips.includes(ship.id);
-                    html += `<div class="ship-item ${isSelected ? 'selected' : ''}" onclick="toggleShipSelection(${ship.id})">
-                        <span>${shipType.name}</span>
-                        <span style="color:#666">move ${shipType.speed}</span>
-                    </div>`;
+                // Show each ship type with selection controls
+                for (const [type, typeShips] of Object.entries(shipsByType)) {
+                    const shipType = SHIP_TYPES[type];
+                    const count = typeShips.length;
+                    const selected = selectedByType[type] || 0;
+
+                    html += `<div style="background:#252540;border-radius:4px;padding:6px;margin:4px 0;">`;
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">`;
+                    html += `<span style="font-size:11px;font-weight:bold;">${shipType.name}</span>`;
+                    html += `<span style="font-size:10px;color:#888;">${selected}/${count}</span>`;
+                    html += `</div>`;
+
+                    // Quick select buttons
+                    html += `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:4px;">`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="selectShipsOfType('${type}', 1)">+1</button>`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="selectShipsOfType('${type}', 10)">+10</button>`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="selectShipsOfType('${type}', 100)">+100</button>`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="deselectShipsOfType('${type}', 1)">-1</button>`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="deselectShipsOfType('${type}', ${count})">None</button>`;
+                    html += `</div>`;
+
+                    // Slider for this type
+                    html += `<input type="range" min="0" max="${count}" value="${selected}" style="width:100%;"
+                               oninput="setShipTypeSelection('${type}', parseInt(this.value))">`;
+                    html += `</div>`;
                 }
             } else {
                 html += `<div class="empty-state">No ships at this location</div>`;
@@ -1317,11 +1354,20 @@
 
             if (incomingShips.length > 0) {
                 html += `<div style="margin-top:10px" class="panel-title">Incoming</div>`;
+                // Group incoming by type too
+                const incomingByType = {};
                 for (const ship of incomingShips) {
-                    const shipType = SHIP_TYPES[ship.type];
+                    if (!incomingByType[ship.type]) {
+                        incomingByType[ship.type] = { count: 0, minTurns: Infinity };
+                    }
+                    incomingByType[ship.type].count++;
+                    incomingByType[ship.type].minTurns = Math.min(incomingByType[ship.type].minTurns, ship.turnsToArrival);
+                }
+                for (const [type, info] of Object.entries(incomingByType)) {
+                    const shipType = SHIP_TYPES[type];
                     html += `<div class="ship-item">
-                        <span>${shipType.name}</span>
-                        <span style="color:#ffe66d">${ship.turnsToArrival}t</span>
+                        <span>${info.count}x ${shipType.name}</span>
+                        <span style="color:#ffe66d">${info.minTurns}t</span>
                     </div>`;
                 }
             }
@@ -1491,6 +1537,71 @@
             updatePanels();
         };
 
+        window.selectShipsOfType = function(type, count) {
+            if (!selectedStar) return;
+            const shipsHere = getShipsAtStar(selectedStar.id).filter(s => s.owner === 'player' && s.type === type);
+            let added = 0;
+            for (const ship of shipsHere) {
+                if (added >= count) break;
+                if (!selectedShips.includes(ship.id)) {
+                    selectedShips.push(ship.id);
+                    added++;
+                }
+            }
+            destinationStar = null;
+            updatePanels();
+        };
+
+        window.deselectShipsOfType = function(type, count) {
+            if (!selectedStar) return;
+            const shipsHere = getShipsAtStar(selectedStar.id).filter(s => s.owner === 'player' && s.type === type);
+            let removed = 0;
+            for (const ship of shipsHere) {
+                if (removed >= count) break;
+                const idx = selectedShips.indexOf(ship.id);
+                if (idx >= 0) {
+                    selectedShips.splice(idx, 1);
+                    removed++;
+                }
+            }
+            destinationStar = null;
+            updatePanels();
+        };
+
+        window.setShipTypeSelection = function(type, targetCount) {
+            if (!selectedStar) return;
+            const shipsHere = getShipsAtStar(selectedStar.id).filter(s => s.owner === 'player' && s.type === type);
+
+            // Count currently selected of this type
+            let currentCount = 0;
+            for (const ship of shipsHere) {
+                if (selectedShips.includes(ship.id)) currentCount++;
+            }
+
+            if (targetCount > currentCount) {
+                // Add more
+                for (const ship of shipsHere) {
+                    if (currentCount >= targetCount) break;
+                    if (!selectedShips.includes(ship.id)) {
+                        selectedShips.push(ship.id);
+                        currentCount++;
+                    }
+                }
+            } else if (targetCount < currentCount) {
+                // Remove some
+                for (const ship of shipsHere) {
+                    if (currentCount <= targetCount) break;
+                    const idx = selectedShips.indexOf(ship.id);
+                    if (idx >= 0) {
+                        selectedShips.splice(idx, 1);
+                        currentCount--;
+                    }
+                }
+            }
+            destinationStar = null;
+            updatePanels();
+        };
+
         window.confirmMove = function() {
             if (destinationStar && selectedShips.length > 0) {
                 moveShips(selectedShips, destinationStar.id);
@@ -1593,12 +1704,13 @@
                     destinationStar = null;
                     AudioSystem.sfx.select();
                     updatePanels();
-                } else {
+                } else if (selectedShips.length === 0) {
+                    // Only deselect if no ships are selected (preserve selection for movement)
                     selectedStar = null;
-                    selectedShips = [];
                     destinationStar = null;
                     updatePanels();
                 }
+                // If ships are selected and clicking empty space, do nothing (keep selection)
             }
         });
 
@@ -1691,11 +1803,31 @@
                 ctx.lineTo(CONFIG.WIDTH, y);
                 ctx.stroke();
             }
-            ctx.fillStyle = '#333';
-            for (let i = 0; i < 100; i++) {
+            // Draw background stars with variety
+            for (let i = 0; i < 150; i++) {
                 const x = (i * 97 + 23) % CONFIG.WIDTH;
                 const y = (i * 53 + 17) % CONFIG.HEIGHT;
-                ctx.fillRect(x, y, 1, 1);
+                const brightness = 40 + (i * 7) % 60; // 40-100 brightness
+                const starType = i % 5; // 0-4 for variety
+
+                if (starType === 0) {
+                    // Bright + shaped star
+                    ctx.fillStyle = `rgb(${brightness + 50}, ${brightness + 50}, ${brightness + 80})`;
+                    ctx.fillRect(x - 1, y, 3, 1);
+                    ctx.fillRect(x, y - 1, 1, 3);
+                } else if (starType === 1) {
+                    // Larger dot
+                    ctx.fillStyle = `rgb(${brightness + 30}, ${brightness + 20}, ${brightness})`;
+                    ctx.fillRect(x, y, 2, 2);
+                } else if (starType === 2) {
+                    // Bright single pixel
+                    ctx.fillStyle = `rgb(${brightness + 60}, ${brightness + 60}, ${brightness + 60})`;
+                    ctx.fillRect(x, y, 1, 1);
+                } else {
+                    // Dim single pixel
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness + 10})`;
+                    ctx.fillRect(x, y, 1, 1);
+                }
             }
         }
 
