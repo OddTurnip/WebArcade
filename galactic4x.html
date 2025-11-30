@@ -400,6 +400,7 @@
     <div id="audioControls">
         <label><input type="checkbox" id="musicToggle" checked> Music</label>
         <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+        <label><input type="checkbox" id="debugToggle"> Debug</label>
     </div>
     <div id="aboutSection">
         <h3>How to Play</h3>
@@ -633,6 +634,7 @@
         let eventHistory = []; // History of events (scouting, colonization, ships built)
         let currentView = ViewState.OVERVIEW;
         let shipsBuiltThisTurn = {}; // Track ships built this turn by type
+        let debugMode = false; // Debug mode for detailed combat logs
 
         // DOM references
         const planetPanel = document.getElementById('planetPanel');
@@ -1332,24 +1334,47 @@
                 startingEnemyCounts[s.type] = (startingEnemyCounts[s.type] || 0) + 1;
             }
 
-            // Create combat units with current health
-            let playerUnits = playerMilitary.map(s => ({
-                id: s.id,
-                type: s.type,
-                owner: s.owner,
-                hp: SHIP_TYPES[s.type].health,
-                attack: SHIP_TYPES[s.type].attack,
-                speed: SHIP_TYPES[s.type].speed
-            }));
+            // Get enemy race info for naming
+            const enemyOwner = enemyMilitary[0].owner;
+            const enemyRace = RACES.find(r => r.id === enemyOwner);
+            const enemyShortName = enemyRace?.shortName || 'Enemy';
+            const playerShortName = player.race?.shortName || 'Player';
 
-            let enemyUnits = enemyMilitary.map(s => ({
-                id: s.id,
-                type: s.type,
-                owner: s.owner,
-                hp: SHIP_TYPES[s.type].health,
-                attack: SHIP_TYPES[s.type].attack,
-                speed: SHIP_TYPES[s.type].speed
-            }));
+            // Track unit numbers by type for debug naming
+            const playerUnitNumbers = {};
+            const enemyUnitNumbers = {};
+
+            // Create combat units with current health and debug names
+            let playerUnits = playerMilitary.map(s => {
+                playerUnitNumbers[s.type] = (playerUnitNumbers[s.type] || 0) + 1;
+                return {
+                    id: s.id,
+                    type: s.type,
+                    owner: s.owner,
+                    hp: SHIP_TYPES[s.type].health,
+                    maxHp: SHIP_TYPES[s.type].health,
+                    attack: SHIP_TYPES[s.type].attack,
+                    speed: SHIP_TYPES[s.type].speed,
+                    debugName: `${playerShortName} ${SHIP_TYPES[s.type].name} #${playerUnitNumbers[s.type]}`
+                };
+            });
+
+            let enemyUnits = enemyMilitary.map(s => {
+                enemyUnitNumbers[s.type] = (enemyUnitNumbers[s.type] || 0) + 1;
+                return {
+                    id: s.id,
+                    type: s.type,
+                    owner: s.owner,
+                    hp: SHIP_TYPES[s.type].health,
+                    maxHp: SHIP_TYPES[s.type].health,
+                    attack: SHIP_TYPES[s.type].attack,
+                    speed: SHIP_TYPES[s.type].speed,
+                    debugName: `${enemyShortName} ${SHIP_TYPES[s.type].name} #${enemyUnitNumbers[s.type]}`
+                };
+            });
+
+            // Combat log for debug mode
+            const combatLog = [];
 
             // Track defense pools (attacks against defense destroy Attack amount)
             let playerDefensePool = (star.owner === 'player') ? star.defense : 0;
@@ -1371,9 +1396,10 @@
                 const enemyDefenseAttacks = (speed === 0) ? enemyDefensePool : 0;
 
                 // Collect all attacks for simultaneous resolution
-                const damageToShips = new Map(); // shipId -> damage
+                const damageToShips = new Map(); // shipId -> { damage, attacks: [{attacker, damage}] }
                 let damageToPlayerDefense = 0;
                 let damageToEnemyDefense = 0;
+                const attackEvents = []; // For debug log
 
                 // Ship attacks
                 for (const attacker of shipAttackers) {
@@ -1391,13 +1417,18 @@
                     if (roll < enemyShipTargets.length) {
                         // Target a ship
                         const target = enemyShipTargets[roll];
-                        damageToShips.set(target.id, (damageToShips.get(target.id) || 0) + attacker.attack);
+                        const current = damageToShips.get(target.id) || { damage: 0, attacks: [] };
+                        current.damage += attacker.attack;
+                        current.attacks.push({ attacker, damage: attacker.attack });
+                        damageToShips.set(target.id, current);
                     } else {
                         // Target defense - destroy Attack amount
                         if (isPlayer) {
                             damageToEnemyDefense += attacker.attack;
+                            attackEvents.push({ attacker: attacker.debugName, target: 'Defense', damage: attacker.attack });
                         } else {
                             damageToPlayerDefense += attacker.attack;
+                            attackEvents.push({ attacker: attacker.debugName, target: 'Defense', damage: attacker.attack });
                         }
                     }
                 }
@@ -1407,21 +1438,35 @@
                     const targets = enemyUnits.filter(u => u.hp > 0);
                     if (targets.length > 0) {
                         const target = targets[Math.floor(Math.random() * targets.length)];
-                        damageToShips.set(target.id, (damageToShips.get(target.id) || 0) + 1);
+                        const current = damageToShips.get(target.id) || { damage: 0, attacks: [] };
+                        current.damage += 1;
+                        current.attacks.push({ attacker: { debugName: `${playerShortName} Defense` }, damage: 1 });
+                        damageToShips.set(target.id, current);
                     }
                 }
                 for (let i = 0; i < enemyDefenseAttacks; i++) {
                     const targets = playerUnits.filter(u => u.hp > 0);
                     if (targets.length > 0) {
                         const target = targets[Math.floor(Math.random() * targets.length)];
-                        damageToShips.set(target.id, (damageToShips.get(target.id) || 0) + 1);
+                        const current = damageToShips.get(target.id) || { damage: 0, attacks: [] };
+                        current.damage += 1;
+                        current.attacks.push({ attacker: { debugName: `${enemyShortName} Defense` }, damage: 1 });
+                        damageToShips.set(target.id, current);
                     }
                 }
 
-                // Apply all damage simultaneously
+                // Apply all damage simultaneously and log
                 for (const unit of [...playerUnits, ...enemyUnits]) {
                     if (damageToShips.has(unit.id)) {
-                        unit.hp -= damageToShips.get(unit.id);
+                        const info = damageToShips.get(unit.id);
+                        const hpBefore = unit.hp;
+                        unit.hp -= info.damage;
+                        // Log each attack
+                        for (const atk of info.attacks) {
+                            const attackerName = atk.attacker.debugName || atk.attacker;
+                            const destroyed = unit.hp <= 0 ? ' [DESTROYED]' : '';
+                            combatLog.push(`${attackerName} → ${unit.debugName} (${atk.damage} dmg, ${Math.max(0, unit.hp)}/${unit.maxHp} HP)${destroyed}`);
+                        }
                     }
                 }
                 playerDefensePool = Math.max(0, playerDefensePool - damageToPlayerDefense);
@@ -1499,6 +1544,24 @@
             // Play sound
             AudioSystem.sfx.explosion();
 
+            // Calculate weighted losses (by ship cost)
+            const playerLossValue = playerShipLosses.reduce((sum, u) => sum + SHIP_TYPES[u.type].cost, 0);
+            const enemyLossValue = enemyShipLosses.reduce((sum, u) => sum + SHIP_TYPES[u.type].cost, 0);
+
+            // Determine battle result
+            let battleResult;
+            if (playerShipLosses.length === 0 && enemyShipLosses.length === 0) {
+                battleResult = 'stalemate';
+            } else if (enemyMilitarySurvivors.length === 0) {
+                battleResult = 'victory';
+            } else if (playerMilitarySurvivors.length === 0) {
+                battleResult = 'defeat';
+            } else if (enemyLossValue >= playerLossValue) {
+                battleResult = 'progress';
+            } else {
+                battleResult = 'losses';
+            }
+
             // Build result message
             let resultMsg = `Your losses: ${playerShipLosses.length} ships`;
             if (playerDefenseLost > 0) resultMsg += `, ${playerDefenseLost} defense`;
@@ -1506,6 +1569,11 @@
             if (enemyDefenseLost > 0) resultMsg += `, ${enemyDefenseLost} defense`;
             resultMsg += `\n\nYour survivors: ${formatSurvivors(playerSurvivorCounts)}`;
             resultMsg += `\nEnemy survivors: ${formatSurvivors(enemySurvivorCounts)}`;
+
+            // Add debug combat log if enabled
+            if (debugMode && combatLog.length > 0) {
+                resultMsg += `\n\n--- Combat Log ---\n${combatLog.join('\n')}`;
+            }
 
             // Add to battle history
             battleHistory.unshift({
@@ -1517,10 +1585,19 @@
                 enemyDefenseLost,
                 playerSurvivors: formatSurvivors(playerSurvivorCounts),
                 enemySurvivors: formatSurvivors(enemySurvivorCounts),
-                victory: enemyMilitarySurvivors.length === 0 && playerMilitarySurvivors.length > 0
+                result: battleResult
             });
 
-            showModal(`⚔️ Combat at ${star.name}!`, resultMsg);
+            // Result display
+            const resultLabels = {
+                victory: 'VICTORY',
+                progress: 'PROGRESS',
+                losses: 'LOSSES',
+                defeat: 'DEFEAT',
+                stalemate: 'STALEMATE'
+            };
+
+            showModal(`⚔️ Combat at ${star.name} - ${resultLabels[battleResult]}!`, resultMsg);
 
             updatePanels();
             updateTurnInfo();
@@ -1860,8 +1937,24 @@
                     html += '<div class="empty-state">No battles yet</div>';
                 } else {
                     for (const battle of battleHistory) {
-                        const resultColor = battle.victory ? '#4ecdc4' : '#ff6b6b';
-                        const resultText = battle.victory ? 'VICTORY' : 'DEFEAT';
+                        // Support old saves with victory boolean and new saves with result string
+                        const result = battle.result || (battle.victory ? 'victory' : 'defeat');
+                        const resultColors = {
+                            victory: '#4ecdc4',
+                            progress: '#4a9fff',
+                            stalemate: '#888',
+                            losses: '#ffa500',
+                            defeat: '#ff6b6b'
+                        };
+                        const resultLabels = {
+                            victory: 'VICTORY',
+                            progress: 'PROGRESS',
+                            stalemate: 'STALEMATE',
+                            losses: 'LOSSES',
+                            defeat: 'DEFEAT'
+                        };
+                        const resultColor = resultColors[result] || '#888';
+                        const resultText = resultLabels[result] || result.toUpperCase();
 
                         html += `<div style="padding:6px;margin:4px 0;background:#252540;border-radius:4px;border-left:3px solid ${resultColor};">`;
                         html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
@@ -2999,6 +3092,10 @@
             AudioSystem.sfxEnabled = e.target.checked;
             gameData.sfxEnabled = e.target.checked;
             saveGameData();
+        });
+
+        document.getElementById('debugToggle').addEventListener('change', (e) => {
+            debugMode = e.target.checked;
         });
 
         AudioSystem.musicEnabled = gameData.musicEnabled;
