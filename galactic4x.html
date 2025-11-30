@@ -349,7 +349,7 @@
             overflow-y: auto;
         }
         .modal-content.wide {
-            max-width: 600px;
+            max-width: 700px;
             text-align: center;
         }
         .modal-content h3 {
@@ -663,7 +663,13 @@
 
         function showModal(title, body) {
             modalTitle.textContent = title;
-            modalBody.textContent = body;
+            // Escape HTML and highlight [DESTROYED] in red
+            const escaped = body
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\[DESTROYED\]/g, '<span style="color:#ff6b6b">[DESTROYED]</span>');
+            modalBody.innerHTML = escaped;
             // Use wider modal in debug mode for longer combat log lines
             const modalContent = gameModal.querySelector('.modal-content');
             if (debugMode) {
