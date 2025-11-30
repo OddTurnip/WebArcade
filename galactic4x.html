@@ -2028,6 +2028,7 @@
             // Fleet actions
             let actionsHtml = '';
             const hasSelection = selectedShips.length > 0;
+            const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
 
             // Check for enemy military ships
             const enemyMilitaryHere = star.explored
@@ -2039,11 +2040,22 @@
             // Check if selected ships can move (not in combat this turn)
             const selectedCanMove = hasSelection && !selectedShips.some(id => shipsInCombatThisTurn.has(id));
 
+            // Check for scouts and unexplored planets for Explore button
+            const scoutsHere = shipsHere.filter(s => s.type === 'scout');
+            const unexploredStars = stars.filter(s => !s.explored);
+            const canExplore = scoutsHere.length > 0 && unexploredStars.length > 0;
+
+            // Select All button - always on top
+            if (shipsHere.length > 0) {
+                const allSelected = selectedShips.length === shipsHere.length;
+                actionsHtml += `<button class="btn btn-sm" onclick="toggleSelectAll()">${allSelected ? 'Clear Selection' : 'Select All Ships'}</button>`;
+            }
+
             if (destinationStar && selectedCanMove) {
                 const travelInfo = calculateTravelInfo(selectedStar, destinationStar, selectedShips);
                 actionsHtml += `<div class="destination-highlight">
                     <div>To: <strong>${destinationStar.name}</strong></div>
-                    <div><span class="distance">${travelInfo.lightYears} LY</span> - <span class="turns">${travelInfo.turns} turns</span></div>
+                    <div><span class="distance">${travelInfo.lightYears} LY</span> - <span class="turns">${travelInfo.turns} years</span></div>
                     ${selectedShips.length > 1 ? `<div style="font-size:9px;color:#888">Slowest: ${travelInfo.slowestShipName}</div>` : ''}
                 </div>`;
                 actionsHtml += `<button class="btn btn-primary" onclick="confirmMove()">Confirm Move</button>`;
@@ -2054,16 +2066,19 @@
                     actionsHtml += `<button class="btn btn-danger" onclick="startCombat(${star.id})">⚔️ Combat</button>`;
                 }
 
-                // Select All button
-                const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
-                if (shipsHere.length > 0) {
-                    const allSelected = selectedShips.length === shipsHere.length;
-                    actionsHtml += `<button class="btn btn-sm" onclick="toggleSelectAll()">${allSelected ? 'Clear Selection' : 'Select All Ships'}</button>`;
-                }
+                // Move and Explore buttons row
+                actionsHtml += `<div style="display:flex;gap:6px;margin-top:6px;">`;
 
                 // Move button
                 const moveDisabled = !selectedCanMove;
                 actionsHtml += `<button class="btn" ${moveDisabled ? 'disabled' : ''} onclick="window.focus()">Move ${hasSelection ? selectedShips.length + ' Ship' + (selectedShips.length > 1 ? 's' : '') : 'Ships'}</button>`;
+
+                // Explore button
+                if (canExplore) {
+                    actionsHtml += `<button class="btn" onclick="exploreWithScouts(${star.id})">Explore (${scoutsHere.length})</button>`;
+                }
+
+                actionsHtml += `</div>`;
 
                 if (hasSelection && shipsInCombatThisTurn.has(selectedShips[0])) {
                     actionsHtml += `<div style="font-size:9px;color:#ff6b6b;margin-top:4px">Ships in combat can't move</div>`;
@@ -2311,6 +2326,57 @@
         window.cancelMove = function() {
             destinationStar = null;
             updatePanels();
+        };
+
+        window.exploreWithScouts = function(starId) {
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+
+            // Get scouts at this star that can move (not in combat)
+            const scoutsHere = getShipsAtStar(starId)
+                .filter(s => s.owner === 'player' && s.type === 'scout' && !shipsInCombatThisTurn.has(s.id));
+
+            if (scoutsHere.length === 0) return;
+
+            // Get unexplored stars
+            const unexploredStars = stars.filter(s => !s.explored);
+            if (unexploredStars.length === 0) return;
+
+            // Get stars that already have a player ship heading there
+            const destinationsInUse = new Set();
+            for (const ship of ships) {
+                if (ship.owner === 'player' && ship.destination !== null) {
+                    destinationsInUse.add(ship.destination);
+                }
+            }
+
+            // Sort unexplored stars by distance from current star
+            const sortedUnexplored = unexploredStars
+                .filter(s => !destinationsInUse.has(s.id))
+                .map(s => ({
+                    star: s,
+                    distance: Math.sqrt(Math.pow(s.x - star.x, 2) + Math.pow(s.y - star.y, 2))
+                }))
+                .sort((a, b) => a.distance - b.distance);
+
+            // Assign each scout to the closest available unexplored star
+            let assignedCount = 0;
+            for (const scout of scoutsHere) {
+                if (assignedCount >= sortedUnexplored.length) break;
+
+                const target = sortedUnexplored[assignedCount].star;
+                moveShips([scout.id], target.id);
+                destinationsInUse.add(target.id);
+                assignedCount++;
+            }
+
+            if (assignedCount > 0) {
+                AudioSystem.sfx.select();
+                selectedShips = [];
+                destinationStar = null;
+                updatePanels();
+                draw();
+            }
         };
 
         window.endTurn = function() {
