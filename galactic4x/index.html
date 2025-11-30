@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galactic 4X</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <link rel="stylesheet" href="galactic4x.css">
+</head>
+<body>
+    <div id="gameModal" class="hidden">
+        <div class="modal-content">
+            <h3 id="modalTitle"></h3>
+            <pre id="modalBody"></pre>
+            <button class="btn btn-primary" onclick="closeModal()">OK</button>
+        </div>
+    </div>
+    <div id="gameContainer">
+        <div id="planetPanel" class="side-panel hidden">
+            <div id="planetContent" class="panel-content"></div>
+        </div>
+        <div id="centerColumn">
+            <canvas id="gameCanvas" width="640" height="550"></canvas>
+            <div id="actionPanel" class="hidden">
+                <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;">
+                    <div id="viewButtons" style="display:flex;gap:10px;align-items:center;"></div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <button class="btn" id="globalExploreBtn" onclick="window.globalExplore()" style="display:none;">Explore</button>
+                        <button class="btn btn-primary" id="endTurnBtn" onclick="window.endTurn()">End Year</button>
+                    </div>
+                </div>
+                <div id="turnInfo" style="color:#888;font-size:11px;margin-top:6px;"></div>
+            </div>
+        </div>
+        <div id="fleetPanel" class="side-panel hidden">
+            <div id="fleetContent" class="panel-content"></div>
+            <div class="fleet-actions" id="fleetActions"></div>
+        </div>
+    </div>
+    <div id="controls">
+        <strong>Mouse:</strong> Click stars to select | Select ships, then click destination | <strong>Keyboard:</strong> Enter = End Turn | Escape = Deselect
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+        <label><input type="checkbox" id="debugToggle"> Debug</label>
+        <span style="margin-left:10px;">|</span>
+        <button class="btn btn-sm" style="margin-left:10px;padding:2px 8px;" onclick="saveToFile()">Save</button>
+        <button class="btn btn-sm" style="padding:2px 8px;" onclick="document.getElementById('loadFileInput').click()">Load</button>
+        <input type="file" id="loadFileInput" accept=".g4x,.json" style="display:none;" onchange="loadFromFile(event)">
+    </div>
+    <div id="aboutSection">
+        <h3>How to Play</h3>
+        <p><strong>Industry</strong> represents your colony's manufacturing capacity (0-100%). Higher industry = more production output per year.</p>
+        <p><strong>Population</strong> is your workforce. More population = more base production. Each planet has a max population based on its type.</p>
+        <p><strong>Production Formula:</strong> Base = Population x (Industry/100) x Planet Modifier. This is split according to your sliders.</p>
+        <p><strong>Slider Locks:</strong> Click 🔓 to lock a slider. Locked sliders won't change when you adjust others.</p>
+
+        <h4>Production Costs</h4>
+        <table style="width:100%;border-collapse:collapse;margin:8px 0;">
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Population</td><td style="padding:4px;text-align:right;">~3.3 Ecology</td></tr>
+            <tr><td style="padding:4px;">+1% Industry</td><td style="padding:4px;text-align:right;">~2 Industry</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Defense</td><td style="padding:4px;text-align:right;">20 Defense</td></tr>
+        </table>
+
+        <h4>Ship Stats</h4>
+        <table style="width:100%;border-collapse:collapse;margin:8px 0;">
+            <tr style="background:#2a2a4a;font-weight:bold;"><td style="padding:4px;">Ship</td><td style="padding:4px;">Cost</td><td style="padding:4px;">Move</td><td style="padding:4px;">Atk</td><td style="padding:4px;">HP</td></tr>
+            <tr><td style="padding:4px;">Colony Ship</td><td style="padding:4px;">200</td><td style="padding:4px;">1</td><td style="padding:4px;">0</td><td style="padding:4px;">1</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Battleship</td><td style="padding:4px;">500</td><td style="padding:4px;">1</td><td style="padding:4px;">30</td><td style="padding:4px;">100</td></tr>
+            <tr><td style="padding:4px;">Cruiser</td><td style="padding:4px;">250</td><td style="padding:4px;">2</td><td style="padding:4px;">10</td><td style="padding:4px;">30</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Destroyer</td><td style="padding:4px;">100</td><td style="padding:4px;">2</td><td style="padding:4px;">6</td><td style="padding:4px;">12</td></tr>
+            <tr><td style="padding:4px;">Fighter</td><td style="padding:4px;">50</td><td style="padding:4px;">3</td><td style="padding:4px;">2</td><td style="padding:4px;">4</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Scout</td><td style="padding:4px;">25</td><td style="padding:4px;">3</td><td style="padding:4px;">1</td><td style="padding:4px;">2</td></tr>
+        </table>
+    </div>
+
+    <!-- Shared libraries -->
+    <script src="../controller.js"></script>
+    <script src="../audio.js"></script>
+    <script src="../storage.js"></script>
+
+    <!-- Game configuration and state -->
+    <script src="config.js"></script>
+    <script src="state.js"></script>
+
+    <!-- Core game logic -->
+    <script src="persistence.js"></script>
+    <script src="galaxy.js"></script>
+    <script src="combat.js"></script>
+    <script src="colony.js"></script>
+    <script src="fleet.js"></script>
+
+    <!-- UI components -->
+    <script src="ui/panels.js"></script>
+    <script src="ui/overview-panel.js"></script>
+    <script src="ui/colony-panel.js"></script>
+    <script src="ui/planets-panel.js"></script>
+    <script src="ui/history-panel.js"></script>
+    <script src="ui/render.js"></script>
+    <script src="ui/input.js"></script>
+
+    <!-- Main entry point -->
+    <script src="main.js"></script>
+</body>
+</html>
