@@ -345,6 +345,9 @@
             border-radius: 8px;
             padding: 20px;
             max-width: 400px;
+        }
+        .modal-content.wide {
+            max-width: 600px;
             text-align: center;
         }
         .modal-content h3 {
@@ -654,6 +657,13 @@
         function showModal(title, body) {
             modalTitle.textContent = title;
             modalBody.textContent = body;
+            // Use wider modal in debug mode for longer combat log lines
+            const modalContent = gameModal.querySelector('.modal-content');
+            if (debugMode) {
+                modalContent.classList.add('wide');
+            } else {
+                modalContent.classList.remove('wide');
+            }
             gameModal.classList.remove('hidden');
         }
 

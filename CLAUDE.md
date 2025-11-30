@@ -253,6 +253,9 @@ let currentView = ViewState.OVERVIEW;
 - Highlight: #ffe66d (yellow)
 - Danger: #ff6b6b (red)
 
+### UI Text
+- Avoid text wrapping in UI elements - size containers to fit content on single lines
+
 ## Debug Utility
 
 `debug.html` is a controller testing page useful for:
