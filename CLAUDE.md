@@ -18,7 +18,25 @@ WebArcade/
 ├── brickspinner.html    # Game: Brick Spinner (Tetris-style)
 ├── serpentine.html      # Game: Serpentine (Snake)
 ├── galacticdefense.html # Game: Galactic Defense (Space Invaders)
-├── galactic4x.html      # Game: Galactic 4X (turn-based space strategy)
+├── galactic4x/          # Game: Galactic 4X (turn-based space strategy)
+│   ├── index.html       # Entry point
+│   ├── galactic4x.css   # Styles
+│   ├── config.js        # Constants, ship/planet/race types
+│   ├── state.js         # Game state variables
+│   ├── persistence.js   # Save/load (localStorage + file)
+│   ├── galaxy.js        # Galaxy generation
+│   ├── combat.js        # Combat system
+│   ├── colony.js        # Production, sliders, turn processing
+│   ├── fleet.js         # Ship movement, exploration
+│   ├── main.js          # Game loop, initialization
+│   └── ui/              # UI components
+│       ├── panels.js        # Shared panel helpers
+│       ├── overview-panel.js
+│       ├── colony-panel.js
+│       ├── planets-panel.js
+│       ├── history-panel.js
+│       ├── render.js        # Canvas rendering
+│       └── input.js         # Event handlers
 ├── pool.html            # Game: Pool (8-ball billiards)
 ├── grid.js              # Hex and triangle grid geometry library
 ├── sapper.js            # Shared game logic for square-grid Sapper games
