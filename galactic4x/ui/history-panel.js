@@ -59,12 +59,14 @@ function renderHistoryRightPanel() {
             html += `</div>`;
             html += `<div style="color:#888;font-size:10px;margin:2px 0;">${battle.location}</div>`;
 
-            // Losses
+            // Losses - show detailed if available, otherwise fall back to count
             html += `<div style="font-size:10px;margin-top:4px;">`;
-            html += `<div style="color:#4ecdc4;">Your losses: ${battle.playerLosses} ships`;
+            const playerLossText = battle.playerLossesDetail || `${battle.playerLosses} ships`;
+            html += `<div style="color:#4ecdc4;">Your losses: ${playerLossText}`;
             if (battle.playerDefenseLost > 0) html += `, ${battle.playerDefenseLost} defense`;
             html += `</div>`;
-            html += `<div style="color:#ff6b6b;">Enemy losses: ${battle.enemyLosses} ships`;
+            const enemyLossText = battle.enemyLossesDetail || `${battle.enemyLosses} ships`;
+            html += `<div style="color:#ff6b6b;">Enemy losses: ${enemyLossText}`;
             if (battle.enemyDefenseLost > 0) html += `, ${battle.enemyDefenseLost} defense`;
             html += `</div>`;
             html += `</div>`;

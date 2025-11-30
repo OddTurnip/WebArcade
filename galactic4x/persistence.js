@@ -46,8 +46,16 @@ function loadSaveData(data) {
     const saveVersion = data.version || 0;
 
     year = data.turn || data.year; // Support old saves
-    player.race = data.player.race;
+
+    // Normalize player race to ensure it references the canonical RACES entry
+    // This fixes state contamination when loading after starting a new game
+    const savedRace = data.player.race;
+    const raceId = savedRace?.id || savedRace; // Handle both object and string formats
+    player.race = RACES.find(r => r.id === raceId) || savedRace;
     player.color = data.player.color;
+
+    // Reset turn-specific state that isn't saved
+    shipsBuiltThisTurn = {};
 
     stars = data.stars.map(s => {
         // Backwards compatibility: convert old number shipProgress to object

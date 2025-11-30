@@ -237,8 +237,8 @@ function startCombat(starId) {
         enemySurvivorCounts[u.type] = (enemySurvivorCounts[u.type] || 0) + 1;
     }
 
-    // Format survivor strings
-    const formatSurvivors = (counts) => {
+    // Format ship counts by type (for survivors and losses)
+    const formatShipCounts = (counts) => {
         const parts = [];
         for (const type of getShipTypeOrder()) {
             if (counts[type]) {
@@ -247,6 +247,16 @@ function startCombat(starId) {
         }
         return parts.length > 0 ? parts.join(', ') : 'None';
     };
+
+    // Count losses by type
+    const playerLossCounts = {};
+    const enemyLossCounts = {};
+    for (const u of playerShipLosses) {
+        playerLossCounts[u.type] = (playerLossCounts[u.type] || 0) + 1;
+    }
+    for (const u of enemyShipLosses) {
+        enemyLossCounts[u.type] = (enemyLossCounts[u.type] || 0) + 1;
+    }
 
     // Play sound
     AudioSystem.sfx.explosion();
@@ -269,13 +279,13 @@ function startCombat(starId) {
         battleResult = 'losses';
     }
 
-    // Build result message
-    let resultMsg = `Your losses: ${playerShipLosses.length} ships`;
+    // Build result message with detailed losses
+    let resultMsg = `Your losses: ${formatShipCounts(playerLossCounts)}`;
     if (playerDefenseLost > 0) resultMsg += `, ${playerDefenseLost} defense`;
-    resultMsg += `\nEnemy losses: ${enemyShipLosses.length} ships`;
+    resultMsg += `\nEnemy losses: ${formatShipCounts(enemyLossCounts)}`;
     if (enemyDefenseLost > 0) resultMsg += `, ${enemyDefenseLost} defense`;
-    resultMsg += `\n\nYour survivors: ${formatSurvivors(playerSurvivorCounts)}`;
-    resultMsg += `\nEnemy survivors: ${formatSurvivors(enemySurvivorCounts)}`;
+    resultMsg += `\n\nYour survivors: ${formatShipCounts(playerSurvivorCounts)}`;
+    resultMsg += `\nEnemy survivors: ${formatShipCounts(enemySurvivorCounts)}`;
 
     // Add debug combat log if enabled
     if (debugMode && combatLog.length > 0) {
@@ -287,11 +297,13 @@ function startCombat(starId) {
         turn: year,
         location: star.name,
         playerLosses: playerShipLosses.length,
+        playerLossesDetail: formatShipCounts(playerLossCounts),
         enemyLosses: enemyShipLosses.length,
+        enemyLossesDetail: formatShipCounts(enemyLossCounts),
         playerDefenseLost,
         enemyDefenseLost,
-        playerSurvivors: formatSurvivors(playerSurvivorCounts),
-        enemySurvivors: formatSurvivors(enemySurvivorCounts),
+        playerSurvivors: formatShipCounts(playerSurvivorCounts),
+        enemySurvivors: formatShipCounts(enemySurvivorCounts),
         result: battleResult
     });
 
