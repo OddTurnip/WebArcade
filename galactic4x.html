@@ -1366,8 +1366,10 @@
             const allShipsHere = getShipsAtStar(starId);
             const playerMilitary = allShipsHere.filter(s => s.owner === 'player' && SHIP_TYPES[s.type].military);
             const enemyMilitary = allShipsHere.filter(s => s.owner !== 'player' && SHIP_TYPES[s.type].military);
+            const enemyDefense = (star.owner && star.owner !== 'player') ? star.defense : 0;
 
-            if (playerMilitary.length === 0 || enemyMilitary.length === 0) return;
+            // Need player military ships, and enemy must have either ships or defenses
+            if (playerMilitary.length === 0 || (enemyMilitary.length === 0 && enemyDefense === 0)) return;
 
             // Track starting counts for history
             const startingPlayerCounts = {};
@@ -1379,8 +1381,8 @@
                 startingEnemyCounts[s.type] = (startingEnemyCounts[s.type] || 0) + 1;
             }
 
-            // Get enemy race info for naming
-            const enemyOwner = enemyMilitary[0].owner;
+            // Get enemy race info for naming (from ships if available, otherwise from star owner)
+            const enemyOwner = enemyMilitary.length > 0 ? enemyMilitary[0].owner : star.owner;
             const enemyRace = RACES.find(r => r.id === enemyOwner);
             const enemyShortName = enemyRace?.shortName || 'Enemy';
             const playerShortName = player.race?.shortName || 'Player';
@@ -2419,12 +2421,13 @@
             const hasSelection = selectedShips.length > 0;
             // shipsHere already defined above
 
-            // Check for enemy military ships
+            // Check for enemy military ships or defenses
             const enemyMilitaryHere = star.explored
                 ? getShipsAtStar(star.id).filter(s => s.owner !== 'player' && SHIP_TYPES[s.type].military)
                 : [];
             const playerMilitaryHere = getShipsAtStar(star.id).filter(s => s.owner === 'player' && SHIP_TYPES[s.type].military);
-            const canCombat = enemyMilitaryHere.length > 0 && playerMilitaryHere.length > 0 && !combatThisTurn;
+            const enemyDefenseHere = (star.owner && star.owner !== 'player') ? star.defense : 0;
+            const canCombat = (enemyMilitaryHere.length > 0 || enemyDefenseHere > 0) && playerMilitaryHere.length > 0 && !combatThisTurn;
 
             // Check if selected ships can move (not in combat this turn)
             const selectedCanMove = hasSelection && !selectedShips.some(id => shipsInCombatThisTurn.has(id));
