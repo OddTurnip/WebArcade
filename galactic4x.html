@@ -1453,6 +1453,13 @@
                 const playerDefenseAttacks = (speed === 0) ? playerDefensePool : 0;
                 const enemyDefenseAttacks = (speed === 0) ? enemyDefensePool : 0;
 
+                // Add initiative header to combat log if there are attackers at this speed
+                const hasAttackers = shipAttackers.length > 0 || playerDefenseAttacks > 0 || enemyDefenseAttacks > 0;
+                if (hasAttackers) {
+                    const initLabel = speed === 0 ? 'Defense' : `Speed ${speed}`;
+                    combatLog.push(`\n=== Initiative: ${initLabel} ===`);
+                }
+
                 // Collect all attacks for simultaneous resolution
                 const damageToShips = new Map(); // shipId -> { damage, attacks: [{attacker, damage}] }
                 let damageToPlayerDefense = 0;
