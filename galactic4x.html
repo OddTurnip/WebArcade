@@ -274,17 +274,27 @@
         }
         #aboutSection h3 {
             color: #4ecdc4;
-            font-size: 12px;
-            margin-bottom: 8px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        #aboutSection h4 {
+            color: #4ecdc4;
+            font-size: 13px;
+            margin: 16px 0 8px 0;
+            padding-top: 12px;
+            border-top: 1px solid #4a4a6a;
         }
         #aboutSection p {
-            font-size: 10px;
+            font-size: 13px;
             color: #aaa;
-            line-height: 1.4;
-            margin-bottom: 6px;
+            line-height: 1.5;
+            margin-bottom: 8px;
         }
         #aboutSection strong {
             color: #ffe66d;
+        }
+        #aboutSection table {
+            font-size: 13px;
         }
         .travel-info {
             background: #252540;
@@ -347,20 +357,20 @@
     </div>
     <div id="aboutSection">
         <h3>How to Play</h3>
-        <p><strong>Industry</strong> represents your colony's manufacturing capacity (0-100%). Higher industry = more production output per turn.</p>
+        <p><strong>Industry</strong> represents your colony's manufacturing capacity (0-100%). Higher industry = more production output per year.</p>
         <p><strong>Population</strong> is your workforce. More population = more base production. Each planet has a max population based on its type.</p>
         <p><strong>Production Formula:</strong> Base = Population x (Industry/100) x Planet Modifier. This is split according to your sliders.</p>
         <p><strong>Slider Locks:</strong> Click 🔓 to lock a slider. Locked sliders won't change when you adjust others.</p>
 
         <h4>Production Costs</h4>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;">
+        <table style="width:100%;border-collapse:collapse;margin:8px 0;">
             <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Population</td><td style="padding:4px;text-align:right;">~3.3 Ecology</td></tr>
             <tr><td style="padding:4px;">+1% Industry</td><td style="padding:4px;text-align:right;">~2 Industry</td></tr>
             <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Defense</td><td style="padding:4px;text-align:right;">20 Defense</td></tr>
         </table>
 
         <h4>Ship Stats</h4>
-        <table style="width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;">
+        <table style="width:100%;border-collapse:collapse;margin:8px 0;">
             <tr style="background:#2a2a4a;font-weight:bold;"><td style="padding:4px;">Ship</td><td style="padding:4px;">Cost</td><td style="padding:4px;">Move</td><td style="padding:4px;">Atk</td><td style="padding:4px;">HP</td></tr>
             <tr><td style="padding:4px;">Colony Ship</td><td style="padding:4px;">200</td><td style="padding:4px;">1</td><td style="padding:4px;">0</td><td style="padding:4px;">1</td></tr>
             <tr style="background:#2a2a4a;"><td style="padding:4px;">Battleship</td><td style="padding:4px;">500</td><td style="padding:4px;">1</td><td style="padding:4px;">30</td><td style="padding:4px;">100</td></tr>
@@ -465,7 +475,7 @@
         function saveGameState() {
             if (state !== GameState.PLAYING) return;
             const saveData = {
-                turn,
+                year,
                 player: { race: player.race, color: player.color },
                 stars: stars.map(s => ({
                     id: s.id, name: s.name, x: s.x, y: s.y,
@@ -475,7 +485,7 @@
                     defenseProgress: s.defenseProgress || 0,
                     sliders: {...s.sliders}, lockedSliders: [...(s.lockedSliders || [])],
                     shipProgress: {...s.shipProgress}, buildingShip: s.buildingShip,
-                    colonizedTurn: s.colonizedTurn, aiPhase: s.aiPhase
+                    colonizedYear: s.colonizedYear, aiPhase: s.aiPhase
                 })),
                 ships: ships.map(s => ({
                     id: s.id, type: s.type, owner: s.owner,
@@ -498,7 +508,7 @@
                 const saved = localStorage.getItem(SAVE_KEY);
                 if (!saved) return false;
                 const data = JSON.parse(saved);
-                turn = data.turn;
+                year = data.turn || data.year; // Support old saves
                 player.race = data.player.race;
                 player.color = data.player.color;
                 stars = data.stars.map(s => {
@@ -552,7 +562,7 @@
         };
 
         let state = GameState.TITLE;
-        let turn = 1;
+        let year = 1;
 
         let player = {
             race: null,
@@ -665,7 +675,7 @@
             homeStar.industry = 20;
             homeStar.defense = 5;
             homeStar.planetType = 'terran';
-            homeStar.colonizedTurn = 1;
+            homeStar.colonizedYear = 1;
 
             ships.push({
                 id: nextShipId++,
@@ -736,7 +746,7 @@
                 enemyHome.population = 40;
                 enemyHome.industry = 20;
                 enemyHome.defense = 5;
-                enemyHome.colonizedTurn = 1;
+                enemyHome.colonizedYear = 1;
                 enemyHome.sliders = { ship: 0, def: 0, ind: 50, eco: 50 }; // Start with industry/eco
                 enemyHome.aiPhase = 'growth'; // Track AI production phase
 
@@ -759,7 +769,7 @@
         // GAME LOGIC
         // ============================================
         function initGame() {
-            turn = 1;
+            year = 1;
             selectedStar = null;
             selectedShips = [];
             destinationStar = null;
@@ -807,7 +817,7 @@
             const devPercent = maxColonyProduction > 0 ? Math.round((totalProduction / maxColonyProduction) * 100) : 0;
             const conquestPercent = maxMapProduction > 0 ? Math.round((totalProduction / maxMapProduction) * 100) : 0;
 
-            turnInfo.textContent = `Year ${turn} | Colonies: ${colonies.length} | Ships: ${totalShips} | Prod: ${Math.floor(totalProduction)}/turn | Dev: ${devPercent}% | Conquest: ${conquestPercent}%`;
+            turnInfo.textContent = `Year ${year} | Colonies: ${colonies.length} | Ships: ${totalShips} | Prod: ${Math.floor(totalProduction)}/year | Dev: ${devPercent}% | Conquest: ${conquestPercent}%`;
         }
 
         function getShipsAtStar(starId) {
@@ -1080,7 +1090,7 @@
                             star.explored = true;
                             // Track scouting event
                             eventHistory.unshift({
-                                year: turn + 1, // This happens at start of next turn
+                                year: year + 1, // This happens at start of next year
                                 type: 'scout',
                                 text: `Scouted ${star.name}`
                             });
@@ -1103,7 +1113,7 @@
             }
             if (builtParts.length > 0) {
                 eventHistory.unshift({
-                    year: turn,
+                    year: year,
                     type: 'built',
                     text: `Built ${builtParts.join(', ')}`
                 });
@@ -1114,7 +1124,7 @@
             combatThisTurn = false;
             shipsInCombatThisTurn.clear();
 
-            turn++;
+            year++;
             state = GameState.PLAYING;
             updatePanels();
             updateTurnInfo();
@@ -1180,10 +1190,10 @@
             star.sliders = { ship: 0, def: 0, ind: 50, eco: 50 };
             star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
             star.buildingShip = null;
-            star.colonizedTurn = turn;
+            star.colonizedYear = year;
             // Track colonization event
             eventHistory.unshift({
-                year: turn,
+                year: year,
                 type: 'colony',
                 text: `Established colony on ${star.name}`
             });
@@ -1214,11 +1224,11 @@
             star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
             star.buildingShip = null;
             star.defenseProgress = 0;
-            star.colonizedTurn = turn;
+            star.colonizedYear = year;
             star.aiPhase = undefined;
             // Track conquest event
             eventHistory.unshift({
-                year: turn,
+                year: year,
                 type: 'conquest',
                 text: `Conquered ${star.name}`
             });
@@ -1430,7 +1440,7 @@
 
             // Add to battle history
             battleHistory.unshift({
-                turn: turn,
+                turn: year,
                 location: star.name,
                 playerLosses: playerShipLosses.length,
                 enemyLosses: enemyShipLosses.length,
@@ -1558,7 +1568,7 @@
                             case 'name':
                                 return a.name.localeCompare(b.name);
                             case 'age':
-                                return (a.colonizedTurn || 1) - (b.colonizedTurn || 1);
+                                return (a.colonizedYear || 1) - (b.colonizedYear || 1);
                             case 'dev':
                                 return getColonyDevPercent(b) - getColonyDevPercent(a);
                             case 'defense':
@@ -1571,7 +1581,7 @@
                     for (const colony of colonies) {
                         const planetInfo = PLANET_TYPES[colony.planetType];
                         const devPercent = getColonyDevPercent(colony);
-                        const age = turn - (colony.colonizedTurn || 1);
+                        const age = year - (colony.colonizedYear || 1);
 
                         html += `<div class="empire-planet" onclick="selectStar(${colony.id})" style="cursor:pointer;padding:6px;margin:4px 0;background:#252540;border-radius:4px;">`;
                         html += `<div style="color:${planetInfo.color};font-weight:bold;font-size:11px;">${colony.name} <span style="color:#888;font-weight:normal;">(${age})</span></div>`;
@@ -1591,7 +1601,7 @@
                                 html += `<div style="font-size:10px;color:#4ecdc4;">`;
                                 html += `${shipType.name}: ${pct}%`;
                                 if (shipsPerTurn >= 0.01) {
-                                    html += ` (${shipsPerTurn.toFixed(2)}/turn)`;
+                                    html += ` (${shipsPerTurn.toFixed(2)}/year)`;
                                 }
                                 html += `</div>`;
                             }
@@ -1662,9 +1672,9 @@
                         if (slider.key === 'ship' && prod.ship < 1) {
                             // Don't show ship production less than 1
                         } else if (slider.key === 'eco' || slider.key === 'ind') {
-                            prodDisplay = `+${prod[slider.prodKey].toFixed(1)} ${slider.prodLabel}/turn`;
+                            prodDisplay = `+${prod[slider.prodKey].toFixed(1)} ${slider.prodLabel}/year`;
                         } else {
-                            prodDisplay = `+${prod[slider.prodKey]} ${slider.prodLabel}/turn`;
+                            prodDisplay = `+${prod[slider.prodKey]} ${slider.prodLabel}/year`;
                         }
                     }
 
@@ -1713,11 +1723,11 @@
                     html += `<div class="info-row"><span class="info-label">Building:</span><span class="info-value">${shipType.name}</span></div>`;
                     html += `<div class="info-row"><span class="info-label">Progress:</span><span class="info-value">${currentProgress}/${shipType.cost} (${progress}%)</span></div>`;
                     if (prod.ship > 0) {
-                        html += `<div class="info-row"><span class="info-label">+Production:</span><span class="info-value">+${prod.ship}/turn</span></div>`;
+                        html += `<div class="info-row"><span class="info-label">+Production:</span><span class="info-value">+${prod.ship}/year</span></div>`;
                         if (shipsNextTurn > 0) {
-                            html += `<div class="info-row"><span class="info-label">Next turn:</span><span class="info-value" style="color:#4ecdc4">${shipsNextTurn} ship${shipsNextTurn > 1 ? 's' : ''}</span></div>`;
+                            html += `<div class="info-row"><span class="info-label">Next year:</span><span class="info-value" style="color:#4ecdc4">${shipsNextTurn} ship${shipsNextTurn > 1 ? 's' : ''}</span></div>`;
                         } else {
-                            html += `<div class="info-row"><span class="info-label">ETA:</span><span class="info-value">${turnsLeft} turn${turnsLeft > 1 ? 's' : ''}</span></div>`;
+                            html += `<div class="info-row"><span class="info-label">ETA:</span><span class="info-value">${turnsLeft} year${turnsLeft > 1 ? 's' : ''}</span></div>`;
                         }
                     } else {
                         html += `<div class="info-row"><span class="info-label">ETA:</span><span class="info-value">∞ (0% allocated)</span></div>`;
@@ -2128,9 +2138,9 @@
                                    (slider.key === 'eco' && star.population >= planetInfo.maxPop);
                     if (!isMaxed) {
                         if (slider.key === 'eco' || slider.key === 'ind') {
-                            prodEl.textContent = `+${prod[slider.prodKey].toFixed(1)} ${slider.prodLabel}/turn`;
+                            prodEl.textContent = `+${prod[slider.prodKey].toFixed(1)} ${slider.prodLabel}/year`;
                         } else {
-                            prodEl.textContent = `+${prod[slider.prodKey]} ${slider.prodLabel}/turn`;
+                            prodEl.textContent = `+${prod[slider.prodKey]} ${slider.prodLabel}/year`;
                         }
                     }
                 }
@@ -2768,7 +2778,7 @@
             ctx.fillStyle = '#ffe66d';
             ctx.font = 'bold 12px Courier New';
             ctx.textAlign = 'center';
-            ctx.fillText('Turn ' + turn, CONFIG.WIDTH - 55, 30);
+            ctx.fillText('Year ' + year, CONFIG.WIDTH - 55, 30);
         }
 
         // ============================================
