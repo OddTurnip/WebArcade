@@ -2028,7 +2028,7 @@
             // Fleet actions
             let actionsHtml = '';
             const hasSelection = selectedShips.length > 0;
-            const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+            // shipsHere already defined above
 
             // Check for enemy military ships
             const enemyMilitaryHere = star.explored
