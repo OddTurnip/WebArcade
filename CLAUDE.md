@@ -219,7 +219,8 @@ For games with multiple UI panels (like Galactic 4X), use a separate view state:
 ```javascript
 const ViewState = {
     OVERVIEW: 'overview',
-    PLANET: 'planet',
+    PLANETS: 'planets',
+    COLONY: 'colony',
     HISTORY: 'history'
 };
 let currentView = ViewState.OVERVIEW;
@@ -229,7 +230,7 @@ let currentView = ViewState.OVERVIEW;
 - Views always update BOTH panels (left and right). Never leave one stale.
 - Each view renders its own panel titles dynamically (not in static HTML)
 - View buttons highlight the active view and grey out unavailable ones
-- Planet view requires a selected star; other views clear the selection
+- Colony view requires a selected star; other views (except Planets) clear the selection
 
 **Panel structure:**
 ```html
