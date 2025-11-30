@@ -1403,6 +1403,7 @@
             // Create combat units with current health and debug names
             let playerUnits = playerMilitary.map(s => {
                 playerUnitNumbers[s.type] = (playerUnitNumbers[s.type] || 0) + 1;
+                const unitNum = String(playerUnitNumbers[s.type]).padStart(3, '0');
                 return {
                     id: s.id,
                     type: s.type,
@@ -1411,12 +1412,13 @@
                     maxHp: SHIP_TYPES[s.type].health,
                     attack: SHIP_TYPES[s.type].attack,
                     speed: SHIP_TYPES[s.type].speed,
-                    debugName: `${playerShortName} ${SHIP_TYPES[s.type].name} #${playerUnitNumbers[s.type]}`
+                    debugName: `${playerShortName} ${SHIP_TYPES[s.type].name} ${unitNum}`
                 };
             });
 
             let enemyUnits = enemyMilitary.map(s => {
                 enemyUnitNumbers[s.type] = (enemyUnitNumbers[s.type] || 0) + 1;
+                const unitNum = String(enemyUnitNumbers[s.type]).padStart(3, '0');
                 return {
                     id: s.id,
                     type: s.type,
@@ -1425,7 +1427,7 @@
                     maxHp: SHIP_TYPES[s.type].health,
                     attack: SHIP_TYPES[s.type].attack,
                     speed: SHIP_TYPES[s.type].speed,
-                    debugName: `${enemyShortName} ${SHIP_TYPES[s.type].name} #${enemyUnitNumbers[s.type]}`
+                    debugName: `${enemyShortName} ${SHIP_TYPES[s.type].name} ${unitNum}`
                 };
             });
 
@@ -1523,7 +1525,10 @@
                             runningHp -= atk.damage;
                             const attackerName = atk.attacker.debugName || atk.attacker;
                             const destroyed = runningHp <= 0 ? ' [DESTROYED]' : '';
-                            combatLog.push(`${attackerName} → ${unit.debugName} (${atk.damage} dmg, ${Math.max(0, runningHp)}/${unit.maxHp} HP)${destroyed}`);
+                            const dmgStr = String(atk.damage).padStart(3, ' ');
+                            const hpStr = String(Math.max(0, runningHp)).padStart(3, ' ');
+                            const maxHpStr = String(unit.maxHp).padStart(3, ' ');
+                            combatLog.push(`${attackerName} → ${unit.debugName} (${dmgStr} dmg, ${hpStr}/${maxHpStr} HP)${destroyed}`);
                         }
                     }
                 }
