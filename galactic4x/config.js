@@ -24,7 +24,7 @@ const CONFIG = {
 };
 
 const PLANET_TYPES = {
-    terran: { name: 'Terran', maxPop: 100, industryMod: 1.0, ecoMod: 1.0, color: '#4ecdc4' },
+    gaia: { name: 'Gaia', maxPop: 100, industryMod: 1.0, ecoMod: 1.0, color: '#4ecdc4' },
     ocean: { name: 'Ocean', maxPop: 90, industryMod: 0.9, ecoMod: 1.1, color: '#4a9fff' },
     jungle: { name: 'Jungle', maxPop: 80, industryMod: 0.85, ecoMod: 1.2, color: '#2e8b57' },
     arid: { name: 'Arid', maxPop: 60, industryMod: 0.8, ecoMod: 0.7, color: '#daa520' },

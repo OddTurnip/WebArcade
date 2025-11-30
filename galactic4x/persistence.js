@@ -69,8 +69,14 @@ function loadSaveData(data) {
         // Ensure new ship types exist in shipProgress
         const defaultProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
         shipProgress = { ...defaultProgress, ...(shipProgress || {}) };
+
+        // Backwards compatibility: rename 'terran' planet type to 'gaia'
+        let planetType = s.planetType;
+        if (planetType === 'terran') planetType = 'gaia';
+
         return {
             ...s,
+            planetType: planetType,
             lockedSliders: s.lockedSliders || [],
             shipProgress: shipProgress,
             defenseProgress: s.defenseProgress || 0

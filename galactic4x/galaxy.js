@@ -33,7 +33,7 @@ function generateGalaxy() {
 
         let planetType;
         const roll = Math.random();
-        if (roll < 0.1) planetType = 'terran';
+        if (roll < 0.1) planetType = 'gaia';
         else if (roll < 0.2) planetType = 'ocean';
         else if (roll < 0.35) planetType = 'jungle';
         else if (roll < 0.5) planetType = 'arid';
@@ -64,7 +64,7 @@ function generateGalaxy() {
         });
     }
 
-    let homeStar = stars.find(s => s.planetType === 'terran') ||
+    let homeStar = stars.find(s => s.planetType === 'gaia') ||
                    stars.find(s => s.planetType === 'ocean') ||
                    stars[0];
 
@@ -73,7 +73,7 @@ function generateGalaxy() {
     homeStar.population = 40;
     homeStar.industry = 20;
     homeStar.defense = 5;
-    homeStar.planetType = 'terran';
+    homeStar.planetType = 'gaia';
     homeStar.colonizedYear = 1;
 
     ships.push({
@@ -126,7 +126,7 @@ function generateGalaxy() {
     // Pick one enemy faction to get a homeworld
     const enemyWithHomeworld = enemyRaces[Math.floor(Math.random() * enemyRaces.length)];
 
-    // Find a good planet for enemy homeworld (prefer terran/ocean, away from player)
+    // Find a good planet for enemy homeworld (prefer gaia/ocean, away from player)
     const candidatePlanets = stars.filter(s =>
         s.id !== homeStar.id &&
         PLANET_TYPES[s.planetType].maxPop >= 80
