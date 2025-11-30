@@ -345,6 +345,8 @@
             border-radius: 8px;
             padding: 20px;
             max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
         .modal-content.wide {
             max-width: 600px;
@@ -3013,6 +3015,12 @@
 
         document.addEventListener('keydown', (e) => {
             AudioSystem.unlock();
+
+            // ESC closes modal if open
+            if (e.key === 'Escape' && !gameModal.classList.contains('hidden')) {
+                closeModal();
+                return;
+            }
 
             if (state === GameState.TITLE) {
                 if (e.key === 'Enter' || e.key === ' ') {
