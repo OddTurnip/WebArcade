@@ -515,6 +515,7 @@
         // ============================================
         const GAME_ID = 'galactic4x';
         const SAVE_KEY = 'galactic4x_save';
+        const SAVE_VERSION = 1; // Increment when save format changes
 
         let gameData = GameStorage.load(GAME_ID, {
             ...GameStorage.defaults.arcade(),
@@ -528,6 +529,7 @@
         function saveGameState() {
             if (state !== GameState.PLAYING) return;
             const saveData = {
+                version: SAVE_VERSION,
                 year,
                 player: { race: player.race, color: player.color },
                 stars: stars.map(s => ({
@@ -548,7 +550,10 @@
                 nextShipId,
                 battleHistory,
                 eventHistory,
-                debugMode
+                debugMode,
+                // Combat state (v1+)
+                combatThisTurn,
+                shipsInCombatThisTurn: [...shipsInCombatThisTurn]
             };
             try {
                 localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
@@ -562,6 +567,11 @@
                 const saved = localStorage.getItem(SAVE_KEY);
                 if (!saved) return false;
                 const data = JSON.parse(saved);
+
+                // Version-aware loading (version 0 = pre-versioning saves)
+                const saveVersion = data.version || 0;
+
+                // Load common data (all versions)
                 year = data.turn || data.year; // Support old saves
                 player.race = data.player.race;
                 player.color = data.player.color;
@@ -590,6 +600,17 @@
                 eventHistory = data.eventHistory || [];
                 debugMode = data.debugMode || false;
                 document.getElementById('debugToggle').checked = debugMode;
+
+                // Version 1+ fields: combat state
+                if (saveVersion >= 1) {
+                    combatThisTurn = data.combatThisTurn || false;
+                    shipsInCombatThisTurn = new Set(data.shipsInCombatThisTurn || []);
+                } else {
+                    // Pre-v1 saves: reset combat state (safe default)
+                    combatThisTurn = false;
+                    shipsInCombatThisTurn = new Set();
+                }
+
                 return true;
             } catch (e) {
                 console.warn('Failed to load game:', e);
