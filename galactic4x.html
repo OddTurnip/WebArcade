@@ -727,7 +727,7 @@
                     updatePanels();
                     saveGameState(); // Save to localStorage too
                     AudioSystem.sfx.levelComplete();
-                    AudioSystem.music.start('invaders');
+                    AudioSystem.music.start('4x');
                 } catch (err) {
                     alert('Failed to load save file: ' + err.message);
                 }
@@ -3067,7 +3067,7 @@
                         updateTurnInfo();
                         updatePanels();
                         AudioSystem.sfx.select();
-                        AudioSystem.music.start('invaders');
+                        AudioSystem.music.start('4x');
                         return;
                     }
                 }
@@ -3095,7 +3095,7 @@
                         initGame();
                         state = GameState.PLAYING;
                         AudioSystem.sfx.levelComplete();
-                        AudioSystem.music.start('invaders');
+                        AudioSystem.music.start('4x');
                         saveGameState();
                         return;
                     }
@@ -3188,7 +3188,7 @@
                         updateTurnInfo();
                         updatePanels();
                         AudioSystem.sfx.select();
-                        AudioSystem.music.start('invaders');
+                        AudioSystem.music.start('4x');
                     } else {
                         state = GameState.RACE_SELECT;
                         AudioSystem.sfx.select();
@@ -3210,7 +3210,7 @@
                     initGame();
                     state = GameState.PLAYING;
                     AudioSystem.sfx.levelComplete();
-                    AudioSystem.music.start('invaders');
+                    AudioSystem.music.start('4x');
                     saveGameState();
                 }
                 return;
@@ -3571,6 +3571,9 @@
         // ============================================
         document.getElementById('musicToggle').addEventListener('change', (e) => {
             AudioSystem.musicEnabled = e.target.checked;
+            if (!e.target.checked) {
+                AudioSystem.music.stop();
+            }
             gameData.musicEnabled = e.target.checked;
             saveGameData();
         });

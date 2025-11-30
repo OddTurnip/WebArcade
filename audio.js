@@ -628,7 +628,8 @@ const AudioSystem = {
 
             const ctx = AudioSystem.ctx;
             const now = ctx.currentTime;
-            const bpm = this.currentTrack === 'tetris' ? 128 : 140;
+            const bpm = this.currentTrack === 'tetris' ? 128 :
+                        this.currentTrack === '4x' ? 72 : 140;
             const beatDuration = 60 / bpm;
 
             // Get track data
@@ -1075,6 +1076,83 @@ const AudioSystem = {
                         392, 330, 392, 330, 392, 330, 392, 330, 392, 330, 392, 330, 392, 330, 392, 330,
                         349, 294, 349, 294, 349, 294, 349, 294, 392, 330, 440, 349, 440, 349, 440, 349,
                         440, 349, 392, 330, 349, 294, 392, 330, 294, 0, 0, 0, 0, 0, 0, 0
+                    ]
+                },
+
+                // Galactic 4X style - ambient, dreamy space exploration (64 beats at 72 BPM = ~53 seconds)
+                // Structure: Am7 - Fmaj7 - C - Em progression, ethereal and contemplative
+                // "Enya at the beach, but in space" - Master of Orion vibes
+                '4x': {
+                    beats: 64,
+                    bassDiv: 1,        // Whole notes - very sparse
+                    melodyDiv: 0.5,    // Half notes - slow, sustained
+                    arpDiv: 0.5,       // Half notes - gentle shimmer
+                    bassType: 'sine',  // Soft, warm bass
+                    bass: [
+                        // Section 1: Establish space - long tones with silence
+                        110, 0, 0, 0, 0, 0, 0, 0,   // Am - single deep note
+                        87, 0, 0, 0, 0, 0, 0, 0,    // F
+                        131, 0, 0, 0, 0, 0, 0, 0,   // C
+                        82, 0, 0, 0, 0, 0, 0, 0,    // Em
+                        // Section 2: Gentle movement
+                        110, 0, 0, 0, 165, 0, 0, 0,   // Am with E
+                        87, 0, 0, 0, 131, 0, 0, 0,    // F with C
+                        131, 0, 0, 0, 196, 0, 0, 0,   // C with G
+                        82, 0, 0, 0, 123, 0, 0, 0,    // Em with B
+                        // Section 3: Deeper presence
+                        110, 0, 165, 0, 110, 0, 0, 0,   // Am floating
+                        87, 0, 131, 0, 87, 0, 0, 0,    // F floating
+                        131, 0, 196, 0, 131, 0, 0, 0,  // C floating
+                        82, 0, 123, 0, 82, 0, 0, 0,    // Em floating
+                        // Section 4: Return to stillness
+                        110, 0, 0, 0, 0, 0, 0, 0,   // Am
+                        87, 0, 0, 0, 0, 0, 0, 0,    // F
+                        131, 0, 0, 0, 0, 0, 0, 0,   // C
+                        110, 0, 0, 0, 0, 0, 0, 0    // Am resolve
+                    ],
+                    melody: [
+                        // Section 1: Distant stars - sparse, questioning
+                        330, 0, 0, 0, 392, 0, 0, 0, 440, 0, 0, 0, 0, 0, 0, 0,  // Am: E-G-A rising
+                        349, 0, 0, 0, 440, 0, 0, 0, 523, 0, 0, 0, 0, 0, 0, 0,  // F: F-A-C
+                        330, 0, 0, 0, 392, 0, 0, 0, 523, 0, 0, 0, 0, 0, 0, 0,  // C: E-G-C
+                        330, 0, 0, 0, 494, 0, 0, 0, 392, 0, 0, 0, 0, 0, 0, 0,  // Em: E-B-G
+                        // Section 2: Expanding horizons
+                        440, 0, 523, 0, 440, 0, 392, 0, 330, 0, 0, 0, 392, 0, 0, 0,  // Am: A-C-A-G-E
+                        523, 0, 440, 0, 349, 0, 0, 0, 440, 0, 523, 0, 440, 0, 0, 0,  // F: C-A-F
+                        392, 0, 523, 0, 587, 0, 523, 0, 392, 0, 0, 0, 330, 0, 0, 0,  // C: G-C-D-C-G-E
+                        494, 0, 392, 0, 330, 0, 0, 0, 392, 0, 494, 0, 392, 0, 0, 0,  // Em: B-G-E
+                        // Section 3: Cosmic wonder - higher, more open
+                        659, 0, 0, 0, 587, 0, 0, 0, 523, 0, 0, 0, 440, 0, 0, 0,  // Am: E5-D5-C5-A4 descend
+                        698, 0, 0, 0, 659, 0, 0, 0, 523, 0, 0, 0, 440, 0, 0, 0,  // F: F5-E5-C5-A4
+                        784, 0, 0, 0, 659, 0, 0, 0, 523, 0, 0, 0, 392, 0, 0, 0,  // C: G5-E5-C5-G4
+                        659, 0, 0, 0, 494, 0, 0, 0, 392, 0, 0, 0, 330, 0, 0, 0,  // Em: E5-B4-G4-E4
+                        // Section 4: Return home - gentle resolution
+                        440, 0, 392, 0, 330, 0, 0, 0, 294, 0, 330, 0, 0, 0, 0, 0,  // Am: A-G-E-D-E
+                        349, 0, 440, 0, 330, 0, 0, 0, 262, 0, 330, 0, 0, 0, 0, 0,  // F: F-A-E-C-E
+                        330, 0, 392, 0, 523, 0, 0, 0, 392, 0, 330, 0, 0, 0, 0, 0,  // C: E-G-C-G-E
+                        330, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0          // Am: E fade
+                    ],
+                    arp: [
+                        // Section 1: Distant shimmer - like stars twinkling
+                        220, 0, 330, 0, 220, 0, 0, 0, 262, 0, 330, 0, 220, 0, 0, 0,  // Am7
+                        175, 0, 262, 0, 175, 0, 0, 0, 220, 0, 262, 0, 175, 0, 0, 0,  // Fmaj7
+                        196, 0, 262, 0, 196, 0, 0, 0, 247, 0, 262, 0, 196, 0, 0, 0,  // Cmaj7
+                        165, 0, 247, 0, 165, 0, 0, 0, 196, 0, 247, 0, 165, 0, 0, 0,  // Em7
+                        // Section 2: Gentle waves
+                        220, 330, 220, 0, 262, 330, 262, 0, 220, 330, 220, 0, 262, 0, 0, 0,  // Am7
+                        175, 262, 175, 0, 220, 262, 220, 0, 175, 262, 175, 0, 220, 0, 0, 0,  // Fmaj7
+                        196, 262, 196, 0, 247, 330, 247, 0, 196, 262, 196, 0, 247, 0, 0, 0,  // Cmaj7
+                        165, 247, 165, 0, 196, 294, 196, 0, 165, 247, 165, 0, 196, 0, 0, 0,  // Em7
+                        // Section 3: Cosmic shimmer - higher octave
+                        440, 0, 523, 0, 440, 0, 0, 0, 523, 0, 659, 0, 523, 0, 0, 0,  // Am high
+                        349, 0, 440, 0, 349, 0, 0, 0, 440, 0, 523, 0, 440, 0, 0, 0,  // F high
+                        392, 0, 523, 0, 392, 0, 0, 0, 523, 0, 659, 0, 523, 0, 0, 0,  // C high
+                        330, 0, 494, 0, 330, 0, 0, 0, 392, 0, 494, 0, 392, 0, 0, 0,  // Em high
+                        // Section 4: Fade to stars
+                        220, 0, 330, 0, 220, 0, 0, 0, 262, 0, 0, 0, 0, 0, 0, 0,  // Am sparse
+                        175, 0, 262, 0, 175, 0, 0, 0, 220, 0, 0, 0, 0, 0, 0, 0,  // F sparse
+                        196, 0, 262, 0, 196, 0, 0, 0, 247, 0, 0, 0, 0, 0, 0, 0,  // C sparse
+                        220, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0         // Am fade
                     ]
                 }
             };
