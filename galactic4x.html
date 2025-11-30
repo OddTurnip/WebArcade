@@ -407,6 +407,10 @@
         <label><input type="checkbox" id="musicToggle" checked> Music</label>
         <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
         <label><input type="checkbox" id="debugToggle"> Debug</label>
+        <span style="margin-left:10px;">|</span>
+        <button class="btn btn-sm" style="margin-left:10px;padding:2px 8px;" onclick="saveToFile()">Save</button>
+        <button class="btn btn-sm" style="padding:2px 8px;" onclick="document.getElementById('loadFileInput').click()">Load</button>
+        <input type="file" id="loadFileInput" accept=".g4x,.json" style="display:none;" onchange="loadFromFile(event)">
     </div>
     <div id="aboutSection">
         <h3>How to Play</h3>
@@ -621,6 +625,116 @@
         function clearSaveGame() {
             localStorage.removeItem(SAVE_KEY);
         }
+
+        // File-based save/load
+        window.saveToFile = function() {
+            if (state !== GameState.PLAYING) {
+                alert('No game in progress to save.');
+                return;
+            }
+            const saveData = {
+                version: SAVE_VERSION,
+                year,
+                player: { race: player.race, color: player.color },
+                stars: stars.map(s => ({
+                    id: s.id, name: s.name, x: s.x, y: s.y,
+                    starType: s.starType, planetType: s.planetType,
+                    owner: s.owner, explored: s.explored,
+                    population: s.population, industry: s.industry, defense: s.defense,
+                    defenseProgress: s.defenseProgress || 0,
+                    sliders: {...s.sliders}, lockedSliders: [...(s.lockedSliders || [])],
+                    shipProgress: {...s.shipProgress}, buildingShip: s.buildingShip,
+                    colonizedYear: s.colonizedYear, aiPhase: s.aiPhase
+                })),
+                ships: ships.map(s => ({
+                    id: s.id, type: s.type, owner: s.owner,
+                    location: s.location, destination: s.destination,
+                    turnsToArrival: s.turnsToArrival, totalTurns: s.totalTurns
+                })),
+                nextShipId,
+                battleHistory,
+                eventHistory,
+                debugMode,
+                combatThisTurn,
+                shipsInCombatThisTurn: [...shipsInCombatThisTurn]
+            };
+
+            const json = JSON.stringify(saveData, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const raceName = player.race?.shortName || 'Unknown';
+            a.download = `galactic4x_${raceName}_year${year}.g4x`;
+            a.click();
+            URL.revokeObjectURL(url);
+            AudioSystem.sfx.select();
+        };
+
+        window.loadFromFile = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    const saveVersion = data.version || 0;
+
+                    // Load the data
+                    year = data.turn || data.year;
+                    player.race = data.player.race;
+                    player.color = data.player.color;
+                    stars = data.stars.map(s => {
+                        let shipProgress = s.shipProgress;
+                        if (typeof shipProgress === 'number') {
+                            shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+                        }
+                        const defaultProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+                        shipProgress = { ...defaultProgress, ...(shipProgress || {}) };
+                        return {
+                            ...s,
+                            lockedSliders: s.lockedSliders || [],
+                            shipProgress: shipProgress,
+                            defenseProgress: s.defenseProgress || 0
+                        };
+                    });
+                    ships = data.ships;
+                    nextShipId = data.nextShipId;
+                    battleHistory = data.battleHistory || [];
+                    eventHistory = data.eventHistory || [];
+                    debugMode = data.debugMode || false;
+                    document.getElementById('debugToggle').checked = debugMode;
+
+                    if (saveVersion >= 1) {
+                        combatThisTurn = data.combatThisTurn || false;
+                        shipsInCombatThisTurn = new Set(data.shipsInCombatThisTurn || []);
+                    } else {
+                        combatThisTurn = false;
+                        shipsInCombatThisTurn = new Set();
+                    }
+
+                    // Start the game
+                    state = GameState.PLAYING;
+                    actionPanel.classList.remove('hidden');
+                    planetPanel.classList.remove('hidden');
+                    fleetPanel.classList.remove('hidden');
+                    currentView = ViewState.OVERVIEW;
+                    selectedStar = null;
+                    selectedShips = [];
+                    destinationStar = null;
+                    updateTurnInfo();
+                    updatePanels();
+                    saveGameState(); // Save to localStorage too
+                    AudioSystem.sfx.levelComplete();
+                    AudioSystem.music.start('invaders');
+                } catch (err) {
+                    alert('Failed to load save file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        };
 
         // ============================================
         // GAME STATE
@@ -2953,6 +3067,7 @@
                         updateTurnInfo();
                         updatePanels();
                         AudioSystem.sfx.select();
+                        AudioSystem.music.start('invaders');
                         return;
                     }
                 }
@@ -2980,6 +3095,7 @@
                         initGame();
                         state = GameState.PLAYING;
                         AudioSystem.sfx.levelComplete();
+                        AudioSystem.music.start('invaders');
                         saveGameState();
                         return;
                     }
@@ -3072,6 +3188,7 @@
                         updateTurnInfo();
                         updatePanels();
                         AudioSystem.sfx.select();
+                        AudioSystem.music.start('invaders');
                     } else {
                         state = GameState.RACE_SELECT;
                         AudioSystem.sfx.select();
@@ -3093,6 +3210,7 @@
                     initGame();
                     state = GameState.PLAYING;
                     AudioSystem.sfx.levelComplete();
+                    AudioSystem.music.start('invaders');
                     saveGameState();
                 }
                 return;
