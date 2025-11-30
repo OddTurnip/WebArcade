@@ -540,7 +540,7 @@
                 ships: ships.map(s => ({
                     id: s.id, type: s.type, owner: s.owner,
                     location: s.location, destination: s.destination,
-                    turnsToArrival: s.turnsToArrival
+                    turnsToArrival: s.turnsToArrival, totalTurns: s.totalTurns
                 })),
                 nextShipId,
                 battleHistory,
@@ -1253,9 +1253,10 @@
                 const originStar = stars.find(s => s.id === ship.location);
                 const shipType = SHIP_TYPES[ship.type];
                 const dist = Math.sqrt((destStar.x - originStar.x) ** 2 + (destStar.y - originStar.y) ** 2);
-                const turns = Math.ceil(dist / (50 * shipType.speed));
+                const turns = Math.max(1, Math.ceil(dist / (50 * shipType.speed)));
                 ship.destination = destinationId;
-                ship.turnsToArrival = Math.max(1, turns);
+                ship.turnsToArrival = turns;
+                ship.totalTurns = turns; // Store total journey time for progress display
             }
             AudioSystem.sfx.select();
             selectedShips = [];
@@ -3013,19 +3014,51 @@
         }
 
         function renderStars() {
-            // Draw travel lines for ships in transit
+            // Draw travel lines for ships in transit and ship progress
             ctx.strokeStyle = player.color;
             ctx.setLineDash([5, 5]);
             ctx.lineWidth = 1;
+
+            // Group ships by route for cleaner display
+            const shipsByRoute = new Map(); // "originId-destId" -> ships[]
             for (const ship of ships) {
                 if (ship.destination !== null && ship.owner === 'player') {
-                    const origin = stars.find(s => s.id === ship.location);
-                    const dest = stars.find(s => s.id === ship.destination);
-                    if (origin && dest) {
-                        ctx.beginPath();
-                        ctx.moveTo(origin.x, origin.y);
-                        ctx.lineTo(dest.x, dest.y);
-                        ctx.stroke();
+                    const routeKey = `${ship.location}-${ship.destination}`;
+                    if (!shipsByRoute.has(routeKey)) {
+                        shipsByRoute.set(routeKey, []);
+                    }
+                    shipsByRoute.get(routeKey).push(ship);
+                }
+            }
+
+            // Draw lines and ship progress indicators
+            for (const [routeKey, routeShips] of shipsByRoute) {
+                const origin = stars.find(s => s.id === routeShips[0].location);
+                const dest = stars.find(s => s.id === routeShips[0].destination);
+                if (origin && dest) {
+                    // Draw dotted line
+                    ctx.beginPath();
+                    ctx.moveTo(origin.x, origin.y);
+                    ctx.lineTo(dest.x, dest.y);
+                    ctx.stroke();
+
+                    // Draw ship progress indicators (only for multi-turn journeys)
+                    for (const ship of routeShips) {
+                        const totalTurns = ship.totalTurns || ship.turnsToArrival;
+                        if (totalTurns > 1) {
+                            // Calculate progress (0 = at origin, 1 = at destination)
+                            const progress = (totalTurns - ship.turnsToArrival) / totalTurns;
+                            const shipX = origin.x + (dest.x - origin.x) * progress;
+                            const shipY = origin.y + (dest.y - origin.y) * progress;
+
+                            // Draw ship indicator circle
+                            ctx.setLineDash([]);
+                            ctx.fillStyle = player.color;
+                            ctx.beginPath();
+                            ctx.arc(shipX, shipY, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.setLineDash([5, 5]);
+                        }
                     }
                 }
             }
