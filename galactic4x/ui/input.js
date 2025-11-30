@@ -21,28 +21,47 @@ function initInputHandlers() {
         AudioSystem.unlock();
 
         if (state === GameState.TITLE) {
-            if (hasSaveGame && y >= CONFIG.HEIGHT / 2 + 30 && y <= CONFIG.HEIGHT / 2 + 60) {
-                if (loadGameState()) {
-                    state = GameState.PLAYING;
-                    actionPanel.classList.remove('hidden');
-                    planetPanel.classList.remove('hidden');
-                    fleetPanel.classList.remove('hidden');
-                    updateTurnInfo();
-                    updatePanels();
-                    AudioSystem.sfx.select();
-                    AudioSystem.music.start('4x');
+            if (hasSaveGame) {
+                // Continue (y: +30 to +60)
+                if (y >= CONFIG.HEIGHT / 2 + 30 && y <= CONFIG.HEIGHT / 2 + 60) {
+                    if (loadGameState()) {
+                        state = GameState.PLAYING;
+                        actionPanel.classList.remove('hidden');
+                        planetPanel.classList.remove('hidden');
+                        fleetPanel.classList.remove('hidden');
+                        updateTurnInfo();
+                        updatePanels();
+                        AudioSystem.sfx.select();
+                        AudioSystem.music.start('4x');
+                    }
                     return;
                 }
-            }
-            if (hasSaveGame && y >= CONFIG.HEIGHT / 2 + 70 && y <= CONFIG.HEIGHT / 2 + 100) {
-                clearSaveGame();
-                state = GameState.RACE_SELECT;
-                AudioSystem.sfx.select();
-                return;
-            }
-            if (!hasSaveGame) {
-                state = GameState.RACE_SELECT;
-                AudioSystem.sfx.select();
+                // New Game (y: +70 to +100)
+                if (y >= CONFIG.HEIGHT / 2 + 70 && y <= CONFIG.HEIGHT / 2 + 100) {
+                    clearSaveGame();
+                    state = GameState.RACE_SELECT;
+                    AudioSystem.sfx.select();
+                    return;
+                }
+                // Load Game (y: +110 to +140)
+                if (y >= CONFIG.HEIGHT / 2 + 110 && y <= CONFIG.HEIGHT / 2 + 140) {
+                    document.getElementById('loadFileInput').click();
+                    AudioSystem.sfx.select();
+                    return;
+                }
+            } else {
+                // New Game (y: +30 to +60)
+                if (y >= CONFIG.HEIGHT / 2 + 30 && y <= CONFIG.HEIGHT / 2 + 60) {
+                    state = GameState.RACE_SELECT;
+                    AudioSystem.sfx.select();
+                    return;
+                }
+                // Load Game (y: +70 to +100)
+                if (y >= CONFIG.HEIGHT / 2 + 70 && y <= CONFIG.HEIGHT / 2 + 100) {
+                    document.getElementById('loadFileInput').click();
+                    AudioSystem.sfx.select();
+                    return;
+                }
             }
             return;
         }

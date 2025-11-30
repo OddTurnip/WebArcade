@@ -252,16 +252,19 @@ function renderTitle() {
     ctx.font = '16px Courier New';
     ctx.fillText('Explore, Expand, Exploit, Exterminate', CONFIG.WIDTH / 2, 190);
 
+    ctx.font = '16px Courier New';
     if (hasSaveGame) {
         ctx.fillStyle = '#ffe66d';
-        ctx.font = '16px Courier New';
         ctx.fillText('[ Continue ]', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
         ctx.fillStyle = '#4ecdc4';
         ctx.fillText('[ New Game ]', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 90);
+        ctx.fillStyle = '#888';
+        ctx.fillText('[ Load Game ]', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 130);
     } else {
         ctx.fillStyle = '#ffe66d';
-        ctx.font = '14px Courier New';
-        ctx.fillText('Click to begin', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
+        ctx.fillText('[ New Game ]', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
+        ctx.fillStyle = '#888';
+        ctx.fillText('[ Load Game ]', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 90);
     }
 
     ctx.fillStyle = '#666';
