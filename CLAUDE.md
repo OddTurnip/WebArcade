@@ -213,6 +213,32 @@ Level-based: MENU → LEVEL_SELECT → PLAYING ↔ PAUSED → LEVEL_COMPLETE →
 - **PAUSED:** 250ms delay before unpause allowed (prevents flicker)
 - **GAME_OVER:** Show score, "NEW HIGH SCORE!" if applicable
 
+### View System (Galactic 4X)
+
+For games with multiple UI panels (like Galactic 4X), use a separate view state:
+```javascript
+const ViewState = {
+    OVERVIEW: 'overview',
+    PLANET: 'planet',
+    HISTORY: 'history'
+};
+let currentView = ViewState.OVERVIEW;
+```
+
+**Key principles:**
+- Views always update BOTH panels (left and right). Never leave one stale.
+- Each view renders its own panel titles dynamically (not in static HTML)
+- View buttons highlight the active view and grey out unavailable ones
+- Planet view requires a selected star; other views clear the selection
+
+**Panel structure:**
+```html
+<div id="planetPanel" class="side-panel">
+    <div id="planetContent" class="panel-content"></div>
+</div>
+<!-- Content is fully replaced by updatePlanetPanel() based on currentView -->
+```
+
 ### Audio Toggle UI
 ```html
 <div id="audioControls">
