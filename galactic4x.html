@@ -544,7 +544,8 @@
                 })),
                 nextShipId,
                 battleHistory,
-                eventHistory
+                eventHistory,
+                debugMode
             };
             try {
                 localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
@@ -584,6 +585,8 @@
                 nextShipId = data.nextShipId;
                 battleHistory = data.battleHistory || [];
                 eventHistory = data.eventHistory || [];
+                debugMode = data.debugMode || false;
+                document.getElementById('debugToggle').checked = debugMode;
                 return true;
             } catch (e) {
                 console.warn('Failed to load game:', e);
@@ -3411,6 +3414,7 @@
 
         document.getElementById('debugToggle').addEventListener('change', (e) => {
             debugMode = e.target.checked;
+            saveGameState();
         });
 
         AudioSystem.musicEnabled = gameData.musicEnabled;
