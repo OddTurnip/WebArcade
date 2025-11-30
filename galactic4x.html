@@ -1247,16 +1247,35 @@
         function moveShips(shipIds, destinationId) {
             const destStar = stars.find(s => s.id === destinationId);
             if (!destStar) return;
+
+            // Find the slowest ship speed among selected ships
+            let slowestSpeed = Infinity;
+            let originStar = null;
             for (const shipId of shipIds) {
                 const ship = ships.find(s => s.id === shipId);
                 if (!ship || ship.destination !== null) continue;
-                const originStar = stars.find(s => s.id === ship.location);
                 const shipType = SHIP_TYPES[ship.type];
-                const dist = Math.sqrt((destStar.x - originStar.x) ** 2 + (destStar.y - originStar.y) ** 2);
-                const turns = Math.max(1, Math.ceil(dist / (50 * shipType.speed)));
+                if (shipType.speed < slowestSpeed) {
+                    slowestSpeed = shipType.speed;
+                }
+                if (!originStar) {
+                    originStar = stars.find(s => s.id === ship.location);
+                }
+            }
+
+            if (!originStar || slowestSpeed === Infinity) return;
+
+            // Calculate travel time based on slowest ship
+            const dist = Math.sqrt((destStar.x - originStar.x) ** 2 + (destStar.y - originStar.y) ** 2);
+            const turns = Math.max(1, Math.ceil(dist / (50 * slowestSpeed)));
+
+            // Apply same travel time to all ships in the group
+            for (const shipId of shipIds) {
+                const ship = ships.find(s => s.id === shipId);
+                if (!ship || ship.destination !== null) continue;
                 ship.destination = destinationId;
                 ship.turnsToArrival = turns;
-                ship.totalTurns = turns; // Store total journey time for progress display
+                ship.totalTurns = turns;
             }
             AudioSystem.sfx.select();
             selectedShips = [];
@@ -2291,6 +2310,55 @@
                 html += `<div class="empty-state">No ships at this location</div>`;
             }
 
+            // Show departing fleets (ships ordered to move this turn, not yet departed)
+            const departingShips = ships.filter(s =>
+                s.location === star.id &&
+                s.destination !== null &&
+                s.owner === 'player' &&
+                s.turnsToArrival === s.totalTurns // Just ordered this turn
+            );
+
+            if (departingShips.length > 0) {
+                html += `<div style="margin-top:10px" class="panel-title">Departing</div>`;
+
+                // Group by destination and ETA
+                const fleetGroups = new Map(); // "destId-eta" -> ships[]
+                for (const ship of departingShips) {
+                    const key = `${ship.destination}-${ship.turnsToArrival}`;
+                    if (!fleetGroups.has(key)) {
+                        fleetGroups.set(key, []);
+                    }
+                    fleetGroups.get(key).push(ship);
+                }
+
+                for (const [key, fleetShips] of fleetGroups) {
+                    const destStar = stars.find(s => s.id === fleetShips[0].destination);
+                    const eta = fleetShips[0].turnsToArrival;
+
+                    // Group ships by type for this fleet
+                    const typeCount = {};
+                    for (const ship of fleetShips) {
+                        typeCount[ship.type] = (typeCount[ship.type] || 0) + 1;
+                    }
+
+                    // Build ship list string
+                    const shipList = getShipTypeOrder()
+                        .filter(t => typeCount[t])
+                        .map(t => `${typeCount[t]} ${SHIP_TYPES[t].name}${typeCount[t] > 1 ? 's' : ''}`)
+                        .join(', ');
+
+                    const shipIds = fleetShips.map(s => s.id).join(',');
+
+                    html += `<div style="background:#252540;border-radius:6px;padding:8px;margin:4px 0;border-left:3px solid #ffe66d;">`;
+                    html += `<div style="font-size:10px;color:#fff;margin-bottom:4px;">${shipList}</div>`;
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                    html += `<span style="font-size:10px;color:#ffe66d;">→ ${destStar?.name || 'Unknown'}, ${eta} year${eta > 1 ? 's' : ''}</span>`;
+                    html += `<button class="btn btn-sm" style="color:#ff6b6b;padding:2px 6px;font-size:9px;" onclick="cancelFleet([${shipIds}])">❌ Cancel</button>`;
+                    html += `</div>`;
+                    html += `</div>`;
+                }
+            }
+
             if (incomingShips.length > 0) {
                 html += `<div style="margin-top:10px" class="panel-title">Incoming</div>`;
                 // Group incoming by type too
@@ -2581,6 +2649,20 @@
             }
             destinationStar = null;
             updatePanels();
+        };
+
+        window.cancelFleet = function(shipIds) {
+            for (const shipId of shipIds) {
+                const ship = ships.find(s => s.id === shipId);
+                if (ship && ship.owner === 'player') {
+                    ship.destination = null;
+                    ship.turnsToArrival = 0;
+                    ship.totalTurns = 0;
+                }
+            }
+            AudioSystem.sfx.select();
+            updatePanels();
+            saveGameState();
         };
 
         window.selectShipsOfType = function(type, count) {
@@ -2883,6 +2965,34 @@
                     updatePanels();
                 }
                 // If ships are selected and clicking empty space, do nothing (keep selection)
+            }
+        });
+
+        canvas.addEventListener('dblclick', (e) => {
+            if (state !== GameState.PLAYING) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left - 4;
+            const y = e.clientY - rect.top - 4;
+            const clickedStar = getStarAtPosition(x, y);
+
+            if (!clickedStar) return;
+
+            // If ships are selected, double-click moves them to that destination
+            if (selectedShips.length > 0 && clickedStar !== selectedStar) {
+                moveShips(selectedShips, clickedStar.id);
+                return;
+            }
+
+            // If no ships selected, double-click selects all player ships at that star
+            const playerShipsHere = getShipsAtStar(clickedStar.id).filter(s => s.owner === 'player');
+            if (playerShipsHere.length > 0) {
+                selectedStar = clickedStar;
+                selectedShips = playerShipsHere.map(s => s.id);
+                destinationStar = null;
+                currentView = ViewState.COLONY;
+                AudioSystem.sfx.select();
+                updatePanels();
             }
         });
 
