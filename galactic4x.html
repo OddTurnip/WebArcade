@@ -1,0 +1,3632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galactic 4X</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+            padding: 10px;
+        }
+        h1 { margin-bottom: 10px; color: #4ecdc4; }
+        #gameContainer {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        #centerColumn {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            display: block;
+            cursor: pointer;
+        }
+        #actionPanel {
+            background: #1a1a2e;
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        #actionPanel.hidden { display: none; }
+        .side-panel {
+            width: 240px;
+            background: #1a1a2e;
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            padding: 12px;
+            height: 652px;
+            display: flex;
+            flex-direction: column;
+        }
+        .side-panel.hidden { display: none; }
+        .panel-title {
+            color: #4ecdc4;
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #4a4a6a;
+            padding-bottom: 4px;
+        }
+        .panel-subtitle {
+            color: #888;
+            font-size: 10px;
+            margin-bottom: 8px;
+        }
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+            font-size: 10px;
+        }
+        .info-label { color: #888; }
+        .info-value { color: #ffe66d; }
+        .slider-container {
+            margin: 6px 0;
+            padding: 6px;
+            background: #252540;
+            border-radius: 4px;
+        }
+        .slider-container.locked-auto {
+            background: #1a1a25;
+            opacity: 0.6;
+        }
+        .slider-container.locked-noship {
+            background: #2a2520;
+            border: 1px solid #665500;
+        }
+        .slider-container.locked-user {
+            background: #2a2a35;
+            border: 1px solid #888;
+        }
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3px;
+        }
+        .slider-label {
+            font-size: 10px;
+            color: #888;
+        }
+        .slider-value {
+            color: #4ecdc4;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .lock-btn {
+            background: none;
+            border: 1px solid #666;
+            color: #666;
+            width: 18px;
+            height: 18px;
+            font-size: 9px;
+            cursor: pointer;
+            border-radius: 3px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .lock-btn:hover { border-color: #888; color: #888; }
+        .lock-btn.locked { border-color: #aaa; color: #aaa; background: #3a3a4a; }
+        .lock-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+        .slider-production {
+            font-size: 9px;
+            color: #4a9;
+            margin-top: 2px;
+        }
+        .lock-reason {
+            font-size: 8px;
+            color: #888;
+            font-style: italic;
+            margin-top: 1px;
+        }
+        .lock-reason.warning {
+            color: #cc8800;
+        }
+        input[type="range"] {
+            flex: 1;
+            height: 14px;
+            -webkit-appearance: none;
+            background: #2a2a4a;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        input[type="range"]:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #4ecdc4;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        input[type="range"]:disabled::-webkit-slider-thumb {
+            background: #666;
+        }
+        .btn {
+            background: #2a2a4a;
+            border: 2px solid #4ecdc4;
+            color: #4ecdc4;
+            padding: 6px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 3px 2px;
+            transition: all 0.2s;
+        }
+        .btn:hover:not(:disabled) {
+            background: #4ecdc4;
+            color: #1a1a2e;
+        }
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .btn-sm {
+            padding: 3px 6px;
+            font-size: 9px;
+            margin: 2px;
+        }
+        .btn-primary {
+            background: #4ecdc4;
+            color: #1a1a2e;
+            font-weight: bold;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #6fefe6;
+        }
+        .btn-danger {
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+        .btn-danger:hover:not(:disabled) {
+            background: #ff6b6b;
+            color: #1a1a2e;
+        }
+        .ship-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 6px;
+            margin: 2px 0;
+            background: #252540;
+            border-radius: 3px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        .ship-item.selected {
+            background: #2a4a4a;
+            border: 1px solid #4ecdc4;
+        }
+        .build-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            margin: 8px 0;
+        }
+        .build-btn {
+            padding: 4px;
+            font-size: 9px;
+        }
+        #controls {
+            margin-top: 10px;
+            font-size: 10px;
+            color: #888;
+            text-align: center;
+            max-width: 950px;
+            line-height: 1.5;
+        }
+        #audioControls {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #888;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        #audioControls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #4ecdc4;
+        }
+        #aboutSection {
+            margin-top: 10px;
+            max-width: 700px;
+            background: #1a1a2e;
+            border: 2px solid #4a4a6a;
+            border-radius: 4px;
+            padding: 12px;
+        }
+        #aboutSection h3 {
+            color: #4ecdc4;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        #aboutSection h4 {
+            color: #4ecdc4;
+            font-size: 13px;
+            margin: 16px 0 8px 0;
+            padding-top: 12px;
+            border-top: 1px solid #4a4a6a;
+        }
+        #aboutSection p {
+            font-size: 13px;
+            color: #aaa;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+        #aboutSection strong {
+            color: #ffe66d;
+        }
+        #aboutSection table {
+            font-size: 13px;
+        }
+        .travel-info {
+            background: #252540;
+            border: 1px solid #4a4a6a;
+            border-radius: 4px;
+            padding: 6px;
+            margin: 6px 0;
+            font-size: 10px;
+        }
+        .travel-info .distance { color: #4a9fff; }
+        .travel-info .turns { color: #ffe66d; }
+        .fleet-actions {
+            margin-top: auto;
+            padding-top: 8px;
+            border-top: 1px solid #4a4a6a;
+        }
+        .empty-state {
+            color: #666;
+            font-size: 10px;
+            text-align: center;
+            padding: 20px 10px;
+        }
+        .destination-highlight {
+            color: #ffe66d;
+            font-size: 10px;
+            margin: 6px 0;
+            padding: 6px;
+            background: #2a2520;
+            border-radius: 4px;
+        }
+        .hidden { display: none !important; }
+        #gameModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        #gameModal.hidden { display: none; }
+        .modal-content {
+            background: #1a1a2e;
+            border: 4px solid #4a4a6a;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-content.wide {
+            width: 600px;
+            max-width: 600px;
+            text-align: center;
+        }
+        .modal-content h3 {
+            color: #ffe66d;
+            margin-bottom: 15px;
+        }
+        .modal-content pre {
+            text-align: left;
+            color: #aaa;
+            font-size: 12px;
+            line-height: 1.5;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        .modal-content button {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameModal" class="hidden">
+        <div class="modal-content">
+            <h3 id="modalTitle"></h3>
+            <pre id="modalBody"></pre>
+            <button class="btn btn-primary" onclick="closeModal()">OK</button>
+        </div>
+    </div>
+    <div id="gameContainer">
+        <div id="planetPanel" class="side-panel hidden">
+            <div id="planetContent" class="panel-content"></div>
+        </div>
+        <div id="centerColumn">
+            <canvas id="gameCanvas" width="640" height="550"></canvas>
+            <div id="actionPanel" class="hidden">
+                <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;">
+                    <div id="viewButtons" style="display:flex;gap:10px;align-items:center;"></div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <button class="btn" id="globalExploreBtn" onclick="window.globalExplore()" style="display:none;">Explore</button>
+                        <button class="btn btn-primary" id="endTurnBtn" onclick="window.endTurn()">End Year</button>
+                    </div>
+                </div>
+                <div id="turnInfo" style="color:#888;font-size:11px;margin-top:6px;"></div>
+            </div>
+        </div>
+        <div id="fleetPanel" class="side-panel hidden">
+            <div id="fleetContent" class="panel-content"></div>
+            <div class="fleet-actions" id="fleetActions"></div>
+        </div>
+    </div>
+    <div id="controls">
+        <strong>Mouse:</strong> Click stars to select | Select ships, then click destination | <strong>Keyboard:</strong> Enter = End Turn | Escape = Deselect
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+        <label><input type="checkbox" id="debugToggle"> Debug</label>
+        <span style="margin-left:10px;">|</span>
+        <button class="btn btn-sm" style="margin-left:10px;padding:2px 8px;" onclick="saveToFile()">Save</button>
+        <button class="btn btn-sm" style="padding:2px 8px;" onclick="document.getElementById('loadFileInput').click()">Load</button>
+        <input type="file" id="loadFileInput" accept=".g4x,.json" style="display:none;" onchange="loadFromFile(event)">
+    </div>
+    <div id="aboutSection">
+        <h3>How to Play</h3>
+        <p><strong>Industry</strong> represents your colony's manufacturing capacity (0-100%). Higher industry = more production output per year.</p>
+        <p><strong>Population</strong> is your workforce. More population = more base production. Each planet has a max population based on its type.</p>
+        <p><strong>Production Formula:</strong> Base = Population x (Industry/100) x Planet Modifier. This is split according to your sliders.</p>
+        <p><strong>Slider Locks:</strong> Click 🔓 to lock a slider. Locked sliders won't change when you adjust others.</p>
+
+        <h4>Production Costs</h4>
+        <table style="width:100%;border-collapse:collapse;margin:8px 0;">
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Population</td><td style="padding:4px;text-align:right;">~3.3 Ecology</td></tr>
+            <tr><td style="padding:4px;">+1% Industry</td><td style="padding:4px;text-align:right;">~2 Industry</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">+1 Defense</td><td style="padding:4px;text-align:right;">20 Defense</td></tr>
+        </table>
+
+        <h4>Ship Stats</h4>
+        <table style="width:100%;border-collapse:collapse;margin:8px 0;">
+            <tr style="background:#2a2a4a;font-weight:bold;"><td style="padding:4px;">Ship</td><td style="padding:4px;">Cost</td><td style="padding:4px;">Move</td><td style="padding:4px;">Atk</td><td style="padding:4px;">HP</td></tr>
+            <tr><td style="padding:4px;">Colony Ship</td><td style="padding:4px;">200</td><td style="padding:4px;">1</td><td style="padding:4px;">0</td><td style="padding:4px;">1</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Battleship</td><td style="padding:4px;">500</td><td style="padding:4px;">1</td><td style="padding:4px;">30</td><td style="padding:4px;">100</td></tr>
+            <tr><td style="padding:4px;">Cruiser</td><td style="padding:4px;">250</td><td style="padding:4px;">2</td><td style="padding:4px;">10</td><td style="padding:4px;">30</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Destroyer</td><td style="padding:4px;">100</td><td style="padding:4px;">2</td><td style="padding:4px;">6</td><td style="padding:4px;">12</td></tr>
+            <tr><td style="padding:4px;">Fighter</td><td style="padding:4px;">50</td><td style="padding:4px;">3</td><td style="padding:4px;">2</td><td style="padding:4px;">4</td></tr>
+            <tr style="background:#2a2a4a;"><td style="padding:4px;">Scout</td><td style="padding:4px;">25</td><td style="padding:4px;">3</td><td style="padding:4px;">1</td><td style="padding:4px;">2</td></tr>
+        </table>
+    </div>
+
+    <script src="controller.js"></script>
+    <script src="audio.js"></script>
+    <script src="storage.js"></script>
+    <script>
+        // ============================================
+        // GAME CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            WIDTH: 640,
+            HEIGHT: 550,
+            STAR_COUNT: 24,
+            MIN_STAR_DISTANCE: 60,
+            PARSEC_SCALE: 10,
+            COLORS: {
+                background: '#0a0a1a',
+                grid: '#1a1a2e',
+                starYellow: '#ffe66d',
+                starRed: '#ff6b6b',
+                starBlue: '#4a9fff',
+                starWhite: '#ffffff',
+                text: '#ffffff',
+                textHighlight: '#ffe66d',
+                playerHighlight: '#4ecdc4',
+                unexplored: '#666666',
+                destination: '#ffe66d'
+            }
+        };
+
+        const PLANET_TYPES = {
+            terran: { name: 'Terran', maxPop: 100, industryMod: 1.0, ecoMod: 1.0, color: '#4ecdc4' },
+            ocean: { name: 'Ocean', maxPop: 90, industryMod: 0.9, ecoMod: 1.1, color: '#4a9fff' },
+            jungle: { name: 'Jungle', maxPop: 80, industryMod: 0.85, ecoMod: 1.2, color: '#2e8b57' },
+            arid: { name: 'Arid', maxPop: 60, industryMod: 0.8, ecoMod: 0.7, color: '#daa520' },
+            desert: { name: 'Desert', maxPop: 50, industryMod: 0.7, ecoMod: 0.6, color: '#c2b280' },
+            tundra: { name: 'Tundra', maxPop: 40, industryMod: 0.6, ecoMod: 0.5, color: '#b0e0e6' },
+            barren: { name: 'Barren', maxPop: 30, industryMod: 0.5, ecoMod: 0.3, color: '#808080' },
+            inferno: { name: 'Inferno', maxPop: 20, industryMod: 0.4, ecoMod: 0.2, color: '#ff4500' },
+            toxic: { name: 'Toxic', maxPop: 15, industryMod: 0.3, ecoMod: 0.1, color: '#7cfc00' }
+        };
+
+        const SHIP_TYPES = {
+            scout: { name: 'Scout', cost: 25, speed: 3, attack: 1, health: 2, icon: 'S', military: false },
+            fighter: { name: 'Fighter', cost: 50, speed: 3, attack: 2, health: 4, icon: 'F', military: true },
+            destroyer: { name: 'Destroyer', cost: 100, speed: 2, attack: 6, health: 12, icon: 'D', military: true },
+            cruiser: { name: 'Cruiser', cost: 250, speed: 2, attack: 10, health: 30, icon: 'R', military: true },
+            battleship: { name: 'Battleship', cost: 500, speed: 1, attack: 30, health: 100, icon: 'B', military: true },
+            colony: { name: 'Colony Ship', cost: 200, speed: 1, attack: 0, health: 1, icon: 'C', colonize: true, military: false }
+        };
+
+        // Get ship types in display order: Colony first, then descending by cost
+        function getShipTypeOrder() {
+            const types = Object.keys(SHIP_TYPES);
+            return types.sort((a, b) => {
+                if (a === 'colony') return -1;
+                if (b === 'colony') return 1;
+                return SHIP_TYPES[b].cost - SHIP_TYPES[a].cost;
+            });
+        }
+
+        const RACES = [
+            { id: 'terran', name: 'Terran Federation', shortName: 'Terran', color: '#4ecdc4', desc: 'Adaptable and expansionist humans' },
+            { id: 'crystalline', name: 'Crystalline Collective', shortName: 'Crystal', color: '#9932cc', desc: 'Silicon-based mineral lifeforms' },
+            { id: 'aquan', name: 'Aquan Dominion', shortName: 'Aquan', color: '#4a9fff', desc: 'Ocean-dwelling telepaths' },
+            { id: 'hivemind', name: 'Hive Swarm', shortName: 'Swarm', color: '#ffa500', desc: 'Unified insectoid consciousness' },
+            { id: 'aviari', name: 'Aviari Consortium', shortName: 'Aviari', color: '#ffe66d', desc: 'Elegant avian traders' },
+            { id: 'saurian', name: 'Saurian Empire', shortName: 'Saurian', color: '#ff6b6b', desc: 'Ancient reptilian warriors' }
+        ];
+
+        const STAR_NAMES = [
+            'Sol', 'Alpha', 'Proxima', 'Vega', 'Sirius', 'Rigel', 'Deneb', 'Altair',
+            'Polaris', 'Arcturus', 'Capella', 'Betelgeuse', 'Aldebaran', 'Antares',
+            'Spica', 'Procyon', 'Canopus', 'Achernar', 'Hadar', 'Acrux', 'Mimosa',
+            'Regulus', 'Adhara', 'Shaula', 'Castor', 'Bellatrix', 'Elnath', 'Miaplacidus',
+            'Alnilam', 'Alnitak', 'Alioth', 'Dubhe', 'Mirfak', 'Wezen', 'Kaus', 'Sargas'
+        ];
+
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        const GAME_ID = 'galactic4x';
+        const SAVE_KEY = 'galactic4x_save';
+        const SAVE_VERSION = 1; // Increment when save format changes
+
+        let gameData = GameStorage.load(GAME_ID, {
+            ...GameStorage.defaults.arcade(),
+            gamesWon: 0
+        });
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        function saveGameState() {
+            if (state !== GameState.PLAYING) return;
+            const saveData = {
+                version: SAVE_VERSION,
+                year,
+                player: { race: player.race, color: player.color },
+                stars: stars.map(s => ({
+                    id: s.id, name: s.name, x: s.x, y: s.y,
+                    starType: s.starType, planetType: s.planetType,
+                    owner: s.owner, explored: s.explored,
+                    population: s.population, industry: s.industry, defense: s.defense,
+                    defenseProgress: s.defenseProgress || 0,
+                    sliders: {...s.sliders}, lockedSliders: [...(s.lockedSliders || [])],
+                    shipProgress: {...s.shipProgress}, buildingShip: s.buildingShip,
+                    colonizedYear: s.colonizedYear, aiPhase: s.aiPhase
+                })),
+                ships: ships.map(s => ({
+                    id: s.id, type: s.type, owner: s.owner,
+                    location: s.location, destination: s.destination,
+                    turnsToArrival: s.turnsToArrival, totalTurns: s.totalTurns
+                })),
+                nextShipId,
+                battleHistory,
+                eventHistory,
+                debugMode,
+                // Combat state (v1+)
+                combatThisTurn,
+                shipsInCombatThisTurn: [...shipsInCombatThisTurn]
+            };
+            try {
+                localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+            } catch (e) {
+                console.warn('Failed to save game:', e);
+            }
+        }
+
+        function loadGameState() {
+            try {
+                const saved = localStorage.getItem(SAVE_KEY);
+                if (!saved) return false;
+                const data = JSON.parse(saved);
+
+                // Version-aware loading (version 0 = pre-versioning saves)
+                const saveVersion = data.version || 0;
+
+                // Load common data (all versions)
+                year = data.turn || data.year; // Support old saves
+                player.race = data.player.race;
+                player.color = data.player.color;
+                stars = data.stars.map(s => {
+                    // Backwards compatibility: convert old number shipProgress to object
+                    let shipProgress = s.shipProgress;
+                    if (typeof shipProgress === 'number') {
+                        shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+                        if (s.buildingShip && shipProgress[s.buildingShip] !== undefined) {
+                            shipProgress[s.buildingShip] = s.shipProgress;
+                        }
+                    }
+                    // Ensure new ship types exist in shipProgress
+                    const defaultProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+                    shipProgress = { ...defaultProgress, ...(shipProgress || {}) };
+                    return {
+                        ...s,
+                        lockedSliders: s.lockedSliders || [],
+                        shipProgress: shipProgress,
+                        defenseProgress: s.defenseProgress || 0
+                    };
+                });
+                ships = data.ships;
+                nextShipId = data.nextShipId;
+                battleHistory = data.battleHistory || [];
+                eventHistory = data.eventHistory || [];
+                debugMode = data.debugMode || false;
+                document.getElementById('debugToggle').checked = debugMode;
+
+                // Version 1+ fields: combat state
+                if (saveVersion >= 1) {
+                    combatThisTurn = data.combatThisTurn || false;
+                    shipsInCombatThisTurn = new Set(data.shipsInCombatThisTurn || []);
+                } else {
+                    // Pre-v1 saves: reset combat state (safe default)
+                    combatThisTurn = false;
+                    shipsInCombatThisTurn = new Set();
+                }
+
+                return true;
+            } catch (e) {
+                console.warn('Failed to load game:', e);
+                return false;
+            }
+        }
+
+        function clearSaveGame() {
+            localStorage.removeItem(SAVE_KEY);
+        }
+
+        // File-based save/load
+        window.saveToFile = function() {
+            if (state !== GameState.PLAYING) {
+                alert('No game in progress to save.');
+                return;
+            }
+            const saveData = {
+                version: SAVE_VERSION,
+                year,
+                player: { race: player.race, color: player.color },
+                stars: stars.map(s => ({
+                    id: s.id, name: s.name, x: s.x, y: s.y,
+                    starType: s.starType, planetType: s.planetType,
+                    owner: s.owner, explored: s.explored,
+                    population: s.population, industry: s.industry, defense: s.defense,
+                    defenseProgress: s.defenseProgress || 0,
+                    sliders: {...s.sliders}, lockedSliders: [...(s.lockedSliders || [])],
+                    shipProgress: {...s.shipProgress}, buildingShip: s.buildingShip,
+                    colonizedYear: s.colonizedYear, aiPhase: s.aiPhase
+                })),
+                ships: ships.map(s => ({
+                    id: s.id, type: s.type, owner: s.owner,
+                    location: s.location, destination: s.destination,
+                    turnsToArrival: s.turnsToArrival, totalTurns: s.totalTurns
+                })),
+                nextShipId,
+                battleHistory,
+                eventHistory,
+                debugMode,
+                combatThisTurn,
+                shipsInCombatThisTurn: [...shipsInCombatThisTurn]
+            };
+
+            const json = JSON.stringify(saveData, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const raceName = player.race?.shortName || 'Unknown';
+            a.download = `galactic4x_${raceName}_year${year}.g4x`;
+            a.click();
+            URL.revokeObjectURL(url);
+            AudioSystem.sfx.select();
+        };
+
+        window.loadFromFile = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    const saveVersion = data.version || 0;
+
+                    // Load the data
+                    year = data.turn || data.year;
+                    player.race = data.player.race;
+                    player.color = data.player.color;
+                    stars = data.stars.map(s => {
+                        let shipProgress = s.shipProgress;
+                        if (typeof shipProgress === 'number') {
+                            shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+                        }
+                        const defaultProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+                        shipProgress = { ...defaultProgress, ...(shipProgress || {}) };
+                        return {
+                            ...s,
+                            lockedSliders: s.lockedSliders || [],
+                            shipProgress: shipProgress,
+                            defenseProgress: s.defenseProgress || 0
+                        };
+                    });
+                    ships = data.ships;
+                    nextShipId = data.nextShipId;
+                    battleHistory = data.battleHistory || [];
+                    eventHistory = data.eventHistory || [];
+                    debugMode = data.debugMode || false;
+                    document.getElementById('debugToggle').checked = debugMode;
+
+                    if (saveVersion >= 1) {
+                        combatThisTurn = data.combatThisTurn || false;
+                        shipsInCombatThisTurn = new Set(data.shipsInCombatThisTurn || []);
+                    } else {
+                        combatThisTurn = false;
+                        shipsInCombatThisTurn = new Set();
+                    }
+
+                    // Start the game
+                    state = GameState.PLAYING;
+                    actionPanel.classList.remove('hidden');
+                    planetPanel.classList.remove('hidden');
+                    fleetPanel.classList.remove('hidden');
+                    currentView = ViewState.OVERVIEW;
+                    selectedStar = null;
+                    selectedShips = [];
+                    destinationStar = null;
+                    updateTurnInfo();
+                    updatePanels();
+                    saveGameState(); // Save to localStorage too
+                    AudioSystem.sfx.levelComplete();
+                    AudioSystem.music.start('4x');
+                } catch (err) {
+                    alert('Failed to load save file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        };
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        const GameState = {
+            TITLE: 'title',
+            RACE_SELECT: 'race_select',
+            PLAYING: 'playing',
+            END_TURN: 'end_turn'
+        };
+
+        const ViewState = {
+            OVERVIEW: 'overview',
+            PLANETS: 'planets',
+            COLONY: 'colony',
+            HISTORY: 'history'
+        };
+
+        let state = GameState.TITLE;
+        let year = 1;
+
+        let player = {
+            race: null,
+            color: '#4ecdc4'
+        };
+
+        let stars = [];
+        let ships = [];
+        let nextShipId = 1;
+
+        // UI state
+        let selectedStar = null;
+        let selectedShips = [];
+        let destinationStar = null; // NEW: target for move
+        let hoveredStar = null;
+        let raceSelectIndex = 0;
+        let hasSaveGame = false;
+        let overviewSort = 'name'; // 'name', 'age', 'dev', 'defense'
+        let planetsSort = 'type'; // 'type', 'fleet'
+        let combatThisTurn = false; // Track if combat happened this turn
+        let shipsInCombatThisTurn = new Set(); // Ships that fought can't move
+        let battleHistory = []; // History of battles
+        let eventHistory = []; // History of events (scouting, colonization, ships built)
+        let currentView = ViewState.OVERVIEW;
+        let shipsBuiltThisTurn = {}; // Track ships built this turn by type
+        let debugMode = false; // Debug mode for detailed combat logs
+
+        // DOM references
+        const planetPanel = document.getElementById('planetPanel');
+        const planetContent = document.getElementById('planetContent');
+        const fleetPanel = document.getElementById('fleetPanel');
+        const fleetContent = document.getElementById('fleetContent');
+        const fleetActions = document.getElementById('fleetActions');
+        const actionPanel = document.getElementById('actionPanel');
+        const viewButtons = document.getElementById('viewButtons');
+        const turnInfo = document.getElementById('turnInfo');
+        const globalExploreBtn = document.getElementById('globalExploreBtn');
+        const gameModal = document.getElementById('gameModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const canvas = document.getElementById('gameCanvas');
+
+        function showModal(title, body) {
+            modalTitle.textContent = title;
+            // Escape HTML and highlight [DESTROYED] in red
+            const escaped = body
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\[DESTROYED\]/g, '<span style="color:#ff6b6b">[DESTROYED]</span>');
+            modalBody.innerHTML = escaped;
+            // Use wider modal in debug mode for longer combat log lines
+            const modalContent = gameModal.querySelector('.modal-content');
+            if (debugMode) {
+                modalContent.classList.add('wide');
+            } else {
+                modalContent.classList.remove('wide');
+            }
+            gameModal.classList.remove('hidden');
+        }
+
+        window.closeModal = function() {
+            gameModal.classList.add('hidden');
+        };
+        const ctx = canvas.getContext('2d');
+
+        // ============================================
+        // GALAXY GENERATION
+        // ============================================
+        function generateGalaxy() {
+            stars = [];
+            ships = [];
+            nextShipId = 1;
+            const shuffledNames = [...STAR_NAMES].sort(() => Math.random() - 0.5);
+
+            for (let i = 0; i < CONFIG.STAR_COUNT; i++) {
+                let attempts = 0;
+                let x, y, valid;
+
+                do {
+                    x = 50 + Math.random() * (CONFIG.WIDTH - 100);
+                    y = 50 + Math.random() * (CONFIG.HEIGHT - 100);
+                    valid = true;
+                    for (const star of stars) {
+                        const dist = Math.sqrt((x - star.x) ** 2 + (y - star.y) ** 2);
+                        if (dist < CONFIG.MIN_STAR_DISTANCE) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    attempts++;
+                } while (!valid && attempts < 100);
+
+                if (!valid) continue;
+
+                const starTypes = ['yellow', 'red', 'blue', 'white'];
+                const starType = starTypes[Math.floor(Math.random() * starTypes.length)];
+
+                let planetType;
+                const roll = Math.random();
+                if (roll < 0.1) planetType = 'terran';
+                else if (roll < 0.2) planetType = 'ocean';
+                else if (roll < 0.35) planetType = 'jungle';
+                else if (roll < 0.5) planetType = 'arid';
+                else if (roll < 0.65) planetType = 'desert';
+                else if (roll < 0.75) planetType = 'tundra';
+                else if (roll < 0.85) planetType = 'barren';
+                else if (roll < 0.93) planetType = 'inferno';
+                else planetType = 'toxic';
+
+                stars.push({
+                    id: i,
+                    name: shuffledNames[i] || `Star-${i}`,
+                    x: x,
+                    y: y,
+                    starType: starType,
+                    planetType: planetType,
+                    owner: null,
+                    explored: false,
+                    population: 0,
+                    industry: 0,
+                    defense: 0,
+                    defenseProgress: 0,
+                    // Default sliders: 50% eco, 50% industry (no ship production until queued)
+                    sliders: { ship: 0, def: 0, ind: 50, eco: 50 },
+                    lockedSliders: [],
+                    shipProgress: { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 },
+                    buildingShip: null
+                });
+            }
+
+            let homeStar = stars.find(s => s.planetType === 'terran') ||
+                           stars.find(s => s.planetType === 'ocean') ||
+                           stars[0];
+
+            homeStar.owner = 'player';
+            homeStar.explored = true;
+            homeStar.population = 40;
+            homeStar.industry = 20;
+            homeStar.defense = 5;
+            homeStar.planetType = 'terran';
+            homeStar.colonizedYear = 1;
+
+            ships.push({
+                id: nextShipId++,
+                type: 'scout',
+                owner: 'player',
+                location: homeStar.id,
+                destination: null,
+                turnsToArrival: 0
+            });
+            ships.push({
+                id: nextShipId++,
+                type: 'scout',
+                owner: 'player',
+                location: homeStar.id,
+                destination: null,
+                turnsToArrival: 0
+            });
+            ships.push({
+                id: nextShipId++,
+                type: 'colony',
+                owner: 'player',
+                location: homeStar.id,
+                destination: null,
+                turnsToArrival: 0
+            });
+
+            // Get enemy factions (all races except player's)
+            const enemyRaces = RACES.filter(r => r.id !== player.race.id);
+            const militaryShipTypes = Object.keys(SHIP_TYPES).filter(k => SHIP_TYPES[k].military);
+
+            // Add random military ship guardians to each non-player planet
+            for (const star of stars) {
+                if (star.id === homeStar.id) continue; // Skip player's home
+                if (PLANET_TYPES[star.planetType].maxPop === 0) continue; // Skip uninhabitable
+
+                const randomEnemy = enemyRaces[Math.floor(Math.random() * enemyRaces.length)];
+                const randomShipType = militaryShipTypes[Math.floor(Math.random() * militaryShipTypes.length)];
+
+                ships.push({
+                    id: nextShipId++,
+                    type: randomShipType,
+                    owner: randomEnemy.id,
+                    location: star.id,
+                    destination: null,
+                    turnsToArrival: 0
+                });
+            }
+
+            // Pick one enemy faction to get a homeworld
+            const enemyWithHomeworld = enemyRaces[Math.floor(Math.random() * enemyRaces.length)];
+
+            // Find a good planet for enemy homeworld (prefer terran/ocean, away from player)
+            const candidatePlanets = stars.filter(s =>
+                s.id !== homeStar.id &&
+                PLANET_TYPES[s.planetType].maxPop >= 80
+            );
+
+            if (candidatePlanets.length > 0) {
+                // Sort by distance from player (prefer far away)
+                candidatePlanets.sort((a, b) => {
+                    const distA = Math.hypot(a.x - homeStar.x, a.y - homeStar.y);
+                    const distB = Math.hypot(b.x - homeStar.x, b.y - homeStar.y);
+                    return distB - distA;
+                });
+
+                const enemyHome = candidatePlanets[0];
+                enemyHome.owner = enemyWithHomeworld.id;
+                enemyHome.population = 40;
+                enemyHome.industry = 20;
+                enemyHome.defense = 5;
+                enemyHome.colonizedYear = 1;
+                enemyHome.sliders = { ship: 0, def: 0, ind: 50, eco: 50 }; // Start with industry/eco
+                enemyHome.aiPhase = 'growth'; // Track AI production phase
+
+                // Remove any guardian ship at enemy homeworld (they own it)
+                ships = ships.filter(s => !(s.location === enemyHome.id && s.owner !== 'player'));
+
+                // Give enemy a starting fleet at their homeworld
+                ships.push({
+                    id: nextShipId++,
+                    type: 'destroyer',
+                    owner: enemyWithHomeworld.id,
+                    location: enemyHome.id,
+                    destination: null,
+                    turnsToArrival: 0
+                });
+            }
+        }
+
+        // ============================================
+        // GAME LOGIC
+        // ============================================
+        function initGame() {
+            year = 1;
+            selectedStar = null;
+            selectedShips = [];
+            destinationStar = null;
+            battleHistory = [];
+            eventHistory = [];
+            shipsBuiltThisTurn = {};
+            currentView = ViewState.OVERVIEW;
+            generateGalaxy();
+            actionPanel.classList.remove('hidden');
+            planetPanel.classList.remove('hidden');
+            fleetPanel.classList.remove('hidden');
+            updateTurnInfo();
+            updatePanels();
+        }
+
+        function updateTurnInfo() {
+            const colonies = getPlayerColonies();
+            const totalShips = ships.filter(s => s.owner === 'player').length;
+
+            // Calculate total production and max production for player's colonies
+            let totalProduction = 0;
+            let maxColonyProduction = 0;
+
+            for (const colony of colonies) {
+                const planetInfo = PLANET_TYPES[colony.planetType];
+                // Current production = population * (industry/100) * industryMod
+                const colonyProd = colony.population * (colony.industry / 100) * planetInfo.industryMod;
+                totalProduction += colonyProd;
+
+                // Max production for this colony if fully developed
+                maxColonyProduction += planetInfo.maxPop * 1.0 * planetInfo.industryMod;
+            }
+
+            // Calculate max possible production for entire map
+            let maxMapProduction = 0;
+            for (const star of stars) {
+                const planetInfo = PLANET_TYPES[star.planetType];
+                if (planetInfo.maxPop > 0) {
+                    maxMapProduction += planetInfo.maxPop * 1.0 * planetInfo.industryMod;
+                }
+            }
+
+            // Dev = how developed your colonies are (your prod / your max prod)
+            // Conquest = how much of map you control (your prod / map max prod)
+            const devPercent = maxColonyProduction > 0 ? Math.round((totalProduction / maxColonyProduction) * 100) : 0;
+            const conquestPercent = maxMapProduction > 0 ? Math.round((totalProduction / maxMapProduction) * 100) : 0;
+
+            turnInfo.textContent = `Year ${year} | Colonies: ${colonies.length} | Ships: ${totalShips} | Prod: ${Math.floor(totalProduction)}/year | Dev: ${devPercent}% | Conquest: ${conquestPercent}%`;
+
+            // Show/hide global explore button
+            const allScouts = ships.filter(s => s.owner === 'player' && s.type === 'scout' && s.destination === null);
+            const unexploredStars = stars.filter(s => !s.explored);
+            if (allScouts.length > 0 && unexploredStars.length > 0) {
+                globalExploreBtn.style.display = 'inline-block';
+                globalExploreBtn.textContent = `Explore (${allScouts.length})`;
+            } else {
+                globalExploreBtn.style.display = 'none';
+            }
+        }
+
+        function getShipsAtStar(starId) {
+            return ships.filter(s => s.location === starId && s.destination === null);
+        }
+
+        function getPlayerColonies() {
+            return stars.filter(s => s.owner === 'player');
+        }
+
+        function getFleetStrength(starId) {
+            const shipsAtStar = ships.filter(s => s.location === starId && !s.destination);
+            return shipsAtStar.reduce((sum, s) => sum + SHIP_TYPES[s.type].cost, 0);
+        }
+
+        function getFleetStrengthByOwner(starId, owner) {
+            const shipsAtStar = ships.filter(s => s.location === starId && !s.destination && s.owner === owner);
+            return shipsAtStar.reduce((sum, s) => sum + SHIP_TYPES[s.type].cost, 0);
+        }
+
+        function calculateProduction(star, overrideSliders = null) {
+            if (!star.owner) return null; // Unowned stars have no production
+            const planetInfo = PLANET_TYPES[star.planetType];
+            const baseProduction = star.population * (star.industry / 100) * planetInfo.industryMod;
+            const sliders = overrideSliders || star.sliders;
+            return {
+                ship: Math.floor(baseProduction * (sliders.ship / 100)),
+                def: Math.floor(baseProduction * (sliders.def / 100)),
+                ind: baseProduction * (sliders.ind / 100) * 0.5, // Keep decimal for gradual growth
+                eco: baseProduction * (sliders.eco / 100) * planetInfo.ecoMod * 0.3
+            };
+        }
+
+        function getSliderLockState(star, sliderKey) {
+            if (star.lockedSliders && star.lockedSliders.includes(sliderKey)) {
+                return { locked: true, type: 'user', reason: 'Locked by you' };
+            }
+            const planetInfo = PLANET_TYPES[star.planetType];
+            if (sliderKey === 'ind' && star.industry >= 100) {
+                return { locked: true, type: 'auto', reason: 'Industry maxed' };
+            }
+            if (sliderKey === 'eco' && star.population >= planetInfo.maxPop) {
+                return { locked: true, type: 'auto', reason: 'Population maxed' };
+            }
+            if (sliderKey === 'ship' && !star.buildingShip) {
+                return { locked: true, type: 'noship', reason: 'No ship queued' };
+            }
+            return { locked: false, type: null, reason: null };
+        }
+
+        function normalizeSliders(star, changedKey, newValue) {
+            const lockStates = {};
+            for (const key of Object.keys(star.sliders)) {
+                lockStates[key] = getSliderLockState(star, key);
+            }
+            star.sliders[changedKey] = newValue;
+            const unlockedKeys = Object.keys(star.sliders).filter(k =>
+                k !== changedKey && !lockStates[k].locked
+            );
+            const total = Object.values(star.sliders).reduce((a, b) => a + b, 0);
+            const diff = total - 100;
+            if (diff === 0 || unlockedKeys.length === 0) return;
+            const unlockedTotal = unlockedKeys.reduce((sum, k) => sum + star.sliders[k], 0);
+            if (unlockedTotal === 0) {
+                const perSlider = Math.floor(diff / unlockedKeys.length);
+                for (const key of unlockedKeys) {
+                    star.sliders[key] = Math.max(0, -perSlider);
+                }
+            } else {
+                for (const key of unlockedKeys) {
+                    const proportion = star.sliders[key] / unlockedTotal;
+                    star.sliders[key] = Math.max(0, Math.round(star.sliders[key] - diff * proportion));
+                }
+            }
+            const finalTotal = Object.values(star.sliders).reduce((a, b) => a + b, 0);
+            if (finalTotal !== 100 && unlockedKeys.length > 0) {
+                const adjustment = 100 - finalTotal;
+                for (const key of unlockedKeys) {
+                    if (star.sliders[key] > 0 || adjustment > 0) {
+                        star.sliders[key] = Math.max(0, star.sliders[key] + adjustment);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // When a slider becomes auto-locked (maxed), set it to 0 and redistribute
+        function redistributeAutoLockedSliders(star) {
+            const keys = ['ship', 'def', 'ind', 'eco'];
+            let changed = false;
+
+            for (const key of keys) {
+                const lockState = getSliderLockState(star, key);
+                // Only handle 'auto' locks (industry/population maxed)
+                if (lockState.type === 'auto' && star.sliders[key] > 0) {
+                    const valueToRedistribute = star.sliders[key];
+                    star.sliders[key] = 0;
+                    changed = true;
+
+                    // Find sliders that can receive this value
+                    // Priority: unlocked > noship > user-locked (override)
+                    const otherKeys = keys.filter(k => k !== key);
+
+                    // Get lock states for other sliders
+                    const otherLockStates = {};
+                    for (const k of otherKeys) {
+                        otherLockStates[k] = getSliderLockState(star, k);
+                    }
+
+                    // Try unlocked sliders first
+                    let receiverKeys = otherKeys.filter(k => !otherLockStates[k].locked);
+
+                    // If no unlocked, try noship sliders
+                    if (receiverKeys.length === 0) {
+                        receiverKeys = otherKeys.filter(k => otherLockStates[k].type === 'noship');
+                    }
+
+                    // If still nothing, override user locks
+                    if (receiverKeys.length === 0) {
+                        receiverKeys = otherKeys.filter(k => otherLockStates[k].type === 'user');
+                        // Remove the user lock since we're overriding it
+                        for (const k of receiverKeys) {
+                            if (star.lockedSliders) {
+                                star.lockedSliders = star.lockedSliders.filter(l => l !== k);
+                            }
+                        }
+                    }
+
+                    // If still nothing (all other sliders are also auto-locked), skip
+                    if (receiverKeys.length === 0) continue;
+
+                    // Redistribute proportionally to current values, or equally if all zero
+                    const receiverTotal = receiverKeys.reduce((sum, k) => sum + star.sliders[k], 0);
+                    if (receiverTotal === 0) {
+                        // Distribute equally
+                        const perSlider = Math.floor(valueToRedistribute / receiverKeys.length);
+                        let remainder = valueToRedistribute - (perSlider * receiverKeys.length);
+                        for (const k of receiverKeys) {
+                            star.sliders[k] += perSlider;
+                            if (remainder > 0) {
+                                star.sliders[k]++;
+                                remainder--;
+                            }
+                        }
+                    } else {
+                        // Distribute proportionally
+                        let distributed = 0;
+                        for (let i = 0; i < receiverKeys.length; i++) {
+                            const k = receiverKeys[i];
+                            if (i === receiverKeys.length - 1) {
+                                // Last one gets the remainder to ensure sum = 100
+                                star.sliders[k] += (valueToRedistribute - distributed);
+                            } else {
+                                const proportion = star.sliders[k] / receiverTotal;
+                                const amount = Math.round(valueToRedistribute * proportion);
+                                star.sliders[k] += amount;
+                                distributed += amount;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return changed;
+        }
+
+        function processTurn() {
+            state = GameState.END_TURN;
+
+            // Process player colonies
+            for (const star of getPlayerColonies()) {
+                const production = calculateProduction(star);
+                const planetInfo = PLANET_TYPES[star.planetType];
+                star.industry = Math.min(100, star.industry + production.ind);
+                const maxPop = planetInfo.maxPop;
+                if (star.population < maxPop) {
+                    star.population = Math.min(maxPop, star.population + production.eco);
+                }
+                // Defense uses defenseProgress for partial construction
+                if (!star.defenseProgress) star.defenseProgress = 0;
+                star.defenseProgress += production.def;
+                while (star.defenseProgress >= 20) {
+                    star.defense++;
+                    star.defenseProgress -= 20;
+                }
+                if (star.buildingShip) {
+                    const shipTypeKey = star.buildingShip;
+                    star.shipProgress[shipTypeKey] += production.ship;
+                    const shipType = SHIP_TYPES[shipTypeKey];
+                    let shipsBuilt = 0;
+                    // Build as many ships as production allows (with carry-over)
+                    while (star.shipProgress[shipTypeKey] >= shipType.cost) {
+                        ships.push({
+                            id: nextShipId++,
+                            type: shipTypeKey,
+                            owner: 'player',
+                            location: star.id,
+                            destination: null,
+                            turnsToArrival: 0
+                        });
+                        star.shipProgress[shipTypeKey] -= shipType.cost;
+                        shipsBuilt++;
+                        // Track ships built this turn
+                        shipsBuiltThisTurn[shipTypeKey] = (shipsBuiltThisTurn[shipTypeKey] || 0) + 1;
+                    }
+                    if (shipsBuilt > 0) {
+                        AudioSystem.sfx.powerUp();
+                    }
+                    // Keep building same ship type (no longer sets to null)
+                }
+                // Redistribute sliders if industry or population just maxed
+                redistributeAutoLockedSliders(star);
+            }
+
+            // Process AI colonies
+            for (const star of stars) {
+                if (star.owner === 'player' || !star.owner) continue;
+
+                const planetInfo = PLANET_TYPES[star.planetType];
+                const maxPop = planetInfo.maxPop;
+
+                // Ensure AI colony has required properties
+                if (!star.aiPhase) star.aiPhase = 'growth';
+                if (!star.sliders) star.sliders = { ship: 0, def: 0, ind: 50, eco: 50 };
+                if (!star.shipProgress) star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+                if (!star.defenseProgress) star.defenseProgress = 0;
+
+                // Check if growth phase is complete
+                if (star.aiPhase === 'growth') {
+                    if (star.industry >= 100 && star.population >= maxPop) {
+                        star.aiPhase = 'military';
+                        star.sliders = { ship: 50, def: 50, ind: 0, eco: 0 };
+                        star.buildingShip = 'destroyer';
+                    }
+                }
+
+                const production = calculateProduction(star);
+                if (!production) continue; // Skip if production can't be calculated
+
+                // Apply production
+                star.industry = Math.min(100, star.industry + production.ind);
+                if (star.population < maxPop) {
+                    star.population = Math.min(maxPop, star.population + production.eco);
+                }
+
+                // Defense with partial construction
+                star.defenseProgress += production.def;
+                while (star.defenseProgress >= 20) {
+                    star.defense++;
+                    star.defenseProgress -= 20;
+                }
+
+                // Ship building
+                if (star.buildingShip) {
+                    const shipTypeKey = star.buildingShip;
+                    star.shipProgress[shipTypeKey] += production.ship;
+                    const shipType = SHIP_TYPES[shipTypeKey];
+                    while (star.shipProgress[shipTypeKey] >= shipType.cost) {
+                        ships.push({
+                            id: nextShipId++,
+                            type: shipTypeKey,
+                            owner: star.owner,
+                            location: star.id,
+                            destination: null,
+                            turnsToArrival: 0
+                        });
+                        star.shipProgress[shipTypeKey] -= shipType.cost;
+                    }
+                }
+            }
+
+            for (const ship of ships) {
+                if (ship.destination !== null) {
+                    ship.turnsToArrival--;
+                    if (ship.turnsToArrival <= 0) {
+                        ship.location = ship.destination;
+                        ship.destination = null;
+                        const star = stars.find(s => s.id === ship.location);
+                        if (star && !star.explored && ship.owner === 'player') {
+                            star.explored = true;
+                            // Track scouting event
+                            eventHistory.unshift({
+                                year: year + 1, // This happens at start of next year
+                                type: 'scout',
+                                text: `Scouted ${star.name}`
+                            });
+                            AudioSystem.sfx.select();
+                        } else if (star && !star.explored) {
+                            star.explored = true;
+                        }
+                    }
+                }
+            }
+
+            // Record ships built this turn as event
+            const builtParts = [];
+            for (const type of getShipTypeOrder()) {
+                if (shipsBuiltThisTurn[type]) {
+                    const shipType = SHIP_TYPES[type];
+                    const count = shipsBuiltThisTurn[type];
+                    builtParts.push(`${count} ${shipType.name}${count > 1 ? 's' : ''}`);
+                }
+            }
+            if (builtParts.length > 0) {
+                eventHistory.unshift({
+                    year: year,
+                    type: 'built',
+                    text: `Built ${builtParts.join(', ')}`
+                });
+            }
+            shipsBuiltThisTurn = {};
+
+            // Reset combat state for new turn
+            combatThisTurn = false;
+            shipsInCombatThisTurn.clear();
+
+            year++;
+            state = GameState.PLAYING;
+            updatePanels();
+            updateTurnInfo();
+            saveGameState();
+        }
+
+        function calculateTravelInfo(originStar, destStar, shipIds) {
+            const dist = Math.sqrt((destStar.x - originStar.x) ** 2 + (destStar.y - originStar.y) ** 2);
+            const lightYears = Math.round(dist / CONFIG.PARSEC_SCALE * 10) / 10;
+            let slowestSpeed = Infinity;
+            let slowestShipName = '';
+            for (const shipId of shipIds) {
+                const ship = ships.find(s => s.id === shipId);
+                if (ship) {
+                    const shipType = SHIP_TYPES[ship.type];
+                    if (shipType.speed < slowestSpeed) {
+                        slowestSpeed = shipType.speed;
+                        slowestShipName = shipType.name;
+                    }
+                }
+            }
+            const turns = Math.max(1, Math.ceil(dist / (50 * slowestSpeed)));
+            return { lightYears, turns, slowestShipName, slowestSpeed };
+        }
+
+        function moveShips(shipIds, destinationId) {
+            const destStar = stars.find(s => s.id === destinationId);
+            if (!destStar) return;
+
+            // Find the slowest ship speed among selected ships
+            let slowestSpeed = Infinity;
+            let originStar = null;
+            for (const shipId of shipIds) {
+                const ship = ships.find(s => s.id === shipId);
+                if (!ship || ship.destination !== null) continue;
+                const shipType = SHIP_TYPES[ship.type];
+                if (shipType.speed < slowestSpeed) {
+                    slowestSpeed = shipType.speed;
+                }
+                if (!originStar) {
+                    originStar = stars.find(s => s.id === ship.location);
+                }
+            }
+
+            if (!originStar || slowestSpeed === Infinity) return;
+
+            // Calculate travel time based on slowest ship
+            const dist = Math.sqrt((destStar.x - originStar.x) ** 2 + (destStar.y - originStar.y) ** 2);
+            const turns = Math.max(1, Math.ceil(dist / (50 * slowestSpeed)));
+
+            // Apply same travel time to all ships in the group
+            for (const shipId of shipIds) {
+                const ship = ships.find(s => s.id === shipId);
+                if (!ship || ship.destination !== null) continue;
+                ship.destination = destinationId;
+                ship.turnsToArrival = turns;
+                ship.totalTurns = turns;
+            }
+            AudioSystem.sfx.select();
+            selectedShips = [];
+            destinationStar = null;
+            updatePanels();
+            saveGameState();
+        }
+
+        function colonizeStar(shipId, starId) {
+            const ship = ships.find(s => s.id === shipId);
+            const star = stars.find(s => s.id === starId);
+            if (!ship || !star || ship.type !== 'colony' || star.owner !== null) return false;
+            const planetInfo = PLANET_TYPES[star.planetType];
+            if (planetInfo.maxPop === 0) return false;
+            // Can't colonize if enemies present
+            const enemiesHere = getShipsAtStar(starId).filter(s => s.owner !== 'player');
+            if (enemiesHere.length > 0) return false;
+            ships = ships.filter(s => s.id !== shipId);
+            star.owner = 'player';
+            star.explored = true;
+            star.population = 10;
+            star.industry = 5;
+            star.defense = 0;
+            star.defenseProgress = 0;
+            star.lockedSliders = [];
+            star.sliders = { ship: 0, def: 0, ind: 50, eco: 50 };
+            star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+            star.buildingShip = null;
+            star.colonizedYear = year;
+            // Track colonization event
+            eventHistory.unshift({
+                year: year,
+                type: 'colony',
+                text: `Established colony on ${star.name}`
+            });
+            AudioSystem.sfx.levelComplete();
+            updatePanels();
+            updateTurnInfo();
+            saveGameState();
+            return true;
+        }
+
+        function conquerStar(starId) {
+            const star = stars.find(s => s.id === starId);
+            if (!star || star.owner === 'player' || !star.owner) return false;
+            // Can't conquer if enemies or defense remain
+            const enemiesHere = getShipsAtStar(starId).filter(s => s.owner !== 'player');
+            if (enemiesHere.length > 0 || star.defense > 0) return false;
+            // Must have player ships present
+            const playerShipsHere = getShipsAtStar(starId).filter(s => s.owner === 'player');
+            if (playerShipsHere.length === 0) return false;
+
+            // Conquer - halve population and industry
+            star.owner = 'player';
+            star.population = Math.floor(star.population / 2);
+            star.industry = Math.floor(star.industry / 2);
+            star.explored = true;
+            star.lockedSliders = [];
+            star.sliders = { ship: 0, def: 0, ind: 50, eco: 50 };
+            star.shipProgress = { scout: 0, fighter: 0, destroyer: 0, cruiser: 0, battleship: 0, colony: 0 };
+            star.buildingShip = null;
+            star.defenseProgress = 0;
+            star.colonizedYear = year;
+            star.aiPhase = undefined;
+            // Track conquest event
+            eventHistory.unshift({
+                year: year,
+                type: 'conquest',
+                text: `Conquered ${star.name}`
+            });
+            AudioSystem.sfx.levelComplete();
+            updatePanels();
+            updateTurnInfo();
+            saveGameState();
+            return true;
+        }
+
+        function startCombat(starId) {
+            if (combatThisTurn) return; // Only one combat per turn
+
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+
+            // Get all ships at location
+            const allShipsHere = getShipsAtStar(starId);
+            const playerMilitary = allShipsHere.filter(s => s.owner === 'player' && SHIP_TYPES[s.type].military);
+            const enemyMilitary = allShipsHere.filter(s => s.owner !== 'player' && SHIP_TYPES[s.type].military);
+            const enemyDefense = (star.owner && star.owner !== 'player') ? star.defense : 0;
+
+            // Need player military ships, and enemy must have either ships or defenses
+            if (playerMilitary.length === 0 || (enemyMilitary.length === 0 && enemyDefense === 0)) return;
+
+            // Track starting counts for history
+            const startingPlayerCounts = {};
+            const startingEnemyCounts = {};
+            for (const s of playerMilitary) {
+                startingPlayerCounts[s.type] = (startingPlayerCounts[s.type] || 0) + 1;
+            }
+            for (const s of enemyMilitary) {
+                startingEnemyCounts[s.type] = (startingEnemyCounts[s.type] || 0) + 1;
+            }
+
+            // Get enemy race info for naming (from ships if available, otherwise from star owner)
+            const enemyOwner = enemyMilitary.length > 0 ? enemyMilitary[0].owner : star.owner;
+            const enemyRace = RACES.find(r => r.id === enemyOwner);
+            const enemyShortName = enemyRace?.shortName || 'Enemy';
+            const playerShortName = player.race?.shortName || 'Player';
+
+            // Track unit numbers by type for debug naming
+            const playerUnitNumbers = {};
+            const enemyUnitNumbers = {};
+
+            // Create combat units with current health and debug names
+            let playerUnits = playerMilitary.map(s => {
+                playerUnitNumbers[s.type] = (playerUnitNumbers[s.type] || 0) + 1;
+                const unitNum = String(playerUnitNumbers[s.type]).padStart(3, '0');
+                return {
+                    id: s.id,
+                    type: s.type,
+                    owner: s.owner,
+                    hp: SHIP_TYPES[s.type].health,
+                    maxHp: SHIP_TYPES[s.type].health,
+                    attack: SHIP_TYPES[s.type].attack,
+                    speed: SHIP_TYPES[s.type].speed,
+                    debugName: `${playerShortName} ${SHIP_TYPES[s.type].name} ${unitNum}`
+                };
+            });
+
+            let enemyUnits = enemyMilitary.map(s => {
+                enemyUnitNumbers[s.type] = (enemyUnitNumbers[s.type] || 0) + 1;
+                const unitNum = String(enemyUnitNumbers[s.type]).padStart(3, '0');
+                return {
+                    id: s.id,
+                    type: s.type,
+                    owner: s.owner,
+                    hp: SHIP_TYPES[s.type].health,
+                    maxHp: SHIP_TYPES[s.type].health,
+                    attack: SHIP_TYPES[s.type].attack,
+                    speed: SHIP_TYPES[s.type].speed,
+                    debugName: `${enemyShortName} ${SHIP_TYPES[s.type].name} ${unitNum}`
+                };
+            });
+
+            // Combat log for debug mode
+            const combatLog = [];
+
+            // Track defense pools (attacks against defense destroy Attack amount)
+            let playerDefensePool = (star.owner === 'player') ? star.defense : 0;
+            let enemyDefensePool = (star.owner && star.owner !== 'player') ? star.defense : 0;
+            const startingPlayerDefense = playerDefensePool;
+            const startingEnemyDefense = enemyDefensePool;
+
+            // Get all unique speeds including defense (0), sorted descending
+            const shipSpeeds = [...new Set([...playerUnits, ...enemyUnits].map(u => u.speed))];
+            const speeds = [...new Set([...shipSpeeds, 0])].sort((a, b) => b - a);
+
+            // Process each speed tier
+            for (const speed of speeds) {
+                // Ships attacking at this speed
+                const shipAttackers = [...playerUnits, ...enemyUnits].filter(u => u.speed === speed && u.hp > 0);
+
+                // Defense attacks at speed 0
+                const playerDefenseAttacks = (speed === 0) ? playerDefensePool : 0;
+                const enemyDefenseAttacks = (speed === 0) ? enemyDefensePool : 0;
+
+                // Add initiative header to combat log if there are attackers at this speed
+                const hasAttackers = shipAttackers.length > 0 || playerDefenseAttacks > 0 || enemyDefenseAttacks > 0;
+                if (hasAttackers) {
+                    const initLabel = speed === 0 ? 'Defense' : `Speed ${speed}`;
+                    combatLog.push(`\n=== Initiative: ${initLabel} ===`);
+                }
+
+                // Collect all attacks for simultaneous resolution
+                const damageToShips = new Map(); // shipId -> { damage, attacks: [{attacker, damage}] }
+                let damageToPlayerDefense = 0;
+                let damageToEnemyDefense = 0;
+                const attackEvents = []; // For debug log
+
+                // Ship attacks
+                for (const attacker of shipAttackers) {
+                    const isPlayer = attacker.owner === 'player';
+                    const enemyShipTargets = isPlayer
+                        ? enemyUnits.filter(u => u.hp > 0)
+                        : playerUnits.filter(u => u.hp > 0);
+                    const enemyDefenseAvailable = isPlayer ? enemyDefensePool : playerDefensePool;
+
+                    // Build target pool: ships + defense (if any)
+                    const totalTargets = enemyShipTargets.length + (enemyDefenseAvailable > 0 ? 1 : 0);
+                    if (totalTargets === 0) continue;
+
+                    const roll = Math.floor(Math.random() * totalTargets);
+                    if (roll < enemyShipTargets.length) {
+                        // Target a ship
+                        const target = enemyShipTargets[roll];
+                        const current = damageToShips.get(target.id) || { damage: 0, attacks: [] };
+                        current.damage += attacker.attack;
+                        current.attacks.push({ attacker, damage: attacker.attack });
+                        damageToShips.set(target.id, current);
+                    } else {
+                        // Target defense - destroy Attack amount
+                        if (isPlayer) {
+                            damageToEnemyDefense += attacker.attack;
+                            attackEvents.push({ attacker: attacker.debugName, target: 'Defense', damage: attacker.attack });
+                        } else {
+                            damageToPlayerDefense += attacker.attack;
+                            attackEvents.push({ attacker: attacker.debugName, target: 'Defense', damage: attacker.attack });
+                        }
+                    }
+                }
+
+                // Defense attacks (1 attack per defense point, each deals 1 damage)
+                for (let i = 0; i < playerDefenseAttacks; i++) {
+                    const targets = enemyUnits.filter(u => u.hp > 0);
+                    if (targets.length > 0) {
+                        const target = targets[Math.floor(Math.random() * targets.length)];
+                        const current = damageToShips.get(target.id) || { damage: 0, attacks: [] };
+                        current.damage += 1;
+                        current.attacks.push({ attacker: { debugName: `${playerShortName} Defense` }, damage: 1 });
+                        damageToShips.set(target.id, current);
+                    }
+                }
+                for (let i = 0; i < enemyDefenseAttacks; i++) {
+                    const targets = playerUnits.filter(u => u.hp > 0);
+                    if (targets.length > 0) {
+                        const target = targets[Math.floor(Math.random() * targets.length)];
+                        const current = damageToShips.get(target.id) || { damage: 0, attacks: [] };
+                        current.damage += 1;
+                        current.attacks.push({ attacker: { debugName: `${enemyShortName} Defense` }, damage: 1 });
+                        damageToShips.set(target.id, current);
+                    }
+                }
+
+                // Apply all damage simultaneously and log
+                for (const unit of [...playerUnits, ...enemyUnits]) {
+                    if (damageToShips.has(unit.id)) {
+                        const info = damageToShips.get(unit.id);
+                        const hpBefore = unit.hp;
+                        unit.hp -= info.damage;
+                        // Log each attack with running HP
+                        let runningHp = hpBefore;
+                        for (const atk of info.attacks) {
+                            runningHp -= atk.damage;
+                            const attackerName = atk.attacker.debugName || atk.attacker;
+                            const destroyed = runningHp <= 0 ? ' [DESTROYED]' : '';
+                            const dmgStr = String(atk.damage).padStart(3, ' ');
+                            const hpStr = String(Math.max(0, runningHp)).padStart(3, ' ');
+                            const maxHpStr = String(unit.maxHp).padStart(3, ' ');
+                            combatLog.push(`${attackerName} → ${unit.debugName} (${dmgStr} dmg, ${hpStr}/${maxHpStr} HP)${destroyed}`);
+                        }
+                    }
+                }
+                playerDefensePool = Math.max(0, playerDefensePool - damageToPlayerDefense);
+                enemyDefensePool = Math.max(0, enemyDefensePool - damageToEnemyDefense);
+            }
+
+            // Determine casualties
+            const playerShipLosses = playerUnits.filter(u => u.hp <= 0);
+            const enemyShipLosses = enemyUnits.filter(u => u.hp <= 0);
+
+            // Remove destroyed ships
+            const destroyedShipIds = new Set([
+                ...playerShipLosses.map(u => u.id),
+                ...enemyShipLosses.map(u => u.id)
+            ]);
+            ships = ships.filter(s => !destroyedShipIds.has(s.id));
+
+            // Update defense count on star
+            const playerDefenseLost = startingPlayerDefense - playerDefensePool;
+            const enemyDefenseLost = startingEnemyDefense - enemyDefensePool;
+            if (star.owner === 'player') {
+                star.defense = playerDefensePool;
+            } else if (star.owner) {
+                star.defense = enemyDefensePool;
+            }
+
+            // Destroy unprotected colony ships
+            const playerMilitarySurvivors = playerUnits.filter(u => u.hp > 0);
+            const enemyMilitarySurvivors = enemyUnits.filter(u => u.hp > 0);
+
+            if (playerMilitarySurvivors.length === 0 && enemyMilitarySurvivors.length > 0) {
+                // Enemy wins - destroy player colony ships
+                const playerColonyShips = allShipsHere.filter(s => s.owner === 'player' && s.type === 'colony');
+                for (const cs of playerColonyShips) {
+                    destroyedShipIds.add(cs.id);
+                }
+                ships = ships.filter(s => !playerColonyShips.some(cs => cs.id === s.id));
+            } else if (enemyMilitarySurvivors.length === 0 && playerMilitarySurvivors.length > 0) {
+                // Player wins - destroy enemy colony ships
+                const enemyColonyShips = allShipsHere.filter(s => s.owner !== 'player' && s.type === 'colony');
+                for (const cs of enemyColonyShips) {
+                    destroyedShipIds.add(cs.id);
+                }
+                ships = ships.filter(s => !enemyColonyShips.some(cs => cs.id === s.id));
+            }
+
+            // Mark ships that fought
+            for (const unit of playerMilitarySurvivors) {
+                shipsInCombatThisTurn.add(unit.id);
+            }
+
+            combatThisTurn = true;
+
+            // Count survivors by type
+            const playerSurvivorCounts = {};
+            const enemySurvivorCounts = {};
+            for (const u of playerMilitarySurvivors) {
+                playerSurvivorCounts[u.type] = (playerSurvivorCounts[u.type] || 0) + 1;
+            }
+            for (const u of enemyMilitarySurvivors) {
+                enemySurvivorCounts[u.type] = (enemySurvivorCounts[u.type] || 0) + 1;
+            }
+
+            // Format survivor strings
+            const formatSurvivors = (counts) => {
+                const parts = [];
+                for (const type of getShipTypeOrder()) {
+                    if (counts[type]) {
+                        parts.push(`${counts[type]} ${SHIP_TYPES[type].name}${counts[type] > 1 ? 's' : ''}`);
+                    }
+                }
+                return parts.length > 0 ? parts.join(', ') : 'None';
+            };
+
+            // Play sound
+            AudioSystem.sfx.explosion();
+
+            // Calculate weighted losses (by ship cost)
+            const playerLossValue = playerShipLosses.reduce((sum, u) => sum + SHIP_TYPES[u.type].cost, 0);
+            const enemyLossValue = enemyShipLosses.reduce((sum, u) => sum + SHIP_TYPES[u.type].cost, 0);
+
+            // Determine battle result
+            let battleResult;
+            if (playerShipLosses.length === 0 && enemyShipLosses.length === 0) {
+                battleResult = 'stalemate';
+            } else if (enemyMilitarySurvivors.length === 0) {
+                battleResult = 'victory';
+            } else if (playerMilitarySurvivors.length === 0) {
+                battleResult = 'defeat';
+            } else if (enemyLossValue >= playerLossValue) {
+                battleResult = 'progress';
+            } else {
+                battleResult = 'losses';
+            }
+
+            // Build result message
+            let resultMsg = `Your losses: ${playerShipLosses.length} ships`;
+            if (playerDefenseLost > 0) resultMsg += `, ${playerDefenseLost} defense`;
+            resultMsg += `\nEnemy losses: ${enemyShipLosses.length} ships`;
+            if (enemyDefenseLost > 0) resultMsg += `, ${enemyDefenseLost} defense`;
+            resultMsg += `\n\nYour survivors: ${formatSurvivors(playerSurvivorCounts)}`;
+            resultMsg += `\nEnemy survivors: ${formatSurvivors(enemySurvivorCounts)}`;
+
+            // Add debug combat log if enabled
+            if (debugMode && combatLog.length > 0) {
+                resultMsg += `\n\n--- Combat Log ---\n${combatLog.join('\n')}`;
+            }
+
+            // Add to battle history
+            battleHistory.unshift({
+                turn: year,
+                location: star.name,
+                playerLosses: playerShipLosses.length,
+                enemyLosses: enemyShipLosses.length,
+                playerDefenseLost,
+                enemyDefenseLost,
+                playerSurvivors: formatSurvivors(playerSurvivorCounts),
+                enemySurvivors: formatSurvivors(enemySurvivorCounts),
+                result: battleResult
+            });
+
+            // Result display
+            const resultLabels = {
+                victory: 'VICTORY',
+                progress: 'PROGRESS',
+                losses: 'LOSSES',
+                defeat: 'DEFEAT',
+                stalemate: 'STALEMATE'
+            };
+
+            showModal(`⚔️ Combat at ${star.name} - ${resultLabels[battleResult]}!`, resultMsg);
+
+            updatePanels();
+            updateTurnInfo();
+            saveGameState();
+        }
+        window.startCombat = startCombat;
+        window.conquerStar = conquerStar;
+
+        function startBuildingShip(starId, shipType) {
+            const star = stars.find(s => s.id === starId);
+            if (!star || star.owner !== 'player') return;
+            star.buildingShip = shipType;
+            // Don't reset progress - keep existing progress for this ship type
+            AudioSystem.sfx.select();
+            updatePanels();
+            saveGameState();
+        }
+
+        function cancelBuildingShip(starId) {
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+            star.buildingShip = null;
+            // Don't clear progress - it stays in the factories for later
+            updatePanels();
+            saveGameState();
+        }
+
+        // ============================================
+        // UI UPDATES
+        // ============================================
+        function updateViewButtons() {
+            const views = [
+                { id: ViewState.OVERVIEW, label: 'Overview', always: true },
+                { id: ViewState.PLANETS, label: 'Planets', always: true },
+                { id: ViewState.COLONY, label: 'Colony', always: false },
+                { id: ViewState.HISTORY, label: 'History', always: true }
+            ];
+
+            let html = '';
+            for (const view of views) {
+                const isActive = currentView === view.id;
+                const isDisabled = view.id === ViewState.COLONY && !selectedStar;
+                const activeStyle = isActive ? 'background:#4ecdc4;color:#1a1a2e;' : '';
+                const disabledStyle = isDisabled ? 'opacity:0.4;cursor:not-allowed;' : '';
+                const onclick = isDisabled ? '' : `onclick="window.showView('${view.id}')"`;
+                html += `<button class="btn" style="${activeStyle}${disabledStyle}" ${onclick}>${view.label}</button>`;
+            }
+            viewButtons.innerHTML = html;
+        }
+
+        function updatePanels() {
+            updateViewButtons();
+            updatePlanetPanel();
+            updateFleetPanel();
+        }
+
+        function getColonyDevPercent(colony) {
+            const planetInfo = PLANET_TYPES[colony.planetType];
+            const prod = colony.population * (colony.industry / 100) * planetInfo.industryMod;
+            const maxProd = planetInfo.maxPop * 1.0 * planetInfo.industryMod;
+            return maxProd > 0 ? Math.round((prod / maxProd) * 100) : 0;
+        }
+
+        function updatePlanetPanel() {
+            // History view - show Event History only
+            if (currentView === ViewState.HISTORY) {
+                let html = '<div class="panel-title">Event History</div>';
+                html += '<div style="max-height:450px;overflow-y:auto;">';
+                if (eventHistory.length === 0) {
+                    html += '<div class="empty-state">No events yet</div>';
+                } else {
+                    for (const event of eventHistory) {
+                        let eventColor = '#888';
+                        if (event.type === 'colony') eventColor = '#4ecdc4';
+                        else if (event.type === 'conquest') eventColor = '#ffe66d';
+                        else if (event.type === 'scout') eventColor = '#9932cc';
+                        else if (event.type === 'built') eventColor = '#4a9fff';
+
+                        html += `<div style="padding:4px 6px;margin:2px 0;background:#252540;border-radius:4px;border-left:3px solid ${eventColor};">`;
+                        html += `<span style="color:#ffe66d;font-size:12px;">Year ${event.year}:</span> `;
+                        html += `<span style="color:${eventColor};font-size:12px;">${event.text}</span>`;
+                        html += `</div>`;
+                    }
+                }
+                html += '</div>';
+                planetContent.innerHTML = html;
+                return;
+            }
+
+            // Planets view - show unexplored colonizable worlds (left panel)
+            if (currentView === ViewState.PLANETS) {
+                let html = '<div class="panel-title">Uncolonized Worlds</div>';
+
+                // Sort buttons
+                html += '<div style="margin-bottom:6px;display:flex;gap:4px;">';
+                const sortOptions = [
+                    { key: 'type', label: 'Type' },
+                    { key: 'fleet', label: 'Fleet' }
+                ];
+                for (const opt of sortOptions) {
+                    const active = planetsSort === opt.key ? 'background:#4ecdc4;color:#1a1a2e;' : '';
+                    html += `<button class="btn btn-sm" style="padding:2px 6px;font-size:9px;${active}" onclick="setPlanetsSort('${opt.key}')">${opt.label}</button>`;
+                }
+                html += '</div>';
+
+                // Get explored, uncolonized, colonizable worlds
+                let uncolonized = stars.filter(s => s.explored && !s.owner && PLANET_TYPES[s.planetType].maxPop > 0);
+
+                // Sort
+                if (planetsSort === 'type') {
+                    // Highest maxPop first
+                    uncolonized.sort((a, b) => PLANET_TYPES[b.planetType].maxPop - PLANET_TYPES[a.planetType].maxPop);
+                } else if (planetsSort === 'fleet') {
+                    // Unguarded first (enemy fleet strength = 0), then by weakest fleet
+                    uncolonized.sort((a, b) => {
+                        const aFleet = getFleetStrength(a.id) - getFleetStrengthByOwner(a.id, 'player');
+                        const bFleet = getFleetStrength(b.id) - getFleetStrengthByOwner(b.id, 'player');
+                        return aFleet - bFleet;
+                    });
+                }
+
+                html += '<div style="max-height:500px;overflow-y:auto;">';
+                if (uncolonized.length === 0) {
+                    html += '<div class="empty-state">No uncolonized worlds discovered</div>';
+                } else {
+                    for (const star of uncolonized) {
+                        const planetInfo = PLANET_TYPES[star.planetType];
+                        const enemyShips = ships.filter(s => s.location === star.id && !s.destination && s.owner !== 'player');
+
+                        html += `<div style="padding:4px 6px;margin:2px 0;background:#252540;border-radius:4px;cursor:pointer;" onclick="window.selectStarById(${star.id})">`;
+                        html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                        html += `<span style="color:#fff;font-weight:bold;font-size:11px;">${star.name}</span>`;
+                        html += `<span style="color:${planetInfo.color};font-size:10px;">${planetInfo.name} (${planetInfo.maxPop})</span>`;
+                        html += `</div>`;
+
+                        if (enemyShips.length > 0) {
+                            // Group enemy ships by owner
+                            const enemyByOwner = {};
+                            for (const ship of enemyShips) {
+                                if (!enemyByOwner[ship.owner]) enemyByOwner[ship.owner] = [];
+                                enemyByOwner[ship.owner].push(ship);
+                            }
+                            for (const owner of Object.keys(enemyByOwner)) {
+                                const ownerRace = RACES.find(r => r.id === owner);
+                                const ownerName = ownerRace ? ownerRace.shortName : 'Enemy';
+                                const ownerColor = ownerRace ? ownerRace.color : '#ff6b6b';
+                                const fleetStr = enemyByOwner[owner].reduce((sum, s) => sum + SHIP_TYPES[s.type].cost, 0);
+                                html += `<div style="color:${ownerColor};font-size:9px;">⚔ ${ownerName} Fleet (${fleetStr})</div>`;
+                            }
+                        } else {
+                            html += `<div style="color:#4ecdc4;font-size:9px;">✓ Unguarded</div>`;
+                        }
+                        html += `</div>`;
+                    }
+                }
+                html += '</div>';
+                planetContent.innerHTML = html;
+                return;
+            }
+
+            // Overview view - show Empire Overview
+            if (currentView === ViewState.OVERVIEW) {
+                let colonies = getPlayerColonies();
+                let html = '<div class="panel-title">Empire Overview</div>';
+
+                if (colonies.length === 0) {
+                    html += '<div class="empty-state">No colonies yet</div>';
+                } else {
+                    // Sort buttons
+                    html += '<div style="margin-bottom:6px;display:flex;gap:4px;flex-wrap:wrap;">';
+                    const sortOptions = [
+                        { key: 'name', label: 'Name' },
+                        { key: 'age', label: 'Age' },
+                        { key: 'dev', label: 'Dev' },
+                        { key: 'defense', label: 'Def' }
+                    ];
+                    for (const opt of sortOptions) {
+                        const active = overviewSort === opt.key ? 'background:#4ecdc4;color:#1a1a2e;' : '';
+                        html += `<button class="btn btn-sm" style="padding:2px 6px;font-size:9px;${active}" onclick="setOverviewSort('${opt.key}')">${opt.label}</button>`;
+                    }
+                    html += '</div>';
+
+                    // Sort colonies
+                    colonies = [...colonies].sort((a, b) => {
+                        switch (overviewSort) {
+                            case 'name':
+                                return a.name.localeCompare(b.name);
+                            case 'age':
+                                return (a.colonizedYear || 1) - (b.colonizedYear || 1);
+                            case 'dev':
+                                return getColonyDevPercent(b) - getColonyDevPercent(a);
+                            case 'defense':
+                                return b.defense - a.defense;
+                            default:
+                                return 0;
+                        }
+                    });
+
+                    for (const colony of colonies) {
+                        const planetInfo = PLANET_TYPES[colony.planetType];
+                        const devPercent = getColonyDevPercent(colony);
+                        const age = year - (colony.colonizedYear || 1);
+
+                        html += `<div class="empire-planet" onclick="selectStar(${colony.id})" style="cursor:pointer;padding:6px;margin:4px 0;background:#252540;border-radius:4px;">`;
+                        html += `<div style="color:${planetInfo.color};font-weight:bold;font-size:11px;">${colony.name} <span style="color:#888;font-weight:normal;">(${age})</span></div>`;
+                        html += `<div style="font-size:10px;color:#888;">`;
+                        html += `Dev: ${devPercent}% | Def: ${colony.defense}`;
+                        html += `</div>`;
+
+                        // Show ship production on separate row (only if producing)
+                        if (colony.buildingShip) {
+                            const prod = calculateProduction(colony);
+                            if (prod.ship >= 1) {
+                                const shipType = SHIP_TYPES[colony.buildingShip];
+                                const progress = colony.shipProgress[colony.buildingShip] || 0;
+                                const pct = Math.floor((progress / shipType.cost) * 100);
+                                const shipsPerTurn = prod.ship / shipType.cost;
+
+                                html += `<div style="font-size:10px;color:#4ecdc4;">`;
+                                html += `${shipType.name}: ${pct}%`;
+                                if (shipsPerTurn >= 0.01) {
+                                    html += ` (${shipsPerTurn.toFixed(2)}/year)`;
+                                }
+                                html += `</div>`;
+                            }
+                        }
+                        html += `</div>`;
+                    }
+                }
+
+                planetContent.innerHTML = html;
+                return;
+            }
+
+            // Colony view - show selected planet details
+            if (currentView === ViewState.COLONY && selectedStar) {
+                const star = selectedStar;
+                let html = `<div class="panel-title">Colony ${star.name}</div>`;
+
+            if (star.explored) {
+                const planetInfo = PLANET_TYPES[star.planetType];
+                html += `<div class="info-row"><span class="info-label">Type:</span><span class="info-value" style="color:${planetInfo.color}">${planetInfo.name}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Max Pop:</span><span class="info-value">${planetInfo.maxPop}</span></div>`;
+            } else {
+                html += `<div class="info-row"><span class="info-label">Type:</span><span class="info-value" style="color:#666">Unknown</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Max Pop:</span><span class="info-value" style="color:#666">???</span></div>`;
+            }
+
+            if (star.owner === 'player') {
+                // Ensure auto-locked sliders are at 0 and redistributed
+                redistributeAutoLockedSliders(star);
+
+                const planetInfo = PLANET_TYPES[star.planetType];
+                const prod = calculateProduction(star);
+
+                html += `<div style="margin-top:10px" class="panel-title">Colony</div>`;
+                html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${star.population.toFixed(1)}/${planetInfo.maxPop}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Industry:</span><span class="info-value">${star.industry.toFixed(1)}%</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Defense:</span><span class="info-value">${star.defense}</span></div>`;
+
+                html += `<div style="margin-top:10px" class="panel-title">Production</div>`;
+
+                const sliderTypes = [
+                    { key: 'ship', label: 'Ships', prodKey: 'ship', prodLabel: 'prod' },
+                    { key: 'def', label: 'Defense', prodKey: 'def', prodLabel: 'def' },
+                    { key: 'ind', label: 'Industry', prodKey: 'ind', prodLabel: '% ind' },
+                    { key: 'eco', label: 'Growth', prodKey: 'eco', prodLabel: 'pop' }
+                ];
+
+                for (const slider of sliderTypes) {
+                    const lockState = getSliderLockState(star, slider.key);
+                    let containerClass = 'slider-container';
+                    if (lockState.locked) {
+                        if (lockState.type === 'auto') containerClass += ' locked-auto';
+                        else if (lockState.type === 'noship') containerClass += ' locked-noship';
+                        else if (lockState.type === 'user') containerClass += ' locked-user';
+                    }
+                    const isUserLocked = star.lockedSliders && star.lockedSliders.includes(slider.key);
+                    const lockBtnClass = isUserLocked ? 'lock-btn locked' : 'lock-btn';
+                    const lockDisabled = lockState.type === 'auto' || lockState.type === 'noship';
+
+                    // Determine if we should show production (hide if maxed)
+                    const isMaxed = (slider.key === 'ind' && star.industry >= 100) ||
+                                   (slider.key === 'eco' && star.population >= planetInfo.maxPop);
+
+                    // Format production value (1 decimal for pop/industry growth)
+                    // Hide ship production if less than 1
+                    let prodDisplay = '';
+                    if (!isMaxed) {
+                        if (slider.key === 'ship' && prod.ship < 1) {
+                            // Don't show ship production less than 1
+                        } else if (slider.key === 'eco' || slider.key === 'ind') {
+                            prodDisplay = `+${prod[slider.prodKey].toFixed(1)} ${slider.prodLabel}/year`;
+                        } else {
+                            prodDisplay = `+${prod[slider.prodKey]} ${slider.prodLabel}/year`;
+                        }
+                    }
+
+                    html += `<div class="${containerClass}" data-slider="${slider.key}">
+                        <div class="slider-header">
+                            <span class="slider-label">${slider.label}</span>
+                            <span class="slider-value" id="slider-val-${star.id}-${slider.key}">${star.sliders[slider.key]}%</span>
+                        </div>
+                        <div class="slider-row">
+                            <input type="range" min="0" max="100" step="5" value="${star.sliders[slider.key]}"
+                                   ${lockState.locked ? 'disabled' : ''}
+                                   oninput="previewSlider(${star.id}, '${slider.key}', this.value)"
+                                   onchange="adjustSlider(${star.id}, '${slider.key}', this.value)">
+                            <button class="${lockBtnClass}" ${lockDisabled ? 'disabled' : ''}
+                                    onclick="toggleSliderLock(${star.id}, '${slider.key}')">
+                                ${isUserLocked ? '🔒' : '🔓'}
+                            </button>
+                        </div>
+                        <div class="slider-production" id="slider-prod-${star.id}-${slider.key}">${prodDisplay}</div>`;
+                    if (lockState.locked && lockState.reason) {
+                        const reasonClass = lockState.type === 'noship' ? 'lock-reason warning' : 'lock-reason';
+                        const prefix = lockState.type === 'noship' ? '⚠ ' : '';
+                        html += `<div class="${reasonClass}">${prefix}${lockState.reason}</div>`;
+                    }
+                    html += `</div>`;
+                }
+
+                html += `<div style="margin-top:10px" class="panel-title">Shipyard</div>`;
+                if (star.buildingShip) {
+                    const shipTypeKey = star.buildingShip;
+                    const shipType = SHIP_TYPES[shipTypeKey];
+                    const currentProgress = star.shipProgress[shipTypeKey] || 0;
+                    const progress = Math.floor((currentProgress / shipType.cost) * 100);
+                    const remaining = shipType.cost - currentProgress;
+
+                    // Calculate ships per turn and next turn output
+                    let shipsNextTurn = 0;
+                    let turnsLeft = '∞';
+                    if (prod.ship > 0) {
+                        const totalNextTurn = currentProgress + prod.ship;
+                        shipsNextTurn = Math.floor(totalNextTurn / shipType.cost);
+                        const leftoverAfterBuilding = totalNextTurn - (shipsNextTurn * shipType.cost);
+                        turnsLeft = Math.ceil(remaining / prod.ship);
+                    }
+
+                    html += `<div class="info-row"><span class="info-label">Building:</span><span class="info-value">${shipType.name}</span></div>`;
+                    html += `<div class="info-row"><span class="info-label">Progress:</span><span class="info-value">${currentProgress}/${shipType.cost} (${progress}%)</span></div>`;
+                    if (prod.ship > 0) {
+                        html += `<div class="info-row"><span class="info-label">+Production:</span><span class="info-value">+${prod.ship}/year</span></div>`;
+                        if (shipsNextTurn > 0) {
+                            html += `<div class="info-row"><span class="info-label">Next year:</span><span class="info-value" style="color:#4ecdc4">${shipsNextTurn} ship${shipsNextTurn > 1 ? 's' : ''}</span></div>`;
+                        } else {
+                            html += `<div class="info-row"><span class="info-label">ETA:</span><span class="info-value">${turnsLeft} year${turnsLeft > 1 ? 's' : ''}</span></div>`;
+                        }
+                    } else {
+                        html += `<div class="info-row"><span class="info-label">ETA:</span><span class="info-value">∞ (0% allocated)</span></div>`;
+                    }
+                    html += `<button class="btn btn-danger btn-sm" onclick="cancelBuildingShip(${star.id})">Cancel</button>`;
+                } else {
+                    html += `<div class="build-options">`;
+                    for (const key of getShipTypeOrder()) {
+                        const type = SHIP_TYPES[key];
+                        const existingProgress = star.shipProgress[key] || 0;
+                        let label = `${type.name}<br>(${type.cost})`;
+                        if (existingProgress > 0) {
+                            label = `${type.name}<br>(${existingProgress}/${type.cost})`;
+                        }
+                        html += `<button class="btn build-btn" onclick="startBuildingShip(${star.id}, '${key}')">${label}</button>`;
+                    }
+                    html += `</div>`;
+                }
+            } else if (star.owner) {
+                // Enemy colony
+                const enemyRace = RACES.find(r => r.id === star.owner);
+                const planetInfo = PLANET_TYPES[star.planetType];
+                html += `<div style="margin-top:10px" class="panel-title">${enemyRace?.shortName || 'Enemy'} Colony</div>`;
+                html += `<div class="info-row"><span class="info-label">Owner:</span><span class="info-value" style="color:${enemyRace?.color || '#ff6b6b'}">${enemyRace?.name || star.owner}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${Math.floor(star.population)}</span></div>`;
+                html += `<div class="info-row"><span class="info-label">Defense:</span><span class="info-value">${star.defense}</span></div>`;
+
+                // Check if can conquer (no enemies, no defense, have ships)
+                const enemyShipsHere = getShipsAtStar(star.id).filter(s => s.owner !== 'player');
+                const playerShipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+                if (enemyShipsHere.length === 0 && star.defense === 0 && playerShipsHere.length > 0) {
+                    html += `<button class="btn btn-primary" style="margin-top:8px" onclick="conquerStar(${star.id})">🏴 Conquer</button>`;
+                }
+            } else if (star.explored) {
+                const planetInfo = PLANET_TYPES[star.planetType];
+                html += `<div style="margin-top:10px;color:#888;font-size:10px">Unclaimed system</div>`;
+                const playerShips = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+                const enemyShips = getShipsAtStar(star.id).filter(s => s.owner !== 'player');
+                const colonyShip = playerShips.find(s => s.type === 'colony');
+                if (colonyShip && planetInfo.maxPop > 0 && enemyShips.length === 0) {
+                    html += `<button class="btn" style="margin-top:8px" onclick="colonizeStar(${colonyShip.id}, ${star.id})">Colonize</button>`;
+                } else if (colonyShip && planetInfo.maxPop > 0 && enemyShips.length > 0) {
+                    html += `<div style="color:#ff6b6b;font-size:10px;margin-top:5px">Clear enemies to colonize</div>`;
+                } else if (planetInfo.maxPop === 0) {
+                    html += `<div style="color:#ff6b6b;font-size:10px;margin-top:5px">Uninhabitable</div>`;
+                }
+            } else {
+                html += `<div style="margin-top:10px;color:#888;font-size:10px">Unexplored - send a ship</div>`;
+            }
+
+                planetContent.innerHTML = html;
+            }
+        }
+
+        function updateFleetPanel() {
+            // History view - show Battle History
+            if (currentView === ViewState.HISTORY) {
+                let html = '<div class="panel-title">Battle History</div>';
+                html += '<div style="max-height:450px;overflow-y:auto;">';
+                if (battleHistory.length === 0) {
+                    html += '<div class="empty-state">No battles yet</div>';
+                } else {
+                    for (const battle of battleHistory) {
+                        // Support old saves with victory boolean and new saves with result string
+                        const result = battle.result || (battle.victory ? 'victory' : 'defeat');
+                        const resultColors = {
+                            victory: '#4ecdc4',
+                            progress: '#4a9fff',
+                            stalemate: '#888',
+                            losses: '#ffa500',
+                            defeat: '#ff6b6b'
+                        };
+                        const resultLabels = {
+                            victory: 'VICTORY',
+                            progress: 'PROGRESS',
+                            stalemate: 'STALEMATE',
+                            losses: 'LOSSES',
+                            defeat: 'DEFEAT'
+                        };
+                        const resultColor = resultColors[result] || '#888';
+                        const resultText = resultLabels[result] || result.toUpperCase();
+
+                        html += `<div style="padding:6px;margin:4px 0;background:#252540;border-radius:4px;border-left:3px solid ${resultColor};">`;
+                        html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                        html += `<span style="color:#ffe66d;font-weight:bold;font-size:11px;">Year ${battle.turn}</span>`;
+                        html += `<span style="color:${resultColor};font-weight:bold;font-size:10px;">${resultText}</span>`;
+                        html += `</div>`;
+                        html += `<div style="color:#888;font-size:10px;margin:2px 0;">${battle.location}</div>`;
+
+                        // Losses
+                        html += `<div style="font-size:10px;margin-top:4px;">`;
+                        html += `<div style="color:#4ecdc4;">Your losses: ${battle.playerLosses} ships`;
+                        if (battle.playerDefenseLost > 0) html += `, ${battle.playerDefenseLost} defense`;
+                        html += `</div>`;
+                        html += `<div style="color:#ff6b6b;">Enemy losses: ${battle.enemyLosses} ships`;
+                        if (battle.enemyDefenseLost > 0) html += `, ${battle.enemyDefenseLost} defense`;
+                        html += `</div>`;
+                        html += `</div>`;
+
+                        // Survivors
+                        html += `<div style="font-size:9px;margin-top:4px;color:#888;">`;
+                        html += `<div>Your survivors: ${battle.playerSurvivors}</div>`;
+                        html += `<div>Enemy survivors: ${battle.enemySurvivors}</div>`;
+                        html += `</div>`;
+
+                        html += `</div>`;
+                    }
+                }
+                html += '</div>';
+                fleetContent.innerHTML = html;
+                fleetActions.innerHTML = '';
+                return;
+            }
+
+            // Planets view - show all colonized worlds (right panel)
+            if (currentView === ViewState.PLANETS) {
+                let html = '<div class="panel-title">All Colonies</div>';
+
+                // Sort buttons (same as left panel)
+                html += '<div style="margin-bottom:6px;display:flex;gap:4px;">';
+                const sortOptions = [
+                    { key: 'type', label: 'Type' },
+                    { key: 'fleet', label: 'Fleet' }
+                ];
+                for (const opt of sortOptions) {
+                    const active = planetsSort === opt.key ? 'background:#4ecdc4;color:#1a1a2e;' : '';
+                    html += `<button class="btn btn-sm" style="padding:2px 6px;font-size:9px;${active}" onclick="setPlanetsSort('${opt.key}')">${opt.label}</button>`;
+                }
+                html += '</div>';
+
+                // Get all colonized worlds (player and enemy)
+                let colonized = stars.filter(s => s.owner);
+
+                // Sort
+                if (planetsSort === 'type') {
+                    // Highest maxPop first
+                    colonized.sort((a, b) => PLANET_TYPES[b.planetType].maxPop - PLANET_TYPES[a.planetType].maxPop);
+                } else if (planetsSort === 'fleet') {
+                    // Unguarded first, then by weakest fleet
+                    colonized.sort((a, b) => getFleetStrength(a.id) - getFleetStrength(b.id));
+                }
+
+                html += '<div style="max-height:500px;overflow-y:auto;">';
+                if (colonized.length === 0) {
+                    html += '<div class="empty-state">No colonies yet</div>';
+                } else {
+                    for (const star of colonized) {
+                        const planetInfo = PLANET_TYPES[star.planetType];
+                        const isPlayer = star.owner === 'player';
+                        const ownerRace = isPlayer ? RACES.find(r => r.id === player.race) : RACES.find(r => r.id === star.owner);
+                        const ownerName = ownerRace ? ownerRace.shortName : (isPlayer ? 'You' : 'Enemy');
+                        const ownerColor = isPlayer ? player.color : (ownerRace ? ownerRace.color : '#ff6b6b');
+                        const fleetStr = getFleetStrength(star.id);
+                        const defense = star.defense || 0;
+
+                        html += `<div style="padding:4px 6px;margin:2px 0;background:#252540;border-radius:4px;border-left:3px solid ${ownerColor};cursor:pointer;" onclick="window.selectStarById(${star.id})">`;
+                        html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                        html += `<span style="color:#fff;font-weight:bold;font-size:11px;">${star.name}</span>`;
+                        html += `<span style="color:${ownerColor};font-size:10px;">${ownerName}</span>`;
+                        html += `</div>`;
+                        html += `<div style="display:flex;justify-content:space-between;font-size:9px;color:#888;">`;
+                        html += `<span style="color:${planetInfo.color}">${planetInfo.name}</span>`;
+                        html += `<span>Fleet: ${fleetStr} | Def: ${defense}</span>`;
+                        html += `</div>`;
+                        html += `</div>`;
+                    }
+                }
+                html += '</div>';
+                fleetContent.innerHTML = html;
+                fleetActions.innerHTML = '';
+                return;
+            }
+
+            // Overview view - show Fleet Overview
+            if (currentView === ViewState.OVERVIEW) {
+                const playerShips = ships.filter(s => s.owner === 'player');
+                let html = '<div class="panel-title">Fleet Overview</div>';
+
+                if (playerShips.length === 0) {
+                    html += '<div class="empty-state">No ships yet</div>';
+                } else {
+                    // Group ships by location (and destination for in-transit)
+                    const locations = new Map(); // starId -> { stationed: [], incoming: [] }
+
+                    for (const ship of playerShips) {
+                        if (ship.destination !== null) {
+                            // In transit - group by destination
+                            if (!locations.has(ship.destination)) {
+                                locations.set(ship.destination, { stationed: [], incoming: [] });
+                            }
+                            locations.get(ship.destination).incoming.push(ship);
+                        } else {
+                            // Stationed
+                            if (!locations.has(ship.location)) {
+                                locations.set(ship.location, { stationed: [], incoming: [] });
+                            }
+                            locations.get(ship.location).stationed.push(ship);
+                        }
+                    }
+
+                    // Sort by star name
+                    const sortedLocations = [...locations.entries()].sort((a, b) => {
+                        const starA = stars.find(s => s.id === a[0]);
+                        const starB = stars.find(s => s.id === b[0]);
+                        return (starA?.name || '').localeCompare(starB?.name || '');
+                    });
+
+                    for (const [starId, fleets] of sortedLocations) {
+                        const star = stars.find(s => s.id === starId);
+                        if (!star) continue;
+
+                        html += `<div class="fleet-location" onclick="selectStar(${starId})" style="cursor:pointer;padding:6px;margin:4px 0;background:#252540;border-radius:4px;">`;
+                        html += `<div style="color:#4ecdc4;font-weight:bold;font-size:11px;">${star.name}</div>`;
+
+                        // Count ships by type for stationed
+                        if (fleets.stationed.length > 0) {
+                            const counts = {};
+                            for (const ship of fleets.stationed) {
+                                counts[ship.type] = (counts[ship.type] || 0) + 1;
+                            }
+                            const parts = [];
+                            for (const type of getShipTypeOrder()) {
+                                if (counts[type]) {
+                                    parts.push(`${counts[type]} ${SHIP_TYPES[type].name}${counts[type] > 1 ? 's' : ''}`);
+                                }
+                            }
+                            html += `<div style="font-size:10px;color:#888;">${parts.join(', ')}</div>`;
+                        }
+
+                        // Count ships by type for incoming
+                        if (fleets.incoming.length > 0) {
+                            const counts = {};
+                            let maxEta = 0;
+                            for (const ship of fleets.incoming) {
+                                counts[ship.type] = (counts[ship.type] || 0) + 1;
+                                maxEta = Math.max(maxEta, ship.turnsToArrival);
+                            }
+                            const parts = [];
+                            for (const type of getShipTypeOrder()) {
+                                if (counts[type]) {
+                                    parts.push(`${counts[type]} ${SHIP_TYPES[type].name}${counts[type] > 1 ? 's' : ''}`);
+                                }
+                            }
+                            html += `<div style="font-size:10px;color:#ffe66d;">→ ${parts.join(', ')} (${maxEta}t)</div>`;
+                        }
+
+                        html += `</div>`;
+                    }
+                }
+
+                fleetContent.innerHTML = html;
+                fleetActions.innerHTML = '';
+                return;
+            }
+
+            // Planet view - show fleets at selected planet
+            if (currentView === ViewState.COLONY && selectedStar) {
+                const star = selectedStar;
+                const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+                const incomingShips = ships.filter(s => s.destination === star.id && s.owner === 'player');
+
+                let html = `<div class="panel-title">Fleets at ${star.name}</div>`;
+
+            if (shipsHere.length > 0) {
+                // Group ships by type
+                const shipsByType = {};
+                for (const ship of shipsHere) {
+                    if (!shipsByType[ship.type]) {
+                        shipsByType[ship.type] = [];
+                    }
+                    shipsByType[ship.type].push(ship);
+                }
+
+                // Count selected by type
+                const selectedByType = {};
+                for (const shipId of selectedShips) {
+                    const ship = shipsHere.find(s => s.id === shipId);
+                    if (ship) {
+                        selectedByType[ship.type] = (selectedByType[ship.type] || 0) + 1;
+                    }
+                }
+
+                const totalSelected = selectedShips.length;
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <span style="font-size:10px;color:#888">Selected: ${totalSelected}/${shipsHere.length}</span>
+                    <button class="btn btn-sm" onclick="toggleSelectAll()">${totalSelected === shipsHere.length ? 'Clear' : 'All'}</button>
+                </div>`;
+
+                // Show each ship type with selection controls (in display order)
+                for (const type of getShipTypeOrder()) {
+                    if (!shipsByType[type]) continue;
+                    const typeShips = shipsByType[type];
+                    const shipType = SHIP_TYPES[type];
+                    const count = typeShips.length;
+                    const selected = selectedByType[type] || 0;
+
+                    html += `<div style="background:#252540;border-radius:4px;padding:6px;margin:4px 0;">`;
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">`;
+                    html += `<span style="font-size:11px;font-weight:bold;">${shipType.name}</span>`;
+                    html += `<span style="font-size:10px;color:#888;">${selected}/${count}</span>`;
+                    html += `</div>`;
+
+                    // Quick select buttons
+                    html += `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:4px;">`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="selectShipsOfType('${type}', 1)">+1</button>`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="selectShipsOfType('${type}', 10)">+10</button>`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="selectShipsOfType('${type}', 100)">+100</button>`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="deselectShipsOfType('${type}', 1)">-1</button>`;
+                    html += `<button class="btn btn-sm" style="padding:1px 4px;font-size:9px;" onclick="deselectShipsOfType('${type}', ${count})">None</button>`;
+                    html += `</div>`;
+
+                    // Slider for this type
+                    html += `<input type="range" min="0" max="${count}" value="${selected}" style="width:100%;"
+                               oninput="setShipTypeSelection('${type}', parseInt(this.value))">`;
+                    html += `</div>`;
+                }
+            } else {
+                html += `<div class="empty-state">No ships at this location</div>`;
+            }
+
+            // Show departing fleets (ships ordered to move this turn, not yet departed)
+            const departingShips = ships.filter(s =>
+                s.location === star.id &&
+                s.destination !== null &&
+                s.owner === 'player' &&
+                s.turnsToArrival === s.totalTurns // Just ordered this turn
+            );
+
+            if (departingShips.length > 0) {
+                html += `<div style="margin-top:10px" class="panel-title">Departing</div>`;
+
+                // Group by destination and ETA
+                const fleetGroups = new Map(); // "destId-eta" -> ships[]
+                for (const ship of departingShips) {
+                    const key = `${ship.destination}-${ship.turnsToArrival}`;
+                    if (!fleetGroups.has(key)) {
+                        fleetGroups.set(key, []);
+                    }
+                    fleetGroups.get(key).push(ship);
+                }
+
+                for (const [key, fleetShips] of fleetGroups) {
+                    const destStar = stars.find(s => s.id === fleetShips[0].destination);
+                    const eta = fleetShips[0].turnsToArrival;
+
+                    // Group ships by type for this fleet
+                    const typeCount = {};
+                    for (const ship of fleetShips) {
+                        typeCount[ship.type] = (typeCount[ship.type] || 0) + 1;
+                    }
+
+                    // Build ship list string
+                    const shipList = getShipTypeOrder()
+                        .filter(t => typeCount[t])
+                        .map(t => `${typeCount[t]} ${SHIP_TYPES[t].name}${typeCount[t] > 1 ? 's' : ''}`)
+                        .join(', ');
+
+                    const shipIds = fleetShips.map(s => s.id).join(',');
+
+                    html += `<div style="background:#252540;border-radius:6px;padding:8px;margin:4px 0;border-left:3px solid #ffe66d;">`;
+                    html += `<div style="font-size:10px;color:#fff;margin-bottom:4px;">${shipList}</div>`;
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                    html += `<span style="font-size:10px;color:#ffe66d;">→ ${destStar?.name || 'Unknown'}, ${eta} year${eta > 1 ? 's' : ''}</span>`;
+                    html += `<button class="btn btn-sm" style="color:#ff6b6b;padding:2px 6px;font-size:9px;" onclick="cancelFleet([${shipIds}])">❌ Cancel</button>`;
+                    html += `</div>`;
+                    html += `</div>`;
+                }
+            }
+
+            if (incomingShips.length > 0) {
+                html += `<div style="margin-top:10px" class="panel-title">Incoming</div>`;
+                // Group incoming by type too
+                const incomingByType = {};
+                for (const ship of incomingShips) {
+                    if (!incomingByType[ship.type]) {
+                        incomingByType[ship.type] = { count: 0, minTurns: Infinity };
+                    }
+                    incomingByType[ship.type].count++;
+                    incomingByType[ship.type].minTurns = Math.min(incomingByType[ship.type].minTurns, ship.turnsToArrival);
+                }
+                for (const type of getShipTypeOrder()) {
+                    if (!incomingByType[type]) continue;
+                    const info = incomingByType[type];
+                    const shipType = SHIP_TYPES[type];
+                    html += `<div class="ship-item">
+                        <span>${info.count}x ${shipType.name}</span>
+                        <span style="color:#ffe66d">${info.minTurns}t</span>
+                    </div>`;
+                }
+            }
+
+            // Show enemy fleets (only for explored planets)
+            if (star.explored) {
+                const enemyShipsHere = getShipsAtStar(star.id).filter(s => s.owner !== 'player');
+                if (enemyShipsHere.length > 0) {
+                    const enemyOwner = enemyShipsHere[0].owner;
+                    const enemyRace = RACES.find(r => r.id === enemyOwner);
+                    const enemyColor = enemyRace?.color || '#ff6b6b';
+                    html += `<div style="margin-top:10px" class="panel-title" style="color:${enemyColor}">${enemyRace?.shortName || 'Enemy'} Fleet</div>`;
+                    // Group by type
+                    const enemyByType = {};
+                    for (const ship of enemyShipsHere) {
+                        if (!enemyByType[ship.type]) {
+                            enemyByType[ship.type] = 0;
+                        }
+                        enemyByType[ship.type]++;
+                    }
+                    for (const type of getShipTypeOrder()) {
+                        if (!enemyByType[type]) continue;
+                        const count = enemyByType[type];
+                        const shipType = SHIP_TYPES[type];
+                        html += `<div class="ship-item" style="color:${enemyColor};">
+                            <span>${count}x ${shipType.name}</span>
+                            <span style="color:#888;font-size:9px;">${shipType.attack} atk / ${shipType.health} hp</span>
+                        </div>`;
+                    }
+                }
+            }
+
+            fleetContent.innerHTML = html;
+
+            // Fleet actions
+            let actionsHtml = '';
+            const hasSelection = selectedShips.length > 0;
+            // shipsHere already defined above
+
+            // Check for enemy military ships or defenses
+            const enemyMilitaryHere = star.explored
+                ? getShipsAtStar(star.id).filter(s => s.owner !== 'player' && SHIP_TYPES[s.type].military)
+                : [];
+            const playerMilitaryHere = getShipsAtStar(star.id).filter(s => s.owner === 'player' && SHIP_TYPES[s.type].military);
+            const enemyDefenseHere = (star.owner && star.owner !== 'player') ? star.defense : 0;
+            const canCombat = (enemyMilitaryHere.length > 0 || enemyDefenseHere > 0) && playerMilitaryHere.length > 0 && !combatThisTurn;
+
+            // Check if selected ships can move (not in combat this turn)
+            const selectedCanMove = hasSelection && !selectedShips.some(id => shipsInCombatThisTurn.has(id));
+
+            // Check for scouts and unexplored planets for Explore button
+            const scoutsHere = shipsHere.filter(s => s.type === 'scout');
+            const unexploredStars = stars.filter(s => !s.explored);
+            const canExplore = scoutsHere.length > 0 && unexploredStars.length > 0;
+
+            // Select All button - always on top
+            if (shipsHere.length > 0) {
+                const allSelected = selectedShips.length === shipsHere.length;
+                actionsHtml += `<button class="btn btn-sm" onclick="toggleSelectAll()">${allSelected ? 'Clear Selection' : 'Select All Ships'}</button>`;
+            }
+
+            if (destinationStar && selectedCanMove) {
+                const travelInfo = calculateTravelInfo(selectedStar, destinationStar, selectedShips);
+                actionsHtml += `<div class="destination-highlight">
+                    <div>To: <strong>${destinationStar.name}</strong></div>
+                    <div><span class="distance">${travelInfo.lightYears} LY</span> - <span class="turns">${travelInfo.turns} years</span></div>
+                    ${selectedShips.length > 1 ? `<div style="font-size:9px;color:#888">Slowest: ${travelInfo.slowestShipName}</div>` : ''}
+                </div>`;
+                actionsHtml += `<button class="btn btn-primary" onclick="confirmMove()">Confirm Move</button>`;
+                actionsHtml += `<button class="btn btn-danger btn-sm" onclick="cancelMove()">Cancel</button>`;
+            } else {
+                // Combat button
+                if (canCombat) {
+                    actionsHtml += `<button class="btn btn-danger" onclick="startCombat(${star.id})">⚔️ Combat</button>`;
+                }
+
+                // Move and Explore buttons row
+                actionsHtml += `<div style="display:flex;gap:6px;margin-top:6px;">`;
+
+                // Move button
+                const moveDisabled = !selectedCanMove;
+                actionsHtml += `<button class="btn" ${moveDisabled ? 'disabled' : ''} onclick="window.focus()">Move ${hasSelection ? selectedShips.length + ' Ship' + (selectedShips.length > 1 ? 's' : '') : 'Ships'}</button>`;
+
+                // Explore button
+                if (canExplore) {
+                    actionsHtml += `<button class="btn" onclick="exploreWithScouts(${star.id})">Explore (${scoutsHere.length})</button>`;
+                }
+
+                actionsHtml += `</div>`;
+
+                if (hasSelection && shipsInCombatThisTurn.has(selectedShips[0])) {
+                    actionsHtml += `<div style="font-size:9px;color:#ff6b6b;margin-top:4px">Ships in combat can't move</div>`;
+                } else if (hasSelection) {
+                    actionsHtml += `<div style="font-size:9px;color:#888;margin-top:4px">Click a destination star</div>`;
+                }
+            }
+
+                fleetActions.innerHTML = actionsHtml;
+            }
+        }
+
+        // Global functions for UI callbacks
+        window.previewSlider = function(starId, sliderKey, value) {
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+            value = parseInt(value);
+
+            // Create a temporary copy of sliders to calculate preview
+            const tempSliders = {...star.sliders};
+            tempSliders[sliderKey] = value;
+
+            // Calculate how other sliders would adjust
+            const lockStates = {};
+            for (const key of Object.keys(star.sliders)) {
+                lockStates[key] = getSliderLockState(star, key);
+            }
+            const unlockedKeys = Object.keys(star.sliders).filter(k =>
+                k !== sliderKey && !lockStates[k].locked
+            );
+            const total = Object.values(tempSliders).reduce((a, b) => a + b, 0);
+            const diff = total - 100;
+
+            if (diff !== 0 && unlockedKeys.length > 0) {
+                const unlockedTotal = unlockedKeys.reduce((sum, k) => sum + tempSliders[k], 0);
+                if (unlockedTotal === 0) {
+                    const perSlider = Math.floor(diff / unlockedKeys.length);
+                    for (const key of unlockedKeys) {
+                        tempSliders[key] = Math.max(0, -perSlider);
+                    }
+                } else {
+                    for (const key of unlockedKeys) {
+                        const proportion = tempSliders[key] / unlockedTotal;
+                        tempSliders[key] = Math.max(0, Math.round(tempSliders[key] - diff * proportion));
+                    }
+                }
+                // Fix rounding
+                const finalTotal = Object.values(tempSliders).reduce((a, b) => a + b, 0);
+                if (finalTotal !== 100 && unlockedKeys.length > 0) {
+                    tempSliders[unlockedKeys[0]] += (100 - finalTotal);
+                }
+            }
+
+            // Calculate preview production
+            const prod = calculateProduction(star, tempSliders);
+            const planetInfo = PLANET_TYPES[star.planetType];
+
+            // Update all slider displays
+            const sliderTypes = [
+                { key: 'ship', prodKey: 'ship', prodLabel: 'prod' },
+                { key: 'def', prodKey: 'def', prodLabel: 'def' },
+                { key: 'ind', prodKey: 'ind', prodLabel: '% ind' },
+                { key: 'eco', prodKey: 'eco', prodLabel: 'pop' }
+            ];
+
+            for (const slider of sliderTypes) {
+                const valEl = document.getElementById(`slider-val-${starId}-${slider.key}`);
+                const prodEl = document.getElementById(`slider-prod-${starId}-${slider.key}`);
+                if (valEl) valEl.textContent = `${tempSliders[slider.key]}%`;
+                if (prodEl) {
+                    const isMaxed = (slider.key === 'ind' && star.industry >= 100) ||
+                                   (slider.key === 'eco' && star.population >= planetInfo.maxPop);
+                    if (!isMaxed) {
+                        if (slider.key === 'eco' || slider.key === 'ind') {
+                            prodEl.textContent = `+${prod[slider.prodKey].toFixed(1)} ${slider.prodLabel}/year`;
+                        } else {
+                            prodEl.textContent = `+${prod[slider.prodKey]} ${slider.prodLabel}/year`;
+                        }
+                    }
+                }
+            }
+        };
+
+        window.adjustSlider = function(starId, sliderKey, value) {
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+            value = parseInt(value);
+            normalizeSliders(star, sliderKey, value);
+            updatePanels();
+            saveGameState();
+        };
+
+        window.setOverviewSort = function(sortKey) {
+            overviewSort = sortKey;
+            updatePanels();
+        };
+
+        window.setPlanetsSort = function(sortKey) {
+            planetsSort = sortKey;
+            updatePanels();
+        };
+
+        window.toggleSliderLock = function(starId, sliderKey) {
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+            if (!star.lockedSliders) star.lockedSliders = [];
+            const idx = star.lockedSliders.indexOf(sliderKey);
+            if (idx >= 0) {
+                star.lockedSliders.splice(idx, 1);
+            } else {
+                star.lockedSliders.push(sliderKey);
+            }
+            updatePanels();
+            saveGameState();
+        };
+
+        window.selectStar = function(starId) {
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+            selectedStar = star;
+            selectedShips = [];
+            destinationStar = null;
+            currentView = ViewState.COLONY;
+            updatePanels();
+            draw();
+        };
+
+        window.showView = function(viewId) {
+            // Colony view requires a selected star
+            if (viewId === ViewState.COLONY && !selectedStar) return;
+
+            // Views other than Colony and Planets clear selection
+            if (viewId !== ViewState.COLONY && viewId !== ViewState.PLANETS) {
+                selectedStar = null;
+                selectedShips = [];
+                destinationStar = null;
+            }
+
+            currentView = viewId;
+            updatePanels();
+            draw();
+        };
+
+        window.showOverview = function() {
+            window.showView(ViewState.OVERVIEW);
+        };
+
+        window.showHistory = function() {
+            window.showView(ViewState.HISTORY);
+        };
+
+        window.selectStarById = function(starId) {
+            const star = stars.find(s => s.id === starId);
+            if (star) {
+                selectedStar = star;
+                selectedShips = [];
+                destinationStar = null;
+                currentView = ViewState.COLONY;
+                updatePanels();
+                draw();
+            }
+        };
+
+        window.toggleShipSelection = function(shipId) {
+            const idx = selectedShips.indexOf(shipId);
+            if (idx >= 0) {
+                selectedShips.splice(idx, 1);
+            } else {
+                selectedShips.push(shipId);
+            }
+            // Clear destination when selection changes
+            destinationStar = null;
+            updatePanels();
+        };
+
+        window.toggleSelectAll = function() {
+            const shipsHere = getShipsAtStar(selectedStar.id).filter(s => s.owner === 'player');
+            if (selectedShips.length === shipsHere.length) {
+                selectedShips = [];
+            } else {
+                selectedShips = shipsHere.map(s => s.id);
+            }
+            destinationStar = null;
+            updatePanels();
+        };
+
+        window.cancelFleet = function(shipIds) {
+            for (const shipId of shipIds) {
+                const ship = ships.find(s => s.id === shipId);
+                if (ship && ship.owner === 'player') {
+                    ship.destination = null;
+                    ship.turnsToArrival = 0;
+                    ship.totalTurns = 0;
+                }
+            }
+            AudioSystem.sfx.select();
+            updatePanels();
+            saveGameState();
+        };
+
+        window.selectShipsOfType = function(type, count) {
+            if (!selectedStar) return;
+            const shipsHere = getShipsAtStar(selectedStar.id).filter(s => s.owner === 'player' && s.type === type);
+            let added = 0;
+            for (const ship of shipsHere) {
+                if (added >= count) break;
+                if (!selectedShips.includes(ship.id)) {
+                    selectedShips.push(ship.id);
+                    added++;
+                }
+            }
+            destinationStar = null;
+            updatePanels();
+        };
+
+        window.deselectShipsOfType = function(type, count) {
+            if (!selectedStar) return;
+            const shipsHere = getShipsAtStar(selectedStar.id).filter(s => s.owner === 'player' && s.type === type);
+            let removed = 0;
+            for (const ship of shipsHere) {
+                if (removed >= count) break;
+                const idx = selectedShips.indexOf(ship.id);
+                if (idx >= 0) {
+                    selectedShips.splice(idx, 1);
+                    removed++;
+                }
+            }
+            destinationStar = null;
+            updatePanels();
+        };
+
+        window.setShipTypeSelection = function(type, targetCount) {
+            if (!selectedStar) return;
+            const shipsHere = getShipsAtStar(selectedStar.id).filter(s => s.owner === 'player' && s.type === type);
+
+            // Count currently selected of this type
+            let currentCount = 0;
+            for (const ship of shipsHere) {
+                if (selectedShips.includes(ship.id)) currentCount++;
+            }
+
+            if (targetCount > currentCount) {
+                // Add more
+                for (const ship of shipsHere) {
+                    if (currentCount >= targetCount) break;
+                    if (!selectedShips.includes(ship.id)) {
+                        selectedShips.push(ship.id);
+                        currentCount++;
+                    }
+                }
+            } else if (targetCount < currentCount) {
+                // Remove some
+                for (const ship of shipsHere) {
+                    if (currentCount <= targetCount) break;
+                    const idx = selectedShips.indexOf(ship.id);
+                    if (idx >= 0) {
+                        selectedShips.splice(idx, 1);
+                        currentCount--;
+                    }
+                }
+            }
+            destinationStar = null;
+            updatePanels();
+        };
+
+        window.confirmMove = function() {
+            if (destinationStar && selectedShips.length > 0) {
+                // Filter out ships that were in combat this turn
+                const movableShips = selectedShips.filter(id => !shipsInCombatThisTurn.has(id));
+                if (movableShips.length > 0) {
+                    moveShips(movableShips, destinationStar.id);
+                }
+            }
+        };
+
+        window.cancelMove = function() {
+            destinationStar = null;
+            updatePanels();
+        };
+
+        window.exploreWithScouts = function(starId) {
+            const star = stars.find(s => s.id === starId);
+            if (!star) return;
+
+            // Get scouts at this star that can move (not in combat)
+            const scoutsHere = getShipsAtStar(starId)
+                .filter(s => s.owner === 'player' && s.type === 'scout' && !shipsInCombatThisTurn.has(s.id));
+
+            if (scoutsHere.length === 0) return;
+
+            // Get unexplored stars
+            const unexploredStars = stars.filter(s => !s.explored);
+            if (unexploredStars.length === 0) return;
+
+            // Get stars that already have a player ship heading there
+            const destinationsInUse = new Set();
+            for (const ship of ships) {
+                if (ship.owner === 'player' && ship.destination !== null) {
+                    destinationsInUse.add(ship.destination);
+                }
+            }
+
+            // Sort unexplored stars by distance from current star
+            const sortedUnexplored = unexploredStars
+                .filter(s => !destinationsInUse.has(s.id))
+                .map(s => ({
+                    star: s,
+                    distance: Math.sqrt(Math.pow(s.x - star.x, 2) + Math.pow(s.y - star.y, 2))
+                }))
+                .sort((a, b) => a.distance - b.distance);
+
+            // Assign each scout to the closest available unexplored star
+            let assignedCount = 0;
+            for (const scout of scoutsHere) {
+                if (assignedCount >= sortedUnexplored.length) break;
+
+                const target = sortedUnexplored[assignedCount].star;
+                moveShips([scout.id], target.id);
+                destinationsInUse.add(target.id);
+                assignedCount++;
+            }
+
+            if (assignedCount > 0) {
+                AudioSystem.sfx.select();
+                selectedShips = [];
+                destinationStar = null;
+                updatePanels();
+                draw();
+            }
+        };
+
+        window.globalExplore = function() {
+            // Get all player scouts that are stationary (not already moving)
+            const allScouts = ships.filter(s =>
+                s.owner === 'player' &&
+                s.type === 'scout' &&
+                s.destination === null &&
+                !shipsInCombatThisTurn.has(s.id)
+            );
+
+            if (allScouts.length === 0) return;
+
+            // Get unexplored stars
+            const unexploredStars = stars.filter(s => !s.explored);
+            if (unexploredStars.length === 0) return;
+
+            // Get stars that already have a player ship heading there
+            const destinationsInUse = new Set();
+            for (const ship of ships) {
+                if (ship.owner === 'player' && ship.destination !== null) {
+                    destinationsInUse.add(ship.destination);
+                }
+            }
+
+            // Sort scouts by their distance to the closest unexplored star
+            const scoutsWithClosest = allScouts.map(scout => {
+                const scoutStar = stars.find(s => s.id === scout.location);
+                if (!scoutStar) return { scout, minDist: Infinity };
+
+                let minDist = Infinity;
+                for (const unexplored of unexploredStars) {
+                    if (!destinationsInUse.has(unexplored.id)) {
+                        const dist = Math.sqrt(Math.pow(unexplored.x - scoutStar.x, 2) + Math.pow(unexplored.y - scoutStar.y, 2));
+                        if (dist < minDist) minDist = dist;
+                    }
+                }
+                return { scout, minDist, star: scoutStar };
+            }).sort((a, b) => a.minDist - b.minDist);
+
+            // Assign scouts starting with the one closest to an unexplored star
+            let assignedCount = 0;
+            for (const { scout, star } of scoutsWithClosest) {
+                if (!star) continue;
+
+                // Find closest unexplored star not already targeted
+                const availableTargets = unexploredStars
+                    .filter(s => !destinationsInUse.has(s.id))
+                    .map(s => ({
+                        star: s,
+                        distance: Math.sqrt(Math.pow(s.x - star.x, 2) + Math.pow(s.y - star.y, 2))
+                    }))
+                    .sort((a, b) => a.distance - b.distance);
+
+                if (availableTargets.length === 0) break;
+
+                const target = availableTargets[0].star;
+                moveShips([scout.id], target.id);
+                destinationsInUse.add(target.id);
+                assignedCount++;
+            }
+
+            if (assignedCount > 0) {
+                AudioSystem.sfx.select();
+                selectedShips = [];
+                destinationStar = null;
+                updatePanels();
+                updateTurnInfo();
+                draw();
+            }
+        };
+
+        window.endTurn = function() {
+            processTurn();
+            AudioSystem.sfx.select();
+        };
+
+        window.startBuildingShip = startBuildingShip;
+        window.cancelBuildingShip = cancelBuildingShip;
+        window.colonizeStar = colonizeStar;
+
+        // ============================================
+        // INPUT HANDLING
+        // ============================================
+        function getStarAtPosition(x, y) {
+            for (const star of stars) {
+                const dist = Math.sqrt((x - star.x) ** 2 + (y - star.y) ** 2);
+                if (dist < 20) {
+                    return star;
+                }
+            }
+            return null;
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left - 4; // Account for 4px border
+            const y = e.clientY - rect.top - 4;
+
+            AudioSystem.unlock();
+
+            if (state === GameState.TITLE) {
+                if (hasSaveGame && y >= CONFIG.HEIGHT / 2 + 30 && y <= CONFIG.HEIGHT / 2 + 60) {
+                    if (loadGameState()) {
+                        state = GameState.PLAYING;
+                        actionPanel.classList.remove('hidden');
+                        planetPanel.classList.remove('hidden');
+                        fleetPanel.classList.remove('hidden');
+                        updateTurnInfo();
+                        updatePanels();
+                        AudioSystem.sfx.select();
+                        AudioSystem.music.start('4x');
+                        return;
+                    }
+                }
+                if (hasSaveGame && y >= CONFIG.HEIGHT / 2 + 70 && y <= CONFIG.HEIGHT / 2 + 100) {
+                    clearSaveGame();
+                    state = GameState.RACE_SELECT;
+                    AudioSystem.sfx.select();
+                    return;
+                }
+                if (!hasSaveGame) {
+                    state = GameState.RACE_SELECT;
+                    AudioSystem.sfx.select();
+                }
+                return;
+            }
+
+            if (state === GameState.RACE_SELECT) {
+                const raceY = 120;
+                const raceHeight = 50;
+                for (let i = 0; i < RACES.length; i++) {
+                    const ry = raceY + i * raceHeight;
+                    if (y >= ry && y < ry + raceHeight && x >= 100 && x <= CONFIG.WIDTH - 100) {
+                        player.race = RACES[i];
+                        player.color = RACES[i].color;
+                        initGame();
+                        state = GameState.PLAYING;
+                        AudioSystem.sfx.levelComplete();
+                        AudioSystem.music.start('4x');
+                        saveGameState();
+                        return;
+                    }
+                }
+                return;
+            }
+
+            if (state === GameState.PLAYING) {
+                const clickedStar = getStarAtPosition(x, y);
+
+                // If ships are selected and we click a different star, set it as destination
+                if (selectedShips.length > 0 && clickedStar && clickedStar !== selectedStar) {
+                    destinationStar = clickedStar;
+                    AudioSystem.sfx.select();
+                    updatePanels();
+                    return;
+                }
+
+                // Otherwise, select the star (or deselect if clicking empty space)
+                if (clickedStar) {
+                    selectedStar = clickedStar;
+                    selectedShips = [];
+                    destinationStar = null;
+                    currentView = ViewState.COLONY;
+                    AudioSystem.sfx.select();
+                    updatePanels();
+                } else if (selectedShips.length === 0) {
+                    // Only deselect if no ships are selected (preserve selection for movement)
+                    selectedStar = null;
+                    destinationStar = null;
+                    updatePanels();
+                }
+                // If ships are selected and clicking empty space, do nothing (keep selection)
+            }
+        });
+
+        canvas.addEventListener('dblclick', (e) => {
+            if (state !== GameState.PLAYING) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left - 4;
+            const y = e.clientY - rect.top - 4;
+            const clickedStar = getStarAtPosition(x, y);
+
+            if (!clickedStar) return;
+
+            // If ships are selected, double-click moves them to that destination
+            if (selectedShips.length > 0 && clickedStar !== selectedStar) {
+                moveShips(selectedShips, clickedStar.id);
+                return;
+            }
+
+            // If no ships selected, double-click selects all player ships at that star
+            const playerShipsHere = getShipsAtStar(clickedStar.id).filter(s => s.owner === 'player');
+            if (playerShipsHere.length > 0) {
+                selectedStar = clickedStar;
+                selectedShips = playerShipsHere.map(s => s.id);
+                destinationStar = null;
+                currentView = ViewState.COLONY;
+                AudioSystem.sfx.select();
+                updatePanels();
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left - 4; // Account for 4px border
+            const y = e.clientY - rect.top - 4;
+            if (state === GameState.PLAYING) {
+                hoveredStar = getStarAtPosition(x, y);
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            AudioSystem.unlock();
+
+            // ESC closes modal if open
+            if (e.key === 'Escape' && !gameModal.classList.contains('hidden')) {
+                closeModal();
+                return;
+            }
+
+            if (state === GameState.TITLE) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    if (hasSaveGame && loadGameState()) {
+                        state = GameState.PLAYING;
+                        actionPanel.classList.remove('hidden');
+                        planetPanel.classList.remove('hidden');
+                        fleetPanel.classList.remove('hidden');
+                        updateTurnInfo();
+                        updatePanels();
+                        AudioSystem.sfx.select();
+                        AudioSystem.music.start('4x');
+                    } else {
+                        state = GameState.RACE_SELECT;
+                        AudioSystem.sfx.select();
+                    }
+                }
+                return;
+            }
+
+            if (state === GameState.RACE_SELECT) {
+                if (e.key === 'ArrowUp') {
+                    raceSelectIndex = (raceSelectIndex - 1 + RACES.length) % RACES.length;
+                    AudioSystem.sfx.select();
+                } else if (e.key === 'ArrowDown') {
+                    raceSelectIndex = (raceSelectIndex + 1) % RACES.length;
+                    AudioSystem.sfx.select();
+                } else if (e.key === 'Enter' || e.key === ' ') {
+                    player.race = RACES[raceSelectIndex];
+                    player.color = RACES[raceSelectIndex].color;
+                    initGame();
+                    state = GameState.PLAYING;
+                    AudioSystem.sfx.levelComplete();
+                    AudioSystem.music.start('4x');
+                    saveGameState();
+                }
+                return;
+            }
+
+            if (state === GameState.PLAYING) {
+                if (e.key === 'Enter') {
+                    if (destinationStar && selectedShips.length > 0) {
+                        moveShips(selectedShips, destinationStar.id);
+                    } else {
+                        processTurn();
+                    }
+                    AudioSystem.sfx.select();
+                } else if (e.key === 'Escape') {
+                    if (destinationStar) {
+                        destinationStar = null;
+                    } else if (selectedShips.length > 0) {
+                        selectedShips = [];
+                    } else {
+                        selectedStar = null;
+                    }
+                    updatePanels();
+                }
+            }
+        });
+
+        // ============================================
+        // RENDER FUNCTIONS
+        // ============================================
+        function renderBackground() {
+            ctx.fillStyle = CONFIG.COLORS.background;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+            ctx.strokeStyle = CONFIG.COLORS.grid;
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < CONFIG.WIDTH; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, CONFIG.HEIGHT);
+                ctx.stroke();
+            }
+            for (let y = 0; y < CONFIG.HEIGHT; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(CONFIG.WIDTH, y);
+                ctx.stroke();
+            }
+            // Draw background stars with variety
+            for (let i = 0; i < 150; i++) {
+                const x = (i * 97 + 23) % CONFIG.WIDTH;
+                const y = (i * 53 + 17) % CONFIG.HEIGHT;
+                const brightness = 40 + (i * 7) % 60; // 40-100 brightness
+                const starType = i % 5; // 0-4 for variety
+
+                if (starType === 0) {
+                    // Bright + shaped star
+                    ctx.fillStyle = `rgb(${brightness + 50}, ${brightness + 50}, ${brightness + 80})`;
+                    ctx.fillRect(x - 1, y, 3, 1);
+                    ctx.fillRect(x, y - 1, 1, 3);
+                } else if (starType === 1) {
+                    // Larger dot
+                    ctx.fillStyle = `rgb(${brightness + 30}, ${brightness + 20}, ${brightness})`;
+                    ctx.fillRect(x, y, 2, 2);
+                } else if (starType === 2) {
+                    // Bright single pixel
+                    ctx.fillStyle = `rgb(${brightness + 60}, ${brightness + 60}, ${brightness + 60})`;
+                    ctx.fillRect(x, y, 1, 1);
+                } else {
+                    // Dim single pixel
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness + 10})`;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+        }
+
+        function getStarColor(star) {
+            switch (star.starType) {
+                case 'yellow': return CONFIG.COLORS.starYellow;
+                case 'red': return CONFIG.COLORS.starRed;
+                case 'blue': return CONFIG.COLORS.starBlue;
+                case 'white': return CONFIG.COLORS.starWhite;
+            }
+            return CONFIG.COLORS.starYellow;
+        }
+
+        function renderStars() {
+            // Draw travel lines for ships in transit and ship progress
+            ctx.strokeStyle = player.color;
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+
+            // Group ships by route for cleaner display
+            const shipsByRoute = new Map(); // "originId-destId" -> ships[]
+            for (const ship of ships) {
+                if (ship.destination !== null && ship.owner === 'player') {
+                    const routeKey = `${ship.location}-${ship.destination}`;
+                    if (!shipsByRoute.has(routeKey)) {
+                        shipsByRoute.set(routeKey, []);
+                    }
+                    shipsByRoute.get(routeKey).push(ship);
+                }
+            }
+
+            // Draw lines and ship progress indicators
+            for (const [routeKey, routeShips] of shipsByRoute) {
+                const origin = stars.find(s => s.id === routeShips[0].location);
+                const dest = stars.find(s => s.id === routeShips[0].destination);
+                if (origin && dest) {
+                    // Draw dotted line
+                    ctx.beginPath();
+                    ctx.moveTo(origin.x, origin.y);
+                    ctx.lineTo(dest.x, dest.y);
+                    ctx.stroke();
+
+                    // Draw ship progress indicators (only for multi-turn journeys)
+                    for (const ship of routeShips) {
+                        const totalTurns = ship.totalTurns || ship.turnsToArrival;
+                        if (totalTurns > 1) {
+                            // Calculate progress (0 = at origin, 1 = at destination)
+                            const progress = (totalTurns - ship.turnsToArrival) / totalTurns;
+                            const shipX = origin.x + (dest.x - origin.x) * progress;
+                            const shipY = origin.y + (dest.y - origin.y) * progress;
+
+                            // Draw ship indicator circle
+                            ctx.setLineDash([]);
+                            ctx.fillStyle = player.color;
+                            ctx.beginPath();
+                            ctx.arc(shipX, shipY, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.setLineDash([5, 5]);
+                        }
+                    }
+                }
+            }
+            ctx.setLineDash([]);
+
+            // Draw destination preview line
+            if (destinationStar && selectedStar && selectedShips.length > 0) {
+                ctx.strokeStyle = CONFIG.COLORS.destination;
+                ctx.setLineDash([3, 3]);
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(selectedStar.x, selectedStar.y);
+                ctx.lineTo(destinationStar.x, destinationStar.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Travel time label
+                const travelInfo = calculateTravelInfo(selectedStar, destinationStar, selectedShips);
+                const midX = (selectedStar.x + destinationStar.x) / 2;
+                const midY = (selectedStar.y + destinationStar.y) / 2;
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                ctx.fillRect(midX - 35, midY - 10, 70, 20);
+                ctx.fillStyle = CONFIG.COLORS.destination;
+                ctx.font = '10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${travelInfo.turns} turns`, midX, midY + 4);
+            }
+
+            for (const star of stars) {
+                const isSelected = selectedStar && selectedStar.id === star.id;
+                const isDestination = destinationStar && destinationStar.id === star.id;
+                const isHovered = hoveredStar && hoveredStar.id === star.id;
+                const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
+                // Only show enemy ships for explored planets
+                const enemyShipsHere = star.explored ? getShipsAtStar(star.id).filter(s => s.owner !== 'player') : [];
+
+                // Destination ring
+                if (isDestination) {
+                    ctx.strokeStyle = CONFIG.COLORS.destination;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, 24, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // Selection ring
+                if (isSelected) {
+                    ctx.strokeStyle = player.color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, 22, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // Hover ring
+                if (isHovered && !isSelected && !isDestination) {
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, 20, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // Owner indicator ring
+                if (star.owner === 'player') {
+                    ctx.strokeStyle = player.color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, 16, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (star.owner) {
+                    // Enemy colony ring
+                    const enemyRace = RACES.find(r => r.id === star.owner);
+                    if (enemyRace) {
+                        ctx.strokeStyle = enemyRace.color;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(star.x, star.y, 16, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                }
+
+                // Star glow
+                if (star.explored) {
+                    const gradient = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, 15);
+                    gradient.addColorStop(0, getStarColor(star));
+                    gradient.addColorStop(1, 'transparent');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, 15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Star core
+                ctx.fillStyle = star.explored ? getStarColor(star) : CONFIG.COLORS.unexplored;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.explored ? 6 : 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Star name
+                ctx.fillStyle = star.explored ? '#fff' : '#666';
+                ctx.font = '10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(star.name, star.x, star.y + 28);
+
+                // Ship counts - center the pair if both present
+                ctx.font = 'bold 10px Courier New';
+                const hasPlayer = shipsHere.length > 0;
+                const hasEnemy = enemyShipsHere.length > 0;
+                const enemyColor = hasEnemy ? (RACES.find(r => r.id === enemyShipsHere[0].owner)?.color || '#ff6b6b') : '#ff6b6b';
+
+                if (hasPlayer && hasEnemy) {
+                    // Both present - center the pair
+                    ctx.fillStyle = player.color;
+                    ctx.fillText(`[${shipsHere.length}]`, star.x - 13, star.y - 20);
+                    ctx.fillStyle = enemyColor;
+                    ctx.fillText(`[${enemyShipsHere.length}]`, star.x + 13, star.y - 20);
+                } else if (hasPlayer) {
+                    ctx.fillStyle = player.color;
+                    ctx.fillText(`[${shipsHere.length}]`, star.x, star.y - 20);
+                } else if (hasEnemy) {
+                    ctx.fillStyle = enemyColor;
+                    ctx.fillText(`[${enemyShipsHere.length}]`, star.x, star.y - 20);
+                }
+
+                // Planet type (when selected)
+                if (star.explored && isSelected) {
+                    const planetInfo = PLANET_TYPES[star.planetType];
+                    ctx.fillStyle = planetInfo.color;
+                    ctx.font = '9px Courier New';
+                    ctx.fillText(planetInfo.name, star.x, star.y + 38);
+                }
+            }
+        }
+
+        function renderTitle() {
+            renderBackground();
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = 'bold 48px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('GALACTIC 4X', CONFIG.WIDTH / 2, 150);
+
+            ctx.fillStyle = '#888';
+            ctx.font = '16px Courier New';
+            ctx.fillText('Explore, Expand, Exploit, Exterminate', CONFIG.WIDTH / 2, 190);
+
+            if (hasSaveGame) {
+                ctx.fillStyle = '#ffe66d';
+                ctx.font = '16px Courier New';
+                ctx.fillText('[ Continue ]', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
+                ctx.fillStyle = '#4ecdc4';
+                ctx.fillText('[ New Game ]', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 90);
+            } else {
+                ctx.fillStyle = '#ffe66d';
+                ctx.font = '14px Courier New';
+                ctx.fillText('Click to begin', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
+            }
+
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Courier New';
+            ctx.fillText('Build your galactic empire across the stars', CONFIG.WIDTH / 2, CONFIG.HEIGHT - 100);
+        }
+
+        function renderRaceSelect() {
+            renderBackground();
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = 'bold 28px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('SELECT YOUR RACE', CONFIG.WIDTH / 2, 80);
+
+            const raceY = 120;
+            const raceHeight = 50;
+
+            for (let i = 0; i < RACES.length; i++) {
+                const race = RACES[i];
+                const y = raceY + i * raceHeight;
+                const isHovered = i === raceSelectIndex;
+
+                if (isHovered) {
+                    ctx.fillStyle = 'rgba(78, 205, 196, 0.2)';
+                    ctx.fillRect(100, y, CONFIG.WIDTH - 200, raceHeight - 5);
+                }
+
+                ctx.fillStyle = race.color;
+                ctx.font = isHovered ? 'bold 16px Courier New' : '14px Courier New';
+                ctx.textAlign = 'left';
+                ctx.fillText(race.name, 120, y + 20);
+
+                ctx.fillStyle = '#888';
+                ctx.font = '11px Courier New';
+                ctx.fillText(race.desc, 120, y + 36);
+
+                if (isHovered) {
+                    ctx.fillStyle = race.color;
+                    ctx.fillText('>', 105, y + 20);
+                }
+            }
+
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('Use arrows or click to select, Enter to confirm', CONFIG.WIDTH / 2, CONFIG.HEIGHT - 40);
+        }
+
+        function renderPlaying() {
+            renderBackground();
+            renderStars();
+
+            // Turn counter
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(CONFIG.WIDTH - 100, 10, 90, 30);
+            ctx.strokeStyle = '#4a4a6a';
+            ctx.strokeRect(CONFIG.WIDTH - 100, 10, 90, 30);
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = 'bold 12px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('Year ' + year, CONFIG.WIDTH - 55, 30);
+        }
+
+        // ============================================
+        // AUDIO CONTROLS
+        // ============================================
+        document.getElementById('musicToggle').addEventListener('change', (e) => {
+            AudioSystem.musicEnabled = e.target.checked;
+            if (!e.target.checked) {
+                AudioSystem.music.stop();
+            }
+            gameData.musicEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        document.getElementById('debugToggle').addEventListener('change', (e) => {
+            debugMode = e.target.checked;
+            saveGameState();
+        });
+
+        AudioSystem.musicEnabled = gameData.musicEnabled;
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        document.getElementById('musicToggle').checked = gameData.musicEnabled;
+        document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+
+        // ============================================
+        // GAME LOOP
+        // ============================================
+        let lastFrameTime = 0;
+
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastFrameTime;
+            lastFrameTime = currentTime;
+
+            GameController.poll();
+
+            switch (state) {
+                case GameState.TITLE:
+                    renderTitle();
+                    break;
+                case GameState.RACE_SELECT:
+                    renderRaceSelect();
+                    break;
+                case GameState.PLAYING:
+                case GameState.END_TURN:
+                    renderPlaying();
+                    break;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================
+        // START
+        // ============================================
+        hasSaveGame = localStorage.getItem(SAVE_KEY) !== null;
+        console.log('Galactic 4X initialized');
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>

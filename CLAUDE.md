@@ -18,6 +18,7 @@ WebArcade/
 ├── brickspinner.html    # Game: Brick Spinner (Tetris-style)
 ├── serpentine.html      # Game: Serpentine (Snake)
 ├── galacticdefense.html # Game: Galactic Defense (Space Invaders)
+├── galactic4x.html      # Game: Galactic 4X (turn-based space strategy)
 ├── pool.html            # Game: Pool (8-ball billiards)
 ├── grid.js              # Hex and triangle grid geometry library
 ├── sapper.js            # Shared game logic for square-grid Sapper games
@@ -212,6 +213,33 @@ Level-based: MENU → LEVEL_SELECT → PLAYING ↔ PAUSED → LEVEL_COMPLETE →
 - **PAUSED:** 250ms delay before unpause allowed (prevents flicker)
 - **GAME_OVER:** Show score, "NEW HIGH SCORE!" if applicable
 
+### View System (Galactic 4X)
+
+For games with multiple UI panels (like Galactic 4X), use a separate view state:
+```javascript
+const ViewState = {
+    OVERVIEW: 'overview',
+    PLANETS: 'planets',
+    COLONY: 'colony',
+    HISTORY: 'history'
+};
+let currentView = ViewState.OVERVIEW;
+```
+
+**Key principles:**
+- Views always update BOTH panels (left and right). Never leave one stale.
+- Each view renders its own panel titles dynamically (not in static HTML)
+- View buttons highlight the active view and grey out unavailable ones
+- Colony view requires a selected star; other views (except Planets) clear the selection
+
+**Panel structure:**
+```html
+<div id="planetPanel" class="side-panel">
+    <div id="planetContent" class="panel-content"></div>
+</div>
+<!-- Content is fully replaced by updatePlanetPanel() based on currentView -->
+```
+
 ### Audio Toggle UI
 ```html
 <div id="audioControls">
@@ -225,6 +253,9 @@ Level-based: MENU → LEVEL_SELECT → PLAYING ↔ PAUSED → LEVEL_COMPLETE →
 - Primary: #4ecdc4 (cyan)
 - Highlight: #ffe66d (yellow)
 - Danger: #ff6b6b (red)
+
+### UI Text
+- Avoid text wrapping in UI elements - size containers to fit content on single lines
 
 ## Debug Utility
 
