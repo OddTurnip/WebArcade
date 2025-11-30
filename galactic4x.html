@@ -1471,11 +1471,13 @@
                         const info = damageToShips.get(unit.id);
                         const hpBefore = unit.hp;
                         unit.hp -= info.damage;
-                        // Log each attack
+                        // Log each attack with running HP
+                        let runningHp = hpBefore;
                         for (const atk of info.attacks) {
+                            runningHp -= atk.damage;
                             const attackerName = atk.attacker.debugName || atk.attacker;
-                            const destroyed = unit.hp <= 0 ? ' [DESTROYED]' : '';
-                            combatLog.push(`${attackerName} → ${unit.debugName} (${atk.damage} dmg, ${Math.max(0, unit.hp)}/${unit.maxHp} HP)${destroyed}`);
+                            const destroyed = runningHp <= 0 ? ' [DESTROYED]' : '';
+                            combatLog.push(`${attackerName} → ${unit.debugName} (${atk.damage} dmg, ${Math.max(0, runningHp)}/${unit.maxHp} HP)${destroyed}`);
                         }
                     }
                 }
