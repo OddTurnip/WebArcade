@@ -50,7 +50,7 @@
             border: 4px solid #4a4a6a;
             border-radius: 4px;
             padding: 12px;
-            height: 620px;
+            height: 652px;
             display: flex;
             flex-direction: column;
         }
@@ -319,7 +319,6 @@
     </style>
 </head>
 <body>
-    <h1>Galactic 4X</h1>
     <div id="gameContainer">
         <div id="planetPanel" class="side-panel hidden">
             <div id="planetContent" class="panel-content"></div>
@@ -432,12 +431,12 @@
         }
 
         const RACES = [
-            { id: 'terran', name: 'Terran Federation', color: '#4ecdc4', desc: 'Adaptable and expansionist humans' },
-            { id: 'crystalline', name: 'Crystalline Collective', color: '#9932cc', desc: 'Silicon-based mineral lifeforms' },
-            { id: 'aquan', name: 'Aquan Dominion', color: '#4a9fff', desc: 'Ocean-dwelling telepaths' },
-            { id: 'hivemind', name: 'Hive Swarm', color: '#ffa500', desc: 'Unified insectoid consciousness' },
-            { id: 'aviari', name: 'Aviari Consortium', color: '#ffe66d', desc: 'Elegant avian traders' },
-            { id: 'saurian', name: 'Saurian Empire', color: '#ff6b6b', desc: 'Ancient reptilian warriors' }
+            { id: 'terran', name: 'Terran Federation', shortName: 'Terran', color: '#4ecdc4', desc: 'Adaptable and expansionist humans' },
+            { id: 'crystalline', name: 'Crystalline Collective', shortName: 'Crystal', color: '#9932cc', desc: 'Silicon-based mineral lifeforms' },
+            { id: 'aquan', name: 'Aquan Dominion', shortName: 'Aquan', color: '#4a9fff', desc: 'Ocean-dwelling telepaths' },
+            { id: 'hivemind', name: 'Hive Swarm', shortName: 'Swarm', color: '#ffa500', desc: 'Unified insectoid consciousness' },
+            { id: 'aviari', name: 'Aviari Consortium', shortName: 'Aviari', color: '#ffe66d', desc: 'Elegant avian traders' },
+            { id: 'saurian', name: 'Saurian Empire', shortName: 'Saurian', color: '#ff6b6b', desc: 'Ancient reptilian warriors' }
         ];
 
         const STAR_NAMES = [
@@ -1608,9 +1607,7 @@
             // Planet view - show selected planet details
             if (currentView === ViewState.PLANET && selectedStar) {
                 const star = selectedStar;
-                let html = '<div class="panel-title">Planet</div>';
-
-                html += `<div class="panel-subtitle">${star.name}</div>`;
+                let html = `<div class="panel-title">Planet ${star.name}</div>`;
 
             if (star.explored) {
                 const planetInfo = PLANET_TYPES[star.planetType];
@@ -1743,7 +1740,7 @@
                 // Enemy colony
                 const enemyRace = RACES.find(r => r.id === star.owner);
                 const planetInfo = PLANET_TYPES[star.planetType];
-                html += `<div style="margin-top:10px" class="panel-title">Enemy Colony</div>`;
+                html += `<div style="margin-top:10px" class="panel-title">${enemyRace?.shortName || 'Enemy'} Colony</div>`;
                 html += `<div class="info-row"><span class="info-label">Owner:</span><span class="info-value" style="color:${enemyRace?.color || '#ff6b6b'}">${enemyRace?.name || star.owner}</span></div>`;
                 html += `<div class="info-row"><span class="info-label">Population:</span><span class="info-value">${Math.floor(star.population)}</span></div>`;
                 html += `<div class="info-row"><span class="info-label">Defense:</span><span class="info-value">${star.defense}</span></div>`;
@@ -1907,8 +1904,7 @@
                 const shipsHere = getShipsAtStar(star.id).filter(s => s.owner === 'player');
                 const incomingShips = ships.filter(s => s.destination === star.id && s.owner === 'player');
 
-                let html = '<div class="panel-title">Fleets</div>';
-                html += `<div class="panel-subtitle">${star.name}</div>`;
+                let html = `<div class="panel-title">Fleets at ${star.name}</div>`;
 
             if (shipsHere.length > 0) {
                 // Group ships by type
@@ -1996,7 +1992,7 @@
                     const enemyOwner = enemyShipsHere[0].owner;
                     const enemyRace = RACES.find(r => r.id === enemyOwner);
                     const enemyColor = enemyRace?.color || '#ff6b6b';
-                    html += `<div style="margin-top:10px" class="panel-title" style="color:${enemyColor}">Enemy Fleet</div>`;
+                    html += `<div style="margin-top:10px" class="panel-title" style="color:${enemyColor}">${enemyRace?.shortName || 'Enemy'} Fleet</div>`;
                     // Group by type
                     const enemyByType = {};
                     for (const ship of enemyShipsHere) {
