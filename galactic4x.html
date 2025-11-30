@@ -326,9 +326,52 @@
             border-radius: 4px;
         }
         .hidden { display: none !important; }
+        #gameModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        #gameModal.hidden { display: none; }
+        .modal-content {
+            background: #1a1a2e;
+            border: 4px solid #4a4a6a;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 400px;
+            text-align: center;
+        }
+        .modal-content h3 {
+            color: #ffe66d;
+            margin-bottom: 15px;
+        }
+        .modal-content pre {
+            text-align: left;
+            color: #aaa;
+            font-size: 12px;
+            line-height: 1.5;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        .modal-content button {
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
+    <div id="gameModal" class="hidden">
+        <div class="modal-content">
+            <h3 id="modalTitle"></h3>
+            <pre id="modalBody"></pre>
+            <button class="btn btn-primary" onclick="closeModal()">OK</button>
+        </div>
+    </div>
     <div id="gameContainer">
         <div id="planetPanel" class="side-panel hidden">
             <div id="planetContent" class="panel-content"></div>
@@ -338,7 +381,10 @@
             <div id="actionPanel" class="hidden">
                 <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;">
                     <div id="viewButtons" style="display:flex;gap:10px;align-items:center;"></div>
-                    <button class="btn btn-primary" id="endTurnBtn" onclick="window.endTurn()">End Turn</button>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <button class="btn" id="globalExploreBtn" onclick="window.globalExplore()" style="display:none;">Explore</button>
+                        <button class="btn btn-primary" id="endTurnBtn" onclick="window.endTurn()">End Year</button>
+                    </div>
                 </div>
                 <div id="turnInfo" style="color:#888;font-size:11px;margin-top:6px;"></div>
             </div>
@@ -597,7 +643,21 @@
         const actionPanel = document.getElementById('actionPanel');
         const viewButtons = document.getElementById('viewButtons');
         const turnInfo = document.getElementById('turnInfo');
+        const globalExploreBtn = document.getElementById('globalExploreBtn');
+        const gameModal = document.getElementById('gameModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
         const canvas = document.getElementById('gameCanvas');
+
+        function showModal(title, body) {
+            modalTitle.textContent = title;
+            modalBody.textContent = body;
+            gameModal.classList.remove('hidden');
+        }
+
+        window.closeModal = function() {
+            gameModal.classList.add('hidden');
+        };
         const ctx = canvas.getContext('2d');
 
         // ============================================
@@ -818,6 +878,16 @@
             const conquestPercent = maxMapProduction > 0 ? Math.round((totalProduction / maxMapProduction) * 100) : 0;
 
             turnInfo.textContent = `Year ${year} | Colonies: ${colonies.length} | Ships: ${totalShips} | Prod: ${Math.floor(totalProduction)}/year | Dev: ${devPercent}% | Conquest: ${conquestPercent}%`;
+
+            // Show/hide global explore button
+            const allScouts = ships.filter(s => s.owner === 'player' && s.type === 'scout' && s.destination === null);
+            const unexploredStars = stars.filter(s => !s.explored);
+            if (allScouts.length > 0 && unexploredStars.length > 0) {
+                globalExploreBtn.style.display = 'inline-block';
+                globalExploreBtn.textContent = `Explore (${allScouts.length})`;
+            } else {
+                globalExploreBtn.style.display = 'none';
+            }
         }
 
         function getShipsAtStar(starId) {
@@ -1430,8 +1500,7 @@
             AudioSystem.sfx.explosion();
 
             // Build result message
-            let resultMsg = `⚔️ Combat at ${star.name}!\n\n`;
-            resultMsg += `Your losses: ${playerShipLosses.length} ships`;
+            let resultMsg = `Your losses: ${playerShipLosses.length} ships`;
             if (playerDefenseLost > 0) resultMsg += `, ${playerDefenseLost} defense`;
             resultMsg += `\nEnemy losses: ${enemyShipLosses.length} ships`;
             if (enemyDefenseLost > 0) resultMsg += `, ${enemyDefenseLost} defense`;
@@ -1451,7 +1520,7 @@
                 victory: enemyMilitarySurvivors.length === 0 && playerMilitarySurvivors.length > 0
             });
 
-            alert(resultMsg);
+            showModal(`⚔️ Combat at ${star.name}!`, resultMsg);
 
             updatePanels();
             updateTurnInfo();
@@ -2375,6 +2444,76 @@
                 selectedShips = [];
                 destinationStar = null;
                 updatePanels();
+                draw();
+            }
+        };
+
+        window.globalExplore = function() {
+            // Get all player scouts that are stationary (not already moving)
+            const allScouts = ships.filter(s =>
+                s.owner === 'player' &&
+                s.type === 'scout' &&
+                s.destination === null &&
+                !shipsInCombatThisTurn.has(s.id)
+            );
+
+            if (allScouts.length === 0) return;
+
+            // Get unexplored stars
+            const unexploredStars = stars.filter(s => !s.explored);
+            if (unexploredStars.length === 0) return;
+
+            // Get stars that already have a player ship heading there
+            const destinationsInUse = new Set();
+            for (const ship of ships) {
+                if (ship.owner === 'player' && ship.destination !== null) {
+                    destinationsInUse.add(ship.destination);
+                }
+            }
+
+            // Sort scouts by their distance to the closest unexplored star
+            const scoutsWithClosest = allScouts.map(scout => {
+                const scoutStar = stars.find(s => s.id === scout.location);
+                if (!scoutStar) return { scout, minDist: Infinity };
+
+                let minDist = Infinity;
+                for (const unexplored of unexploredStars) {
+                    if (!destinationsInUse.has(unexplored.id)) {
+                        const dist = Math.sqrt(Math.pow(unexplored.x - scoutStar.x, 2) + Math.pow(unexplored.y - scoutStar.y, 2));
+                        if (dist < minDist) minDist = dist;
+                    }
+                }
+                return { scout, minDist, star: scoutStar };
+            }).sort((a, b) => a.minDist - b.minDist);
+
+            // Assign scouts starting with the one closest to an unexplored star
+            let assignedCount = 0;
+            for (const { scout, star } of scoutsWithClosest) {
+                if (!star) continue;
+
+                // Find closest unexplored star not already targeted
+                const availableTargets = unexploredStars
+                    .filter(s => !destinationsInUse.has(s.id))
+                    .map(s => ({
+                        star: s,
+                        distance: Math.sqrt(Math.pow(s.x - star.x, 2) + Math.pow(s.y - star.y, 2))
+                    }))
+                    .sort((a, b) => a.distance - b.distance);
+
+                if (availableTargets.length === 0) break;
+
+                const target = availableTargets[0].star;
+                moveShips([scout.id], target.id);
+                destinationsInUse.add(target.id);
+                assignedCount++;
+            }
+
+            if (assignedCount > 0) {
+                AudioSystem.sfx.select();
+                selectedShips = [];
+                destinationStar = null;
+                updatePanels();
+                updateTurnInfo();
                 draw();
             }
         };
