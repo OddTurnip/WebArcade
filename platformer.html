@@ -232,10 +232,16 @@
                 level[LEVEL_HEIGHT - 9][x] = TILE.GROUND;
             }
 
-            // Temple walls (block the sides so player can't fall off or go past)
+            // Fill in temple interior (solid structure below platform)
             for (let y = LEVEL_HEIGHT - 8; y < LEVEL_HEIGHT - 2; y++) {
-                level[y][99] = TILE.GROUND;  // Right wall
+                for (let x = 94; x < 100; x++) {
+                    level[y][x] = TILE.GROUND;
+                }
             }
+
+            // Temple door (empty space for Level 2 entrance)
+            level[LEVEL_HEIGHT - 4][97] = TILE.EMPTY;
+            level[LEVEL_HEIGHT - 3][97] = TILE.EMPTY;
 
             // Goal gem at top of temple
             level[LEVEL_HEIGHT - 10][96] = TILE.GOAL;
@@ -243,8 +249,95 @@
             return level;
         }
 
-        // Enemy spawn positions (x tile position)
-        const ENEMY_SPAWNS = [18, 30, 40, 52, 68, 82];
+        function createLevel2() {
+            // Level 2: Inside the temple - darker, more enclosed
+            const level = [];
+            for (let y = 0; y < LEVEL_HEIGHT; y++) {
+                level[y] = [];
+                for (let x = 0; x < LEVEL_WIDTH; x++) {
+                    level[y][x] = TILE.EMPTY;
+                }
+            }
+
+            // Fill ground (bottom 2 rows)
+            for (let x = 0; x < LEVEL_WIDTH; x++) {
+                level[LEVEL_HEIGHT - 1][x] = TILE.GROUND;
+                level[LEVEL_HEIGHT - 2][x] = TILE.GROUND;
+            }
+
+            // Ceiling (top rows) - temple interior has a ceiling
+            for (let x = 0; x < LEVEL_WIDTH; x++) {
+                level[0][x] = TILE.GROUND;
+                level[1][x] = TILE.GROUND;
+            }
+
+            // Add pits (spike pits in temple)
+            const pits = [
+                { x: 15, width: 2 },
+                { x: 28, width: 3 },
+                { x: 45, width: 2 },
+                { x: 58, width: 4 },
+                { x: 72, width: 2 }
+            ];
+            for (const pit of pits) {
+                for (let px = pit.x; px < pit.x + pit.width; px++) {
+                    level[LEVEL_HEIGHT - 1][px] = TILE.PIT;
+                    level[LEVEL_HEIGHT - 2][px] = TILE.PIT;
+                }
+            }
+
+            // Add platforms (stone platforms inside temple)
+            const platforms = [
+                { x: 10, y: 10, width: 5 },
+                { x: 20, y: 8, width: 4 },
+                { x: 32, y: 10, width: 6 },
+                { x: 42, y: 7, width: 3 },
+                { x: 50, y: 10, width: 4 },
+                { x: 62, y: 9, width: 5 },
+                { x: 75, y: 10, width: 4 },
+                { x: 82, y: 8, width: 3 }
+            ];
+            for (const plat of platforms) {
+                for (let px = plat.x; px < plat.x + plat.width; px++) {
+                    level[plat.y][px] = TILE.BRICK;
+                }
+            }
+
+            // Add rune blocks
+            const blocks = [
+                { x: 8, y: 9 },
+                { x: 25, y: 5 },
+                { x: 38, y: 9 },
+                { x: 55, y: 6 },
+                { x: 68, y: 9 },
+                { x: 80, y: 5 }
+            ];
+            for (const block of blocks) {
+                level[block.y][block.x] = TILE.BLOCK;
+            }
+
+            // Temple exit structure at end
+            for (let i = 0; i < 4; i++) {
+                for (let y = LEVEL_HEIGHT - 3; y >= LEVEL_HEIGHT - 3 - i; y--) {
+                    level[y][90 + i] = TILE.GROUND;
+                }
+            }
+
+            // Final gem pedestal
+            level[LEVEL_HEIGHT - 8][96] = TILE.GROUND;
+            level[LEVEL_HEIGHT - 9][96] = TILE.GOAL;
+
+            // Block the end
+            for (let y = 2; y < LEVEL_HEIGHT - 2; y++) {
+                level[y][99] = TILE.GROUND;
+            }
+
+            return level;
+        }
+
+        // Enemy spawn positions per level
+        const ENEMY_SPAWNS_L1 = [18, 30, 40, 52, 68, 82];
+        const ENEMY_SPAWNS_L2 = [12, 24, 36, 48, 60, 70, 78];
 
         // ============================================
         // PERSISTENCE
@@ -264,6 +357,7 @@
             PLAYING: 'playing',
             PAUSED: 'paused',
             GAME_OVER: 'game_over',
+            LEVEL_TRANSITION: 'level_transition',
             LEVEL_COMPLETE: 'level_complete'
         };
 
@@ -275,8 +369,11 @@
         let maxCameraX = 0; // For no-backtracking
         let pauseTime = 0;
         let stateChangeTime = 0;
+        let currentLevel = 1;
+        let transitionTimer = 0;
         const UNPAUSE_DELAY = 250;
         const STATE_CHANGE_DELAY = 250;
+        const MAX_LEVELS = 2;
 
         // Player state
         const player = {
@@ -308,10 +405,14 @@
         // ============================================
         // INITIALIZATION
         // ============================================
-        function initGame() {
-            level = createLevel();
-            score = 0;
-            isNewHighScore = false;
+        function initLevel(levelNum) {
+            // Create level based on number
+            if (levelNum === 1) {
+                level = createLevel();
+            } else {
+                level = createLevel2();
+            }
+
             cameraX = 0;
             maxCameraX = 0;
 
@@ -325,9 +426,10 @@
             player.animFrame = 0;
             player.animTimer = 0;
 
-            // Spawn enemies
+            // Spawn enemies based on level
             enemies = [];
-            for (const spawnX of ENEMY_SPAWNS) {
+            const spawns = levelNum === 1 ? ENEMY_SPAWNS_L1 : ENEMY_SPAWNS_L2;
+            for (const spawnX of spawns) {
                 enemies.push({
                     x: spawnX * CONFIG.TILE_SIZE,
                     y: (LEVEL_HEIGHT - 3) * CONFIG.TILE_SIZE,
@@ -338,7 +440,13 @@
                     squashTimer: 0
                 });
             }
+        }
 
+        function initGame() {
+            currentLevel = 1;
+            score = 0;
+            isNewHighScore = false;
+            initLevel(currentLevel);
             updateDisplays();
         }
 
@@ -609,21 +717,77 @@
         }
 
         function levelComplete() {
-            AudioSystem.music.stop();
             AudioSystem.sfx.levelComplete();
-
             score += 1000; // Completion bonus
-
-            if (score > gameData.highScore) {
-                gameData.highScore = score;
-                isNewHighScore = gameData.gamesPlayed > 0;
-            }
-            gameData.gamesPlayed++;
-            saveGameData();
             updateDisplays();
 
-            stateChangeTime = Date.now();
-            state = GameState.LEVEL_COMPLETE;
+            if (currentLevel < MAX_LEVELS) {
+                // Transition to next level - auto-walk to door
+                transitionTimer = 0;
+                state = GameState.LEVEL_TRANSITION;
+            } else {
+                // Final level complete - game won!
+                AudioSystem.music.stop();
+
+                if (score > gameData.highScore) {
+                    gameData.highScore = score;
+                    isNewHighScore = gameData.gamesPlayed > 0;
+                }
+                gameData.gamesPlayed++;
+                saveGameData();
+                updateDisplays();
+
+                stateChangeTime = Date.now();
+                state = GameState.LEVEL_COMPLETE;
+            }
+        }
+
+        function updateLevelTransition() {
+            transitionTimer++;
+
+            // Auto-walk player to the right toward the door
+            player.facing = 1;
+            player.vx = CONFIG.PLAYER_SPEED * 0.7;
+
+            // Simple walking animation
+            player.animTimer++;
+            if (player.animTimer >= 10) {
+                player.animTimer = 0;
+                player.animFrame = (player.animFrame + 1) % 3;
+            }
+
+            // Move player
+            player.x += player.vx;
+
+            // Apply gravity
+            player.vy += CONFIG.GRAVITY;
+            if (player.vy > CONFIG.MAX_FALL_SPEED) {
+                player.vy = CONFIG.MAX_FALL_SPEED;
+            }
+
+            // Vertical collision
+            const newY = player.y + player.vy;
+            if (player.vy > 0) {
+                if (checkCollision(player.x, newY, player.width, player.height)) {
+                    player.y = Math.floor((newY + player.height) / CONFIG.TILE_SIZE) * CONFIG.TILE_SIZE - player.height;
+                    player.vy = 0;
+                    player.onGround = true;
+                } else {
+                    player.y = newY;
+                    player.onGround = false;
+                }
+            } else {
+                player.y = newY;
+            }
+
+            // After walking for a bit, fade to next level
+            if (transitionTimer > 90) {
+                // Start next level
+                currentLevel++;
+                initLevel(currentLevel);
+                state = GameState.PLAYING;
+                AudioSystem.music.start('bounce');
+            }
         }
 
         function updatePaused() {
@@ -662,25 +826,45 @@
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
 
-            // Draw clouds (parallax)
-            const cloudOffset = -cameraX * 0.2;
-            drawCloud(100 + ((cloudOffset % 900) + 900) % 900, 50);
-            drawCloud(400 + ((cloudOffset % 900) + 900) % 900, 70);
-            drawCloud(700 + ((cloudOffset % 900) + 900) % 900, 40);
+            // Background earth layer (behind pits) - darker distant soil
+            ctx.fillStyle = '#3d2817';
+            ctx.fillRect(0, CONFIG.HEIGHT - 80, CONFIG.WIDTH, 80);
+
+            // Draw clouds (parallax) - use screen-relative positions
+            const cloudSpacing = 300;
+            const cloudOffset = (cameraX * 0.2) % cloudSpacing;
+            for (let i = -1; i < 4; i++) {
+                const baseX = i * cloudSpacing - cloudOffset;
+                drawCloud(baseX + 50, 50 + (i % 2) * 20);
+            }
+
+            // Draw distant trees (slower parallax, behind main trees)
+            const distantTreeSpacing = 200;
+            const distantOffset = (cameraX * 0.25) % distantTreeSpacing;
+            ctx.globalAlpha = 0.5;
+            for (let i = -1; i < 5; i++) {
+                const baseX = i * distantTreeSpacing - distantOffset;
+                drawJungleTree(baseX + 100, CONFIG.HEIGHT - 50, 40);
+            }
+            ctx.globalAlpha = 1;
 
             // Draw jungle trees in background (parallax)
-            const treeOffset = -cameraX * 0.4;
-            drawJungleTree(80 + ((treeOffset % 500) + 500) % 500, CONFIG.HEIGHT - 64, 60);
-            drawJungleTree(220 + ((treeOffset % 500) + 500) % 500, CONFIG.HEIGHT - 64, 80);
-            drawJungleTree(380 + ((treeOffset % 500) + 500) % 500, CONFIG.HEIGHT - 64, 50);
-            drawJungleTree(520 + ((treeOffset % 500) + 500) % 500, CONFIG.HEIGHT - 64, 70);
+            const treeSpacing = 180;
+            const treeOffset = (cameraX * 0.4) % treeSpacing;
+            for (let i = -1; i < 5; i++) {
+                const baseX = i * treeSpacing - treeOffset;
+                const height = 55 + (i % 3) * 15;
+                drawJungleTree(baseX + 90, CONFIG.HEIGHT - 64, height);
+            }
 
             // Draw hanging vines
-            const vineOffset = -cameraX * 0.3;
-            drawVine(60 + ((vineOffset % 400) + 400) % 400, 0, 120);
-            drawVine(180 + ((vineOffset % 400) + 400) % 400, 0, 90);
-            drawVine(320 + ((vineOffset % 400) + 400) % 400, 0, 140);
-            drawVine(480 + ((vineOffset % 400) + 400) % 400, 0, 100);
+            const vineSpacing = 160;
+            const vineOffset = (cameraX * 0.3) % vineSpacing;
+            for (let i = -1; i < 6; i++) {
+                const baseX = i * vineSpacing - vineOffset;
+                const length = 80 + (i % 3) * 30;
+                drawVine(baseX + 80, 0, length);
+            }
         }
 
         function drawCloud(x, y) {
@@ -1092,19 +1276,91 @@
             ctx.fillText(`High Score: ${gameData.highScore}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 130);
         }
 
+        function renderTempleInterior() {
+            // Dark stone background for temple interior
+            ctx.fillStyle = '#1a1410';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            // Stone wall texture (parallax)
+            const wallOffset = (cameraX * 0.1) % 80;
+            ctx.fillStyle = '#2a2018';
+            for (let i = -1; i < 10; i++) {
+                const baseX = i * 80 - wallOffset;
+                ctx.fillRect(baseX, 0, 40, CONFIG.HEIGHT);
+            }
+
+            // Torch glow effects
+            const torchSpacing = 200;
+            const torchOffset = (cameraX * 0.5) % torchSpacing;
+            for (let i = -1; i < 5; i++) {
+                const baseX = i * torchSpacing - torchOffset + 100;
+                // Torch bracket
+                ctx.fillStyle = '#4a3828';
+                ctx.fillRect(baseX - 4, 80, 8, 20);
+                // Flame glow
+                ctx.fillStyle = 'rgba(255, 150, 50, 0.3)';
+                ctx.beginPath();
+                ctx.arc(baseX, 70, 40 + Math.sin(Date.now() / 200) * 5, 0, Math.PI * 2);
+                ctx.fill();
+                // Flame
+                ctx.fillStyle = '#ff6600';
+                ctx.beginPath();
+                ctx.ellipse(baseX, 70, 6, 12 + Math.sin(Date.now() / 100) * 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffcc00';
+                ctx.beginPath();
+                ctx.ellipse(baseX, 72, 3, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Ancient carvings on walls
+            ctx.fillStyle = '#3a2a1a';
+            const carvingOffset = (cameraX * 0.2) % 150;
+            for (let i = -1; i < 6; i++) {
+                const baseX = i * 150 - carvingOffset + 50;
+                // Simple hieroglyph-like patterns
+                ctx.fillRect(baseX, 150, 20, 3);
+                ctx.fillRect(baseX + 5, 155, 10, 20);
+                ctx.fillRect(baseX + 25, 145, 15, 5);
+                ctx.fillRect(baseX + 30, 150, 5, 30);
+            }
+        }
+
         function renderPlaying() {
-            renderBackground();
+            if (currentLevel === 2) {
+                renderTempleInterior();
+            } else {
+                renderBackground();
+            }
             renderTiles();
             renderEnemies();
             renderPlayer();
 
-            // Score display
+            // Score and level display
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
-            ctx.fillRect(10, 10, 120, 30);
+            ctx.fillRect(10, 10, 180, 30);
             ctx.fillStyle = CONFIG.COLORS.text;
             ctx.font = '18px "Courier New", monospace';
             ctx.textAlign = 'left';
-            ctx.fillText(`Score: ${score}`, 20, 32);
+            ctx.fillText(`L${currentLevel}  Score: ${score}`, 20, 32);
+        }
+
+        function renderLevelTransition() {
+            renderBackground();
+            renderTiles();
+            renderPlayer();
+
+            // "Entering Temple" text with fade effect
+            const fadeProgress = Math.min(transitionTimer / 60, 1);
+            ctx.fillStyle = `rgba(0,0,0,${fadeProgress * 0.7})`;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            if (transitionTimer > 30) {
+                ctx.fillStyle = CONFIG.COLORS.templeAccent;
+                ctx.font = 'bold 36px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('ENTERING THE TEMPLE...', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2);
+            }
         }
 
         function renderPaused() {
@@ -1124,7 +1380,11 @@
         }
 
         function renderGameOver() {
-            renderBackground();
+            if (currentLevel === 2) {
+                renderTempleInterior();
+            } else {
+                renderBackground();
+            }
             renderTiles();
             renderEnemies();
 
@@ -1152,7 +1412,8 @@
         }
 
         function renderLevelComplete() {
-            renderBackground();
+            // Final victory - show temple interior since we beat level 2
+            renderTempleInterior();
             renderTiles();
             renderPlayer();
 
@@ -1162,16 +1423,20 @@
             ctx.fillStyle = CONFIG.COLORS.gem;
             ctx.font = 'bold 48px "Courier New", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText('GEM FOUND!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 50);
+            ctx.fillText('VICTORY!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 60);
+
+            ctx.fillStyle = CONFIG.COLORS.templeAccent;
+            ctx.font = '20px "Courier New", monospace';
+            ctx.fillText('You claimed the temple treasure!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 20);
 
             ctx.fillStyle = CONFIG.COLORS.text;
             ctx.font = '24px "Courier New", monospace';
-            ctx.fillText(`Score: ${score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 10);
+            ctx.fillText(`Final Score: ${score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
 
             if (isNewHighScore) {
                 ctx.fillStyle = CONFIG.COLORS.textHighlight;
                 ctx.font = 'bold 28px "Courier New", monospace';
-                ctx.fillText('NEW HIGH SCORE!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
+                ctx.fillText('NEW HIGH SCORE!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
             }
 
             ctx.fillStyle = CONFIG.COLORS.textHighlight;
@@ -1247,6 +1512,10 @@
                 case GameState.GAME_OVER:
                     updateGameOver();
                     renderGameOver();
+                    break;
+                case GameState.LEVEL_TRANSITION:
+                    updateLevelTransition();
+                    renderLevelTransition();
                     break;
                 case GameState.LEVEL_COMPLETE:
                     updateLevelComplete();
