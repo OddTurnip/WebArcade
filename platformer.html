@@ -371,6 +371,15 @@
             return false;
         }
 
+        function isOnGround(x, y, width, height) {
+            // Check if there's solid ground just below the player's feet
+            // Check 3 points along the bottom edge, 1 pixel below
+            const groundY = y + height + 1;
+            return isSolidTile(getTileAt(x + 4, groundY)) ||
+                   isSolidTile(getTileAt(x + width / 2, groundY)) ||
+                   isSolidTile(getTileAt(x + width - 4, groundY));
+        }
+
         // ============================================
         // UPDATE FUNCTIONS
         // ============================================
@@ -407,6 +416,9 @@
                 player.x = minPlayerX;
             }
 
+            // Check if on ground before applying physics
+            player.onGround = isOnGround(player.x, player.y, player.width, player.height);
+
             // Jumping
             if (GameController.justPressed('a') && player.onGround) {
                 player.vy = CONFIG.PLAYER_JUMP;
@@ -427,7 +439,6 @@
             }
 
             // Vertical movement with collision
-            player.onGround = false;
             const newY = player.y + player.vy;
 
             if (player.vy > 0) {
@@ -436,7 +447,6 @@
                     // Snap to tile boundary
                     player.y = Math.floor((newY + player.height) / CONFIG.TILE_SIZE) * CONFIG.TILE_SIZE - player.height;
                     player.vy = 0;
-                    player.onGround = true;
                 } else {
                     player.y = newY;
                 }
