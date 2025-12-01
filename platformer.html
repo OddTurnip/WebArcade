@@ -830,12 +830,14 @@
             ctx.fillStyle = '#3d2817';
             ctx.fillRect(0, CONFIG.HEIGHT - 80, CONFIG.WIDTH, 80);
 
-            // Draw clouds (parallax) - use screen-relative positions
+            // Draw clouds (parallax) - use world-based positions
             const cloudSpacing = 300;
             const cloudOffset = (cameraX * 0.2) % cloudSpacing;
+            const cloudWorldBase = Math.floor(cameraX * 0.2 / cloudSpacing);
             for (let i = -1; i < 4; i++) {
                 const baseX = i * cloudSpacing - cloudOffset;
-                drawCloud(baseX + 50, 50 + (i % 2) * 20);
+                const worldIndex = cloudWorldBase + i;
+                drawCloud(baseX + 50, 50 + (Math.abs(worldIndex) % 2) * 20);
             }
 
             // Draw distant trees (slower parallax, behind main trees)
