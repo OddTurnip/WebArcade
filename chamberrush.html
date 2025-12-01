@@ -446,11 +446,13 @@
             const dy = player.y - enemy.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            // Update facing direction
-            if (Math.abs(dx) > Math.abs(dy)) {
-                enemy.dir = dx > 0 ? Dir.RIGHT : Dir.LEFT;
-            } else {
-                enemy.dir = dy > 0 ? Dir.DOWN : Dir.UP;
+            // Update facing direction (only when not winding up or attacking)
+            if (enemy.state === 'idle' || enemy.state === 'moving' || enemy.state === 'cooldown') {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    enemy.dir = dx > 0 ? Dir.RIGHT : Dir.LEFT;
+                } else {
+                    enemy.dir = dy > 0 ? Dir.DOWN : Dir.UP;
+                }
             }
 
             // State machine
@@ -467,9 +469,10 @@
                         enemy.y += moveY;
                         enemy.state = 'moving';
                     } else if (enemy.attackCooldown <= 0) {
-                        // Start attack windup
+                        // Start attack windup - lock direction for telegraph
                         enemy.state = 'windup';
                         enemy.stateTimer = type.attackWindup;
+                        enemy.attackDir = { ...enemy.dir }; // Lock attack direction
 
                         // Boss has special attacks
                         if (type.isBoss) {
@@ -513,10 +516,10 @@
                         }
                     }
 
-                    // Boss charge attack
+                    // Boss charge attack - use locked attack direction
                     if (type.isBoss && enemy.attackPattern === 2) {
-                        enemy.x += enemy.dir.x * 6;
-                        enemy.y += enemy.dir.y * 6;
+                        enemy.x += enemy.attackDir.x * 6;
+                        enemy.y += enemy.attackDir.y * 6;
                     }
 
                     if (enemy.stateTimer <= 0) {
@@ -660,13 +663,14 @@
             const x = enemy.x;
             const y = enemy.y;
 
-            // Telegraph attack
+            // Telegraph attack during windup
             if (enemy.state === 'windup') {
                 const progress = 1 - (enemy.stateTimer / type.attackWindup);
+                const attackDir = enemy.attackDir || enemy.dir;
 
-                // Warning indicator
+                // Warning indicator - reduced opacity
                 ctx.save();
-                ctx.globalAlpha = 0.3 + progress * 0.4;
+                ctx.globalAlpha = 0.15 + progress * 0.2;
 
                 if (type.isBoss && enemy.attackPattern === 1) {
                     // Projectile attack warning - circle
@@ -676,21 +680,21 @@
                     ctx.arc(x, y, type.size + 20 + progress * 30, 0, Math.PI * 2);
                     ctx.stroke();
                 } else if (type.isBoss && enemy.attackPattern === 2) {
-                    // Charge attack warning - line
+                    // Charge attack warning - line using locked direction
                     ctx.strokeStyle = '#f44';
                     ctx.lineWidth = type.size;
                     ctx.beginPath();
                     ctx.moveTo(x, y);
-                    ctx.lineTo(x + enemy.dir.x * 200, y + enemy.dir.y * 200);
+                    ctx.lineTo(x + attackDir.x * 200, y + attackDir.y * 200);
                     ctx.stroke();
                 } else {
-                    // Melee attack warning - arc
+                    // Melee attack warning - arc using locked direction
                     ctx.fillStyle = '#f44';
                     ctx.beginPath();
                     ctx.moveTo(x, y);
                     ctx.arc(x, y, type.attackRange + 20,
-                        enemy.dir.angle - Math.PI/3,
-                        enemy.dir.angle + Math.PI/3);
+                        attackDir.angle - Math.PI/3,
+                        attackDir.angle + Math.PI/3);
                     ctx.closePath();
                     ctx.fill();
                 }
@@ -700,6 +704,39 @@
                 const shake = progress * 3;
                 enemy.shakeX = (Math.random() - 0.5) * shake;
                 enemy.shakeY = (Math.random() - 0.5) * shake;
+            } else if (enemy.state === 'attacking') {
+                // Draw attack animation during attack
+                const attackDir = enemy.attackDir || enemy.dir;
+                const attackProgress = 1 - (enemy.stateTimer / EnemyTypes[enemy.type].attackDuration);
+
+                if (!type.isBoss || enemy.attackPattern === 0) {
+                    // Melee attack swing animation
+                    ctx.save();
+                    ctx.globalAlpha = 0.6;
+                    ctx.fillStyle = '#f66';
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    // Swing through the arc
+                    const startAngle = attackDir.angle - Math.PI/3;
+                    const endAngle = attackDir.angle + Math.PI/3;
+                    const currentAngle = startAngle + (endAngle - startAngle) * attackProgress;
+                    ctx.arc(x, y, type.attackRange + 15, startAngle, currentAngle);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                } else if (type.isBoss && enemy.attackPattern === 2) {
+                    // Charge attack trail
+                    ctx.save();
+                    ctx.globalAlpha = 0.4;
+                    ctx.fillStyle = '#f44';
+                    ctx.beginPath();
+                    ctx.arc(x - attackDir.x * 20, y - attackDir.y * 20, type.size / 2 + 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                enemy.shakeX = 0;
+                enemy.shakeY = 0;
             } else {
                 enemy.shakeX = 0;
                 enemy.shakeY = 0;
