@@ -64,12 +64,33 @@
             cursor: pointer;
             accent-color: #4ecdc4;
         }
+        #scoreGuide {
+            margin-top: 10px;
+            color: #aaa;
+            font-size: 14px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+        .score-entry {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .score-entry canvas {
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
     <h1>Platformer</h1>
     <canvas id="gameCanvas" width="640" height="480"></canvas>
     <div id="scoreDisplay">
+        <div class="score-item">
+            <div class="score-label">Lives</div>
+            <div class="score-value" id="livesDisplay">3</div>
+        </div>
         <div class="score-item">
             <div class="score-label">Score</div>
             <div class="score-value" id="currentScore">0</div>
@@ -86,6 +107,11 @@
     <div id="audioControls">
         <label><input type="checkbox" id="musicToggle" checked> Music</label>
         <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+    <div id="scoreGuide">
+        <strong>Scoring:</strong>
+        <span class="score-entry"><canvas id="snakeIcon" width="24" height="16"></canvas> 100 pts</span>
+        <span class="score-entry"><canvas id="gemIcon" width="16" height="16"></canvas> 1000 pts</span>
     </div>
 
     <script src="controller.js"></script>
@@ -327,6 +353,14 @@
             level[LEVEL_HEIGHT - 8][96] = TILE.GROUND;
             level[LEVEL_HEIGHT - 9][96] = TILE.GOAL;
 
+            // Pit below the gem pedestal (miss the jump = death)
+            for (let px = 94; px <= 98; px++) {
+                if (px !== 96) { // Keep pedestal column solid
+                    level[LEVEL_HEIGHT - 1][px] = TILE.PIT;
+                    level[LEVEL_HEIGHT - 2][px] = TILE.PIT;
+                }
+            }
+
             // Block the end
             for (let y = 2; y < LEVEL_HEIGHT - 2; y++) {
                 level[y][99] = TILE.GROUND;
@@ -374,6 +408,8 @@
         const UNPAUSE_DELAY = 250;
         const STATE_CHANGE_DELAY = 250;
         const MAX_LEVELS = 2;
+        const STARTING_LIVES = 3;
+        let lives = STARTING_LIVES;
 
         // Player state
         const player = {
@@ -401,6 +437,7 @@
 
         const currentScoreEl = document.getElementById('currentScore');
         const highScoreEl = document.getElementById('highScore');
+        const livesEl = document.getElementById('livesDisplay');
 
         // ============================================
         // INITIALIZATION
@@ -445,6 +482,7 @@
         function initGame() {
             currentLevel = 1;
             score = 0;
+            lives = STARTING_LIVES;
             isNewHighScore = false;
             initLevel(currentLevel);
             updateDisplays();
@@ -461,6 +499,7 @@
         function updateDisplays() {
             currentScoreEl.textContent = score;
             highScoreEl.textContent = gameData.highScore;
+            livesEl.textContent = lives;
         }
 
         // ============================================
@@ -704,16 +743,27 @@
             AudioSystem.music.stop();
             AudioSystem.sfx.death();
 
-            if (score > gameData.highScore) {
-                gameData.highScore = score;
-                isNewHighScore = gameData.gamesPlayed > 0;
-            }
-            gameData.gamesPlayed++;
-            saveGameData();
+            lives--;
             updateDisplays();
 
-            stateChangeTime = Date.now();
-            state = GameState.GAME_OVER;
+            if (lives > 0) {
+                // Restart current level
+                initLevel(currentLevel);
+                AudioSystem.music.start('bounce');
+                state = GameState.PLAYING;
+            } else {
+                // Game over
+                if (score > gameData.highScore) {
+                    gameData.highScore = score;
+                    isNewHighScore = gameData.gamesPlayed > 0;
+                }
+                gameData.gamesPlayed++;
+                saveGameData();
+                updateDisplays();
+
+                stateChangeTime = Date.now();
+                state = GameState.GAME_OVER;
+            }
         }
 
         function levelComplete() {
@@ -1533,10 +1583,72 @@
         }
 
         // ============================================
+        // SCORE GUIDE ICONS
+        // ============================================
+        function drawScoreIcons() {
+            // Draw snake icon
+            const snakeCanvas = document.getElementById('snakeIcon');
+            const snakeCtx = snakeCanvas.getContext('2d');
+            snakeCtx.clearRect(0, 0, 24, 16);
+
+            // Snake body coils
+            snakeCtx.fillStyle = CONFIG.COLORS.enemy;
+            snakeCtx.beginPath();
+            snakeCtx.ellipse(6, 10, 4, 5, 0, 0, Math.PI * 2);
+            snakeCtx.ellipse(12, 10, 4, 5, 0, 0, Math.PI * 2);
+            snakeCtx.ellipse(18, 10, 4, 5, 0, 0, Math.PI * 2);
+            snakeCtx.fill();
+
+            // Snake pattern
+            snakeCtx.fillStyle = CONFIG.COLORS.enemyPattern;
+            snakeCtx.fillRect(4, 8, 3, 3);
+            snakeCtx.fillRect(10, 8, 3, 3);
+            snakeCtx.fillRect(16, 8, 3, 3);
+
+            // Snake head
+            snakeCtx.fillStyle = CONFIG.COLORS.enemy;
+            snakeCtx.beginPath();
+            snakeCtx.ellipse(22, 6, 4, 3, 0, 0, Math.PI * 2);
+            snakeCtx.fill();
+
+            // Eye
+            snakeCtx.fillStyle = '#ffff00';
+            snakeCtx.fillRect(21, 4, 2, 2);
+            snakeCtx.fillStyle = '#000000';
+            snakeCtx.fillRect(22, 4, 1, 2);
+
+            // Draw gem icon
+            const gemCanvas = document.getElementById('gemIcon');
+            const gemCtx = gemCanvas.getContext('2d');
+            gemCtx.clearRect(0, 0, 16, 16);
+
+            // Main gem body (diamond shape)
+            gemCtx.fillStyle = CONFIG.COLORS.gem;
+            gemCtx.beginPath();
+            gemCtx.moveTo(8, 1);   // Top
+            gemCtx.lineTo(14, 8);  // Right
+            gemCtx.lineTo(8, 15);  // Bottom
+            gemCtx.lineTo(2, 8);   // Left
+            gemCtx.closePath();
+            gemCtx.fill();
+
+            // Gem shine
+            gemCtx.fillStyle = CONFIG.COLORS.gemShine;
+            gemCtx.beginPath();
+            gemCtx.moveTo(6, 4);
+            gemCtx.lineTo(10, 6);
+            gemCtx.lineTo(6, 10);
+            gemCtx.lineTo(4, 6);
+            gemCtx.closePath();
+            gemCtx.fill();
+        }
+
+        // ============================================
         // START
         // ============================================
         console.log('Platformer initialized');
         highScoreEl.textContent = gameData.highScore;
+        drawScoreIcons();
         requestAnimationFrame(gameLoop);
     </script>
 </body>
