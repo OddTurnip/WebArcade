@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chamber Rush - WebArcade</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+            color: #fff;
+            padding: 20px;
+        }
+        h1 {
+            color: #4ecdc4;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px #000;
+        }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            background: #000;
+            image-rendering: pixelated;
+        }
+        #controls {
+            margin-top: 15px;
+            color: #888;
+            font-size: 12px;
+            text-align: center;
+        }
+        #audioControls {
+            margin-top: 10px;
+            display: flex;
+            gap: 20px;
+        }
+        #audioControls label {
+            color: #888;
+            cursor: pointer;
+            user-select: none;
+        }
+        #audioControls input {
+            cursor: pointer;
+        }
+        a {
+            color: #4ecdc4;
+            text-decoration: none;
+            margin-top: 15px;
+        }
+        a:hover {
+            color: #ffe66d;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chamber Rush</h1>
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <div id="controls">
+        WASD/Arrows: Move | Space/Z: Sword | Shift/X: Shield | P/Esc: Pause
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+    <a href="../index.html">← Back to Games</a>
+
+    <script src="../controller.js"></script>
+    <script src="../audio.js"></script>
+    <script src="../storage.js"></script>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const GAME_ID = 'chamberrush';
+
+        // Game constants
+        const TILE_SIZE = 32;
+        const ROOM_WIDTH = 20;  // tiles
+        const ROOM_HEIGHT = 15; // tiles
+        const PLAYER_SIZE = 24;
+        const PLAYER_SPEED = 3;
+        const SWORD_RANGE = 40;
+        const SWORD_ARC = Math.PI * 0.8; // ~144 degree arc
+        const SWORD_DURATION = 15; // frames
+        const SHIELD_BLOCK_ARC = Math.PI * 0.6; // ~108 degree block cone
+
+        // Game states
+        const State = {
+            TITLE: 'title',
+            PLAYING: 'playing',
+            PAUSED: 'paused',
+            ROOM_CLEAR: 'room_clear',
+            GAME_OVER: 'game_over',
+            VICTORY: 'victory'
+        };
+
+        // Directions
+        const Dir = {
+            UP: { x: 0, y: -1, angle: -Math.PI/2 },
+            DOWN: { x: 0, y: 1, angle: Math.PI/2 },
+            LEFT: { x: -1, y: 0, angle: Math.PI },
+            RIGHT: { x: 1, y: 0, angle: 0 }
+        };
+
+        // Game state
+        let state = State.TITLE;
+        let pauseDelay = 0;
+        let roomClearTimer = 0;
+        let currentRoom = 0;
+        let gameData;
+
+        // Player
+        let player = {
+            x: 320,
+            y: 400,
+            dir: Dir.UP,
+            health: 6,
+            maxHealth: 6,
+            swordTimer: 0,
+            shielding: false,
+            invincible: 0,
+            knockback: { x: 0, y: 0, timer: 0 }
+        };
+
+        // Enemies
+        let enemies = [];
+        let projectiles = [];
+
+        // Room definitions
+        const rooms = [
+            // Room 0: Regular enemies
+            {
+                name: "The Gauntlet",
+                enemies: [
+                    { type: 'slime', x: 160, y: 120 },
+                    { type: 'slime', x: 480, y: 120 },
+                    { type: 'slime', x: 160, y: 280 },
+                    { type: 'slime', x: 480, y: 280 },
+                    { type: 'skeleton', x: 320, y: 200 }
+                ]
+            },
+            // Room 1: Boss
+            {
+                name: "The Dark Knight",
+                enemies: [
+                    { type: 'boss', x: 320, y: 160 }
+                ],
+                isBoss: true
+            }
+        ];
+
+        // Enemy types
+        const EnemyTypes = {
+            slime: {
+                size: 20,
+                health: 2,
+                speed: 1,
+                damage: 1,
+                color: '#4a4',
+                attackRange: 30,
+                attackWindup: 45,
+                attackDuration: 15,
+                attackCooldown: 90
+            },
+            skeleton: {
+                size: 22,
+                health: 3,
+                speed: 1.5,
+                damage: 1,
+                color: '#ddd',
+                attackRange: 35,
+                attackWindup: 30,
+                attackDuration: 20,
+                attackCooldown: 60
+            },
+            boss: {
+                size: 48,
+                health: 20,
+                speed: 1.2,
+                damage: 2,
+                color: '#622',
+                attackRange: 60,
+                attackWindup: 60,
+                attackDuration: 30,
+                attackCooldown: 90,
+                isBoss: true
+            }
+        };
+
+        // Initialize storage
+        function initStorage() {
+            gameData = GameStorage.load(GAME_ID, {
+                ...GameStorage.defaults.levelBased(),
+                bestRoom: 0
+            });
+            document.getElementById('musicToggle').checked = gameData.musicEnabled;
+            document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+        }
+
+        // Audio toggle handlers
+        document.getElementById('musicToggle').addEventListener('change', (e) => {
+            gameData.musicEnabled = e.target.checked;
+            GameStorage.save(GAME_ID, gameData);
+            if (!e.target.checked) {
+                AudioSystem.music.stop();
+            } else if (state === State.PLAYING) {
+                AudioSystem.music.start('invaders');
+            }
+        });
+
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            gameData.sfxEnabled = e.target.checked;
+            GameStorage.save(GAME_ID, gameData);
+        });
+
+        function playSfx(sfxName, ...args) {
+            if (gameData.sfxEnabled && AudioSystem.sfx[sfxName]) {
+                AudioSystem.sfx[sfxName](...args);
+            }
+        }
+
+        // Create enemy from definition
+        function createEnemy(def) {
+            const type = EnemyTypes[def.type];
+            return {
+                type: def.type,
+                x: def.x,
+                y: def.y,
+                health: type.health,
+                maxHealth: type.health,
+                state: 'idle', // idle, moving, windup, attacking, cooldown
+                stateTimer: 0,
+                dir: Dir.DOWN,
+                targetX: def.x,
+                targetY: def.y,
+                attackCooldown: 0,
+                knockback: { x: 0, y: 0, timer: 0 },
+                // Boss-specific
+                attackPattern: 0,
+                phaseTimer: 0
+            };
+        }
+
+        // Load room
+        function loadRoom(index) {
+            currentRoom = index;
+            const room = rooms[index];
+            enemies = room.enemies.map(createEnemy);
+            projectiles = [];
+
+            // Reset player position
+            player.x = 320;
+            player.y = 400;
+            player.swordTimer = 0;
+            player.shielding = false;
+            player.knockback = { x: 0, y: 0, timer: 0 };
+        }
+
+        // Start game
+        function startGame() {
+            player.health = player.maxHealth;
+            player.invincible = 0;
+            currentRoom = 0;
+            loadRoom(0);
+            state = State.PLAYING;
+            if (gameData.musicEnabled) {
+                AudioSystem.music.start('invaders');
+            }
+        }
+
+        // Player takes damage
+        function damagePlayer(amount, sourceX, sourceY) {
+            if (player.invincible > 0) return;
+
+            // Check shield block
+            if (player.shielding) {
+                const angle = Math.atan2(sourceY - player.y, sourceX - player.x);
+                const facingAngle = player.dir.angle;
+                let diff = angle - facingAngle;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+
+                if (Math.abs(diff) < SHIELD_BLOCK_ARC / 2) {
+                    playSfx('wallHit');
+                    return; // Blocked!
+                }
+            }
+
+            player.health -= amount;
+            player.invincible = 60;
+            playSfx('death');
+
+            // Knockback away from source
+            const kbAngle = Math.atan2(player.y - sourceY, player.x - sourceX);
+            player.knockback = {
+                x: Math.cos(kbAngle) * 8,
+                y: Math.sin(kbAngle) * 8,
+                timer: 10
+            };
+
+            if (player.health <= 0) {
+                state = State.GAME_OVER;
+                AudioSystem.music.stop();
+                playSfx('gameOver');
+            }
+        }
+
+        // Enemy takes damage
+        function damageEnemy(enemy, amount) {
+            enemy.health -= amount;
+            playSfx('hit');
+
+            // Knockback
+            const kbAngle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+            enemy.knockback = {
+                x: Math.cos(kbAngle) * 6,
+                y: Math.sin(kbAngle) * 6,
+                timer: 8
+            };
+
+            if (enemy.health <= 0) {
+                playSfx('explosion');
+                return true; // Dead
+            }
+            return false;
+        }
+
+        // Check sword hit on enemy
+        function checkSwordHit(enemy) {
+            const type = EnemyTypes[enemy.type];
+            const dx = enemy.x - player.x;
+            const dy = enemy.y - player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > SWORD_RANGE + type.size / 2) return false;
+
+            // Check if enemy is within sword arc
+            const angle = Math.atan2(dy, dx);
+            const facingAngle = player.dir.angle;
+            let diff = angle - facingAngle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+
+            return Math.abs(diff) < SWORD_ARC / 2;
+        }
+
+        // Update player
+        function updatePlayer() {
+            // Handle knockback
+            if (player.knockback.timer > 0) {
+                player.x += player.knockback.x;
+                player.y += player.knockback.y;
+                player.knockback.timer--;
+                player.knockback.x *= 0.8;
+                player.knockback.y *= 0.8;
+            }
+
+            // Movement (disabled during attack or knockback)
+            if (player.swordTimer === 0 && player.knockback.timer === 0) {
+                let dx = 0, dy = 0;
+
+                if (GameController.direction.up) dy = -1;
+                if (GameController.direction.down) dy = 1;
+                if (GameController.direction.left) dx = -1;
+                if (GameController.direction.right) dx = 1;
+
+                // Normalize diagonal movement
+                if (dx !== 0 && dy !== 0) {
+                    dx *= 0.707;
+                    dy *= 0.707;
+                }
+
+                // Update facing direction
+                if (dx !== 0 || dy !== 0) {
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        player.dir = dx > 0 ? Dir.RIGHT : Dir.LEFT;
+                    } else {
+                        player.dir = dy > 0 ? Dir.DOWN : Dir.UP;
+                    }
+                }
+
+                // Shield slows movement
+                const speed = player.shielding ? PLAYER_SPEED * 0.5 : PLAYER_SPEED;
+                player.x += dx * speed;
+                player.y += dy * speed;
+            }
+
+            // Clamp to room bounds
+            const margin = PLAYER_SIZE / 2 + 16;
+            player.x = Math.max(margin, Math.min(canvas.width - margin, player.x));
+            player.y = Math.max(margin, Math.min(canvas.height - margin, player.y));
+
+            // Shield
+            player.shielding = GameController.buttons.b && player.swordTimer === 0;
+
+            // Sword attack
+            if (player.swordTimer > 0) {
+                player.swordTimer--;
+
+                // Check hits on first few frames
+                if (player.swordTimer > SWORD_DURATION - 5) {
+                    for (let i = enemies.length - 1; i >= 0; i--) {
+                        if (!enemies[i].hitThisSwing && checkSwordHit(enemies[i])) {
+                            enemies[i].hitThisSwing = true;
+                            if (damageEnemy(enemies[i], 1)) {
+                                enemies.splice(i, 1);
+                            }
+                        }
+                    }
+                }
+            } else if (GameController.justPressed('a') && !player.shielding) {
+                player.swordTimer = SWORD_DURATION;
+                playSfx('shoot');
+                // Reset hit tracking
+                enemies.forEach(e => e.hitThisSwing = false);
+            }
+
+            // Invincibility timer
+            if (player.invincible > 0) {
+                player.invincible--;
+            }
+        }
+
+        // Update enemy AI
+        function updateEnemy(enemy) {
+            const type = EnemyTypes[enemy.type];
+
+            // Handle knockback
+            if (enemy.knockback.timer > 0) {
+                enemy.x += enemy.knockback.x;
+                enemy.y += enemy.knockback.y;
+                enemy.knockback.timer--;
+                enemy.knockback.x *= 0.8;
+                enemy.knockback.y *= 0.8;
+                return;
+            }
+
+            const dx = player.x - enemy.x;
+            const dy = player.y - enemy.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Update facing direction (only when not winding up or attacking)
+            if (enemy.state === 'idle' || enemy.state === 'moving' || enemy.state === 'cooldown') {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    enemy.dir = dx > 0 ? Dir.RIGHT : Dir.LEFT;
+                } else {
+                    enemy.dir = dy > 0 ? Dir.DOWN : Dir.UP;
+                }
+            }
+
+            // State machine
+            switch (enemy.state) {
+                case 'idle':
+                case 'moving':
+                    enemy.attackCooldown--;
+
+                    // Move toward player
+                    if (dist > type.attackRange) {
+                        const moveX = (dx / dist) * type.speed;
+                        const moveY = (dy / dist) * type.speed;
+                        enemy.x += moveX;
+                        enemy.y += moveY;
+                        enemy.state = 'moving';
+                    } else if (enemy.attackCooldown <= 0) {
+                        // Start attack windup - lock direction for telegraph
+                        enemy.state = 'windup';
+                        enemy.stateTimer = type.attackWindup;
+                        enemy.attackDir = { ...enemy.dir }; // Lock attack direction
+
+                        // Boss has special attacks
+                        if (type.isBoss) {
+                            enemy.attackPattern = (enemy.attackPattern + 1) % 3;
+                        }
+                    }
+                    break;
+
+                case 'windup':
+                    enemy.stateTimer--;
+                    if (enemy.stateTimer <= 0) {
+                        enemy.state = 'attacking';
+                        enemy.stateTimer = type.attackDuration;
+
+                        // Boss projectile attack
+                        if (type.isBoss && enemy.attackPattern === 1) {
+                            // Fire projectiles in 8 directions
+                            for (let i = 0; i < 8; i++) {
+                                const angle = (i / 8) * Math.PI * 2;
+                                projectiles.push({
+                                    x: enemy.x,
+                                    y: enemy.y,
+                                    vx: Math.cos(angle) * 4,
+                                    vy: Math.sin(angle) * 4,
+                                    damage: 1,
+                                    life: 120
+                                });
+                            }
+                            playSfx('shoot');
+                        }
+                    }
+                    break;
+
+                case 'attacking':
+                    enemy.stateTimer--;
+
+                    // Check hit on player (melee)
+                    if (!type.isBoss || enemy.attackPattern !== 1) {
+                        if (dist < type.attackRange + PLAYER_SIZE / 2) {
+                            damagePlayer(type.damage, enemy.x, enemy.y);
+                        }
+                    }
+
+                    // Boss charge attack - use locked attack direction
+                    if (type.isBoss && enemy.attackPattern === 2) {
+                        enemy.x += enemy.attackDir.x * 6;
+                        enemy.y += enemy.attackDir.y * 6;
+                    }
+
+                    if (enemy.stateTimer <= 0) {
+                        enemy.state = 'cooldown';
+                        enemy.stateTimer = type.attackCooldown;
+                    }
+                    break;
+
+                case 'cooldown':
+                    enemy.stateTimer--;
+                    if (enemy.stateTimer <= 0) {
+                        enemy.state = 'idle';
+                        enemy.attackCooldown = 30;
+                    }
+                    break;
+            }
+
+            // Clamp to room bounds
+            const margin = type.size / 2 + 16;
+            enemy.x = Math.max(margin, Math.min(canvas.width - margin, enemy.x));
+            enemy.y = Math.max(margin, Math.min(canvas.height - margin, enemy.y));
+        }
+
+        // Update projectiles
+        function updateProjectiles() {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+
+                // Check player collision
+                const dx = player.x - p.x;
+                const dy = player.y - p.y;
+                if (dx * dx + dy * dy < (PLAYER_SIZE / 2 + 8) ** 2) {
+                    damagePlayer(p.damage, p.x, p.y);
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+
+                // Remove if off screen or expired
+                if (p.life <= 0 || p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
+                    projectiles.splice(i, 1);
+                }
+            }
+        }
+
+        // Draw room background
+        function drawRoom() {
+            // Floor
+            ctx.fillStyle = '#2a2a3a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Floor tiles
+            ctx.strokeStyle = '#3a3a4a';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < ROOM_WIDTH; x++) {
+                for (let y = 0; y < ROOM_HEIGHT; y++) {
+                    ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                }
+            }
+
+            // Walls
+            ctx.fillStyle = '#4a4a6a';
+            ctx.fillRect(0, 0, canvas.width, 16);
+            ctx.fillRect(0, canvas.height - 16, canvas.width, 16);
+            ctx.fillRect(0, 0, 16, canvas.height);
+            ctx.fillRect(canvas.width - 16, 0, 16, canvas.height);
+        }
+
+        // Draw player
+        function drawPlayer() {
+            // Flicker when invincible
+            if (player.invincible > 0 && Math.floor(player.invincible / 4) % 2 === 0) {
+                return;
+            }
+
+            const x = player.x;
+            const y = player.y;
+
+            // Draw shield if active
+            if (player.shielding) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(player.dir.angle);
+                ctx.fillStyle = '#88a';
+                ctx.beginPath();
+                ctx.arc(12, 0, 14, -Math.PI/2, Math.PI/2);
+                ctx.fill();
+                ctx.strokeStyle = '#aac';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Draw sword if attacking
+            if (player.swordTimer > 0) {
+                ctx.save();
+                ctx.translate(x, y);
+
+                // Sword swings through arc
+                const swingProgress = 1 - (player.swordTimer / SWORD_DURATION);
+                const swingAngle = player.dir.angle + (swingProgress - 0.5) * SWORD_ARC;
+
+                ctx.rotate(swingAngle);
+                ctx.fillStyle = '#ccc';
+                ctx.fillRect(10, -3, SWORD_RANGE - 10, 6);
+                ctx.fillStyle = '#fa4';
+                ctx.fillRect(8, -5, 8, 10);
+                ctx.restore();
+
+                // Draw sword arc trail
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.strokeStyle = 'rgba(255, 200, 100, 0.5)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, SWORD_RANGE - 5,
+                    player.dir.angle - SWORD_ARC/2,
+                    player.dir.angle - SWORD_ARC/2 + swingProgress * SWORD_ARC);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Body
+            ctx.fillStyle = '#4a4';
+            ctx.beginPath();
+            ctx.arc(x, y, PLAYER_SIZE / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Face direction indicator
+            ctx.fillStyle = '#6c6';
+            ctx.beginPath();
+            ctx.arc(x + player.dir.x * 6, y + player.dir.y * 6, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw enemy
+        function drawEnemy(enemy) {
+            const type = EnemyTypes[enemy.type];
+            const x = enemy.x;
+            const y = enemy.y;
+
+            // Telegraph attack during windup
+            if (enemy.state === 'windup') {
+                const progress = 1 - (enemy.stateTimer / type.attackWindup);
+                const attackDir = enemy.attackDir || enemy.dir;
+
+                // Warning indicator - reduced opacity
+                ctx.save();
+                ctx.globalAlpha = 0.15 + progress * 0.2;
+
+                if (type.isBoss && enemy.attackPattern === 1) {
+                    // Projectile attack warning - circle
+                    ctx.strokeStyle = '#f44';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(x, y, type.size + 20 + progress * 30, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (type.isBoss && enemy.attackPattern === 2) {
+                    // Charge attack warning - line using locked direction
+                    ctx.strokeStyle = '#f44';
+                    ctx.lineWidth = type.size;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + attackDir.x * 200, y + attackDir.y * 200);
+                    ctx.stroke();
+                } else {
+                    // Melee attack warning - arc using locked direction
+                    ctx.fillStyle = '#f44';
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.arc(x, y, type.attackRange + 20,
+                        attackDir.angle - Math.PI/3,
+                        attackDir.angle + Math.PI/3);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                // Shake during windup
+                const shake = progress * 3;
+                enemy.shakeX = (Math.random() - 0.5) * shake;
+                enemy.shakeY = (Math.random() - 0.5) * shake;
+            } else if (enemy.state === 'attacking') {
+                // Draw attack animation during attack
+                const attackDir = enemy.attackDir || enemy.dir;
+                const attackProgress = 1 - (enemy.stateTimer / EnemyTypes[enemy.type].attackDuration);
+
+                if (!type.isBoss || enemy.attackPattern === 0) {
+                    // Melee attack swing animation
+                    ctx.save();
+                    ctx.globalAlpha = 0.6;
+                    ctx.fillStyle = '#f66';
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    // Swing through the arc
+                    const startAngle = attackDir.angle - Math.PI/3;
+                    const endAngle = attackDir.angle + Math.PI/3;
+                    const currentAngle = startAngle + (endAngle - startAngle) * attackProgress;
+                    ctx.arc(x, y, type.attackRange + 15, startAngle, currentAngle);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                } else if (type.isBoss && enemy.attackPattern === 2) {
+                    // Charge attack trail
+                    ctx.save();
+                    ctx.globalAlpha = 0.4;
+                    ctx.fillStyle = '#f44';
+                    ctx.beginPath();
+                    ctx.arc(x - attackDir.x * 20, y - attackDir.y * 20, type.size / 2 + 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                enemy.shakeX = 0;
+                enemy.shakeY = 0;
+            } else {
+                enemy.shakeX = 0;
+                enemy.shakeY = 0;
+            }
+
+            // Attacking flash
+            if (enemy.state === 'attacking') {
+                ctx.fillStyle = '#f88';
+            } else {
+                ctx.fillStyle = type.color;
+            }
+
+            // Body
+            ctx.beginPath();
+            ctx.arc(x + (enemy.shakeX || 0), y + (enemy.shakeY || 0),
+                type.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Face
+            ctx.fillStyle = '#000';
+            const faceX = x + enemy.dir.x * type.size * 0.2;
+            const faceY = y + enemy.dir.y * type.size * 0.2;
+            ctx.beginPath();
+            ctx.arc(faceX - 4, faceY - 2, 3, 0, Math.PI * 2);
+            ctx.arc(faceX + 4, faceY - 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Boss health bar
+            if (type.isBoss) {
+                const barWidth = 200;
+                const barHeight = 16;
+                const barX = (canvas.width - barWidth) / 2;
+                const barY = 30;
+
+                ctx.fillStyle = '#400';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+                ctx.fillStyle = '#f44';
+                ctx.fillRect(barX, barY, barWidth * (enemy.health / enemy.maxHealth), barHeight);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('DARK KNIGHT', canvas.width / 2, barY - 5);
+            }
+        }
+
+        // Draw projectile
+        function drawProjectile(p) {
+            ctx.fillStyle = '#f66';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#faa';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw HUD
+        function drawHUD() {
+            // Hearts
+            for (let i = 0; i < player.maxHealth / 2; i++) {
+                const hx = 20 + i * 28;
+                const hy = 20;
+
+                if (player.health >= (i + 1) * 2) {
+                    // Full heart
+                    ctx.fillStyle = '#f44';
+                } else if (player.health >= i * 2 + 1) {
+                    // Half heart
+                    ctx.fillStyle = '#844';
+                } else {
+                    // Empty heart
+                    ctx.fillStyle = '#444';
+                }
+
+                // Heart shape
+                ctx.beginPath();
+                ctx.moveTo(hx, hy + 4);
+                ctx.bezierCurveTo(hx, hy, hx - 10, hy, hx - 10, hy + 6);
+                ctx.bezierCurveTo(hx - 10, hy + 12, hx, hy + 16, hx, hy + 20);
+                ctx.bezierCurveTo(hx, hy + 16, hx + 10, hy + 12, hx + 10, hy + 6);
+                ctx.bezierCurveTo(hx + 10, hy, hx, hy, hx, hy + 4);
+                ctx.fill();
+            }
+
+            // Room name
+            ctx.fillStyle = '#fff';
+            ctx.font = '14px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Chamber ${currentRoom + 1}: ${rooms[currentRoom].name}`, canvas.width - 20, 30);
+        }
+
+        // Draw title screen
+        function drawTitle() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = 'bold 48px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('CHAMBER RUSH', canvas.width / 2, 150);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px monospace';
+            ctx.fillText('Clear the chambers. Defeat the boss.', canvas.width / 2, 200);
+
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = '20px monospace';
+            ctx.fillText('Press SPACE or A to Start', canvas.width / 2, 300);
+
+            ctx.fillStyle = '#888';
+            ctx.font = '14px monospace';
+            ctx.fillText('WASD/Arrows: Move', canvas.width / 2, 360);
+            ctx.fillText('Space/Z: Sword Attack', canvas.width / 2, 380);
+            ctx.fillText('Shift/X: Shield (blocks attacks from front)', canvas.width / 2, 400);
+
+            if (gameData.bestRoom > 0) {
+                ctx.fillStyle = '#4ecdc4';
+                ctx.fillText(`Best: Chamber ${gameData.bestRoom + 1}`, canvas.width / 2, 440);
+            }
+        }
+
+        // Draw pause screen
+        function drawPause() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = 'bold 36px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px monospace';
+            ctx.fillText('Press P or Start to Resume', canvas.width / 2, canvas.height / 2 + 40);
+        }
+
+        // Draw room clear screen
+        function drawRoomClear() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = 'bold 36px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('CHAMBER CLEARED!', canvas.width / 2, canvas.height / 2);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px monospace';
+            ctx.fillText(`Entering Chamber ${currentRoom + 2}...`, canvas.width / 2, canvas.height / 2 + 40);
+        }
+
+        // Draw game over screen
+        function drawGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#f44';
+            ctx.font = 'bold 48px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 30);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px monospace';
+            ctx.fillText(`Reached Chamber ${currentRoom + 1}`, canvas.width / 2, canvas.height / 2 + 20);
+
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = '16px monospace';
+            ctx.fillText('Press SPACE to Try Again', canvas.width / 2, canvas.height / 2 + 70);
+        }
+
+        // Draw victory screen
+        function drawVictory() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = 'bold 48px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('VICTORY!', canvas.width / 2, canvas.height / 2 - 30);
+
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = '20px monospace';
+            ctx.fillText('All chambers cleared!', canvas.width / 2, canvas.height / 2 + 20);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px monospace';
+            ctx.fillText('Press SPACE to Play Again', canvas.width / 2, canvas.height / 2 + 70);
+        }
+
+        // Main update
+        function update() {
+            GameController.poll();
+
+            switch (state) {
+                case State.TITLE:
+                    if (GameController.justPressed('a') || GameController.justPressed('start')) {
+                        AudioSystem.unlock();
+                        startGame();
+                    }
+                    break;
+
+                case State.PLAYING:
+                    updatePlayer();
+                    enemies.forEach(updateEnemy);
+                    updateProjectiles();
+
+                    // Check room clear
+                    if (enemies.length === 0) {
+                        if (currentRoom >= rooms.length - 1) {
+                            // Victory!
+                            state = State.VICTORY;
+                            AudioSystem.music.stop();
+                            playSfx('levelComplete');
+                            if (currentRoom >= gameData.bestRoom) {
+                                gameData.bestRoom = currentRoom + 1;
+                                GameStorage.save(GAME_ID, gameData);
+                            }
+                        } else {
+                            state = State.ROOM_CLEAR;
+                            roomClearTimer = 120;
+                            playSfx('levelComplete');
+                        }
+                    }
+
+                    // Pause
+                    if (GameController.justPressed('start')) {
+                        state = State.PAUSED;
+                        pauseDelay = 15;
+                    }
+                    break;
+
+                case State.PAUSED:
+                    if (pauseDelay > 0) {
+                        pauseDelay--;
+                    } else if (GameController.justPressed('start') || GameController.justPressed('b')) {
+                        state = State.PLAYING;
+                    }
+                    break;
+
+                case State.ROOM_CLEAR:
+                    roomClearTimer--;
+                    if (roomClearTimer <= 0) {
+                        loadRoom(currentRoom + 1);
+                        state = State.PLAYING;
+                    }
+                    break;
+
+                case State.GAME_OVER:
+                case State.VICTORY:
+                    if (GameController.justPressed('a') || GameController.justPressed('start')) {
+                        state = State.TITLE;
+                    }
+                    break;
+            }
+        }
+
+        // Main draw
+        function draw() {
+            switch (state) {
+                case State.TITLE:
+                    drawTitle();
+                    break;
+
+                case State.PLAYING:
+                case State.PAUSED:
+                case State.ROOM_CLEAR:
+                    drawRoom();
+                    projectiles.forEach(drawProjectile);
+                    enemies.forEach(drawEnemy);
+                    drawPlayer();
+                    drawHUD();
+
+                    if (state === State.PAUSED) drawPause();
+                    if (state === State.ROOM_CLEAR) drawRoomClear();
+                    break;
+
+                case State.GAME_OVER:
+                    drawRoom();
+                    drawPlayer();
+                    drawHUD();
+                    drawGameOver();
+                    break;
+
+                case State.VICTORY:
+                    drawRoom();
+                    drawPlayer();
+                    drawHUD();
+                    drawVictory();
+                    break;
+            }
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize
+        initStorage();
+        gameLoop();
+    </script>
+</body>
+</html>
