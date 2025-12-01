@@ -114,265 +114,12 @@
         <span class="score-entry"><canvas id="gemIcon" width="16" height="16"></canvas> 1000 pts</span>
     </div>
 
-    <script src="controller.js"></script>
-    <script src="audio.js"></script>
-    <script src="storage.js"></script>
+    <script src="../controller.js"></script>
+    <script src="../audio.js"></script>
+    <script src="../storage.js"></script>
+    <script src="levels.js"></script>
+    <script src="game.js"></script>
     <script>
-        // ============================================
-        // GAME CONFIGURATION
-        // ============================================
-        const CONFIG = {
-            WIDTH: 640,
-            HEIGHT: 480,
-            TILE_SIZE: 32,
-            GRAVITY: 0.6,
-            MAX_FALL_SPEED: 12,
-            PLAYER_SPEED: 4,
-            PLAYER_JUMP: -12,
-            ENEMY_SPEED: 1.5,
-            COLORS: {
-                // Jungle theme
-                sky: '#87ceeb',
-                skyGradient: '#98d8c8',
-                ground: '#5d4037',
-                groundHighlight: '#8d6e63',
-                groundDark: '#3e2723',
-                brick: '#607d5b',       // Mossy stone
-                brickHighlight: '#7a9a75',
-                block: '#a1887f',        // Ancient stone
-                blockShade: '#6d4c41',
-                player: '#d2691e',       // Explorer brown/khaki
-                playerShirt: '#f5deb3',  // Khaki shirt
-                enemy: '#228b22',        // Snake green
-                enemyDark: '#006400',
-                enemyPattern: '#32cd32', // Snake pattern
-                gem: '#ff1493',          // Pink gem
-                gemShine: '#ffb6c1',
-                temple: '#8b7355',       // Temple stone
-                templeDark: '#5d4e37',
-                templeAccent: '#daa520', // Gold trim
-                cloud: '#ffffff',
-                bush: '#228b22',
-                bushDark: '#006400',
-                vine: '#2e8b57',
-                tree: '#0b5345',
-                treeTrunk: '#5d4037',
-                text: '#ffffff',
-                textHighlight: '#ffe66d'
-            }
-        };
-
-        // Tile types
-        const TILE = {
-            EMPTY: 0,
-            GROUND: 1,
-            BRICK: 2,
-            BLOCK: 3,
-            GOAL: 4,
-            PIT: 5  // Invisible death zone below ground level
-        };
-
-        // Calculate visible tiles
-        const TILES_X = Math.ceil(CONFIG.WIDTH / CONFIG.TILE_SIZE) + 1;
-        const TILES_Y = Math.ceil(CONFIG.HEIGHT / CONFIG.TILE_SIZE);
-
-        // ============================================
-        // LEVEL DATA
-        // ============================================
-        // Level is 100 tiles wide, 15 tiles tall
-        // 0 = empty, 1 = ground, 2 = brick, 3 = block, 4 = goal, 5 = pit
-        const LEVEL_WIDTH = 100;
-        const LEVEL_HEIGHT = 15;
-
-        function createLevel() {
-            // Create empty level
-            const level = [];
-            for (let y = 0; y < LEVEL_HEIGHT; y++) {
-                level[y] = [];
-                for (let x = 0; x < LEVEL_WIDTH; x++) {
-                    level[y][x] = TILE.EMPTY;
-                }
-            }
-
-            // Fill ground (bottom 2 rows)
-            for (let x = 0; x < LEVEL_WIDTH; x++) {
-                level[LEVEL_HEIGHT - 1][x] = TILE.GROUND;
-                level[LEVEL_HEIGHT - 2][x] = TILE.GROUND;
-            }
-
-            // Add pits (gaps in ground)
-            const pits = [
-                { x: 20, width: 3 },
-                { x: 35, width: 2 },
-                { x: 55, width: 4 },
-                { x: 75, width: 3 }
-            ];
-            for (const pit of pits) {
-                for (let px = pit.x; px < pit.x + pit.width; px++) {
-                    level[LEVEL_HEIGHT - 1][px] = TILE.PIT;
-                    level[LEVEL_HEIGHT - 2][px] = TILE.PIT;
-                }
-            }
-
-            // Add platforms (brick blocks)
-            const platforms = [
-                { x: 15, y: 10, width: 4 },
-                { x: 25, y: 9, width: 3 },
-                { x: 32, y: 11, width: 5 },
-                { x: 45, y: 10, width: 3 },
-                { x: 50, y: 8, width: 4 },
-                { x: 60, y: 10, width: 6 },
-                { x: 70, y: 9, width: 3 },
-                { x: 80, y: 10, width: 4 },
-                { x: 85, y: 8, width: 3 }
-            ];
-            for (const plat of platforms) {
-                for (let px = plat.x; px < plat.x + plat.width; px++) {
-                    level[plat.y][px] = TILE.BRICK;
-                }
-            }
-
-            // Add question blocks / solid blocks
-            const blocks = [
-                { x: 12, y: 9 },
-                { x: 28, y: 6 },
-                { x: 42, y: 9 },
-                { x: 48, y: 9 },
-                { x: 65, y: 7 },
-                { x: 78, y: 9 }
-            ];
-            for (const block of blocks) {
-                level[block.y][block.x] = TILE.BLOCK;
-            }
-
-            // Build temple at the end (stairs up, platform with gem, no way past)
-            // Temple stairs going up (left side)
-            for (let i = 0; i < 6; i++) {
-                for (let y = LEVEL_HEIGHT - 3; y >= LEVEL_HEIGHT - 3 - i; y--) {
-                    level[y][88 + i] = TILE.GROUND;
-                }
-            }
-
-            // Temple top platform
-            for (let x = 94; x < 100; x++) {
-                level[LEVEL_HEIGHT - 9][x] = TILE.GROUND;
-            }
-
-            // Fill in temple interior (solid structure below platform)
-            for (let y = LEVEL_HEIGHT - 8; y < LEVEL_HEIGHT - 2; y++) {
-                for (let x = 94; x < 100; x++) {
-                    level[y][x] = TILE.GROUND;
-                }
-            }
-
-            // Temple door (empty space for Level 2 entrance)
-            level[LEVEL_HEIGHT - 4][97] = TILE.EMPTY;
-            level[LEVEL_HEIGHT - 3][97] = TILE.EMPTY;
-
-            // Goal gem at top of temple
-            level[LEVEL_HEIGHT - 10][96] = TILE.GOAL;
-
-            return level;
-        }
-
-        function createLevel2() {
-            // Level 2: Inside the temple - darker, more enclosed
-            const level = [];
-            for (let y = 0; y < LEVEL_HEIGHT; y++) {
-                level[y] = [];
-                for (let x = 0; x < LEVEL_WIDTH; x++) {
-                    level[y][x] = TILE.EMPTY;
-                }
-            }
-
-            // Fill ground (bottom 2 rows)
-            for (let x = 0; x < LEVEL_WIDTH; x++) {
-                level[LEVEL_HEIGHT - 1][x] = TILE.GROUND;
-                level[LEVEL_HEIGHT - 2][x] = TILE.GROUND;
-            }
-
-            // Ceiling (top rows) - temple interior has a ceiling
-            for (let x = 0; x < LEVEL_WIDTH; x++) {
-                level[0][x] = TILE.GROUND;
-                level[1][x] = TILE.GROUND;
-            }
-
-            // Add pits (spike pits in temple)
-            const pits = [
-                { x: 15, width: 2 },
-                { x: 28, width: 3 },
-                { x: 45, width: 2 },
-                { x: 58, width: 4 },
-                { x: 72, width: 2 }
-            ];
-            for (const pit of pits) {
-                for (let px = pit.x; px < pit.x + pit.width; px++) {
-                    level[LEVEL_HEIGHT - 1][px] = TILE.PIT;
-                    level[LEVEL_HEIGHT - 2][px] = TILE.PIT;
-                }
-            }
-
-            // Add platforms (stone platforms inside temple)
-            const platforms = [
-                { x: 10, y: 10, width: 5 },
-                { x: 20, y: 8, width: 4 },
-                { x: 32, y: 10, width: 6 },
-                { x: 42, y: 7, width: 3 },
-                { x: 50, y: 10, width: 4 },
-                { x: 62, y: 9, width: 5 },
-                { x: 75, y: 10, width: 4 },
-                { x: 82, y: 8, width: 3 }
-            ];
-            for (const plat of platforms) {
-                for (let px = plat.x; px < plat.x + plat.width; px++) {
-                    level[plat.y][px] = TILE.BRICK;
-                }
-            }
-
-            // Add rune blocks
-            const blocks = [
-                { x: 8, y: 9 },
-                { x: 25, y: 5 },
-                { x: 38, y: 9 },
-                { x: 55, y: 6 },
-                { x: 68, y: 9 },
-                { x: 80, y: 5 }
-            ];
-            for (const block of blocks) {
-                level[block.y][block.x] = TILE.BLOCK;
-            }
-
-            // Temple exit structure at end
-            for (let i = 0; i < 4; i++) {
-                for (let y = LEVEL_HEIGHT - 3; y >= LEVEL_HEIGHT - 3 - i; y--) {
-                    level[y][90 + i] = TILE.GROUND;
-                }
-            }
-
-            // Final gem pedestal
-            level[LEVEL_HEIGHT - 8][96] = TILE.GROUND;
-            level[LEVEL_HEIGHT - 9][96] = TILE.GOAL;
-
-            // Pit below the gem pedestal (miss the jump = death)
-            for (let px = 94; px <= 98; px++) {
-                if (px !== 96) { // Keep pedestal column solid
-                    level[LEVEL_HEIGHT - 1][px] = TILE.PIT;
-                    level[LEVEL_HEIGHT - 2][px] = TILE.PIT;
-                }
-            }
-
-            // Block the end
-            for (let y = 2; y < LEVEL_HEIGHT - 2; y++) {
-                level[y][99] = TILE.GROUND;
-            }
-
-            return level;
-        }
-
-        // Enemy spawn positions per level
-        const ENEMY_SPAWNS_L1 = [18, 30, 40, 52, 68, 82];
-        const ENEMY_SPAWNS_L2 = [12, 24, 36, 48, 60, 70, 78];
-
         // ============================================
         // PERSISTENCE
         // ============================================
@@ -382,51 +129,6 @@
         function saveGameData() {
             GameStorage.save(GAME_ID, gameData);
         }
-
-        // ============================================
-        // GAME STATE
-        // ============================================
-        const GameState = {
-            TITLE: 'title',
-            PLAYING: 'playing',
-            PAUSED: 'paused',
-            GAME_OVER: 'game_over',
-            LEVEL_TRANSITION: 'level_transition',
-            LEVEL_COMPLETE: 'level_complete'
-        };
-
-        let state = GameState.TITLE;
-        let score = 0;
-        let isNewHighScore = false;
-        let level = [];
-        let cameraX = 0;
-        let maxCameraX = 0; // For no-backtracking
-        let pauseTime = 0;
-        let stateChangeTime = 0;
-        let currentLevel = 1;
-        let transitionTimer = 0;
-        const UNPAUSE_DELAY = 250;
-        const STATE_CHANGE_DELAY = 250;
-        const MAX_LEVELS = 2;
-        const STARTING_LIVES = 3;
-        let lives = STARTING_LIVES;
-
-        // Player state
-        const player = {
-            x: 0,
-            y: 0,
-            vx: 0,
-            vy: 0,
-            width: 24,
-            height: 30,
-            onGround: false,
-            facing: 1, // 1 = right, -1 = left
-            animFrame: 0,
-            animTimer: 0
-        };
-
-        // Enemies array
-        let enemies = [];
 
         // ============================================
         // CANVAS SETUP
@@ -439,111 +141,74 @@
         const highScoreEl = document.getElementById('highScore');
         const livesEl = document.getElementById('livesDisplay');
 
-        // ============================================
-        // INITIALIZATION
-        // ============================================
-        function initLevel(levelNum) {
-            // Create level based on number
-            if (levelNum === 1) {
-                level = createLevel();
-            } else {
-                level = createLevel2();
-            }
-
-            cameraX = 0;
-            maxCameraX = 0;
-
-            // Reset player
-            player.x = 3 * CONFIG.TILE_SIZE;
-            player.y = (LEVEL_HEIGHT - 3) * CONFIG.TILE_SIZE;
-            player.vx = 0;
-            player.vy = 0;
-            player.onGround = false;
-            player.facing = 1;
-            player.animFrame = 0;
-            player.animTimer = 0;
-
-            // Spawn enemies based on level
-            enemies = [];
-            const spawns = levelNum === 1 ? ENEMY_SPAWNS_L1 : ENEMY_SPAWNS_L2;
-            for (const spawnX of spawns) {
-                enemies.push({
-                    x: spawnX * CONFIG.TILE_SIZE,
-                    y: (LEVEL_HEIGHT - 3) * CONFIG.TILE_SIZE,
-                    vx: -CONFIG.ENEMY_SPEED,
-                    width: 28,
-                    height: 26,
-                    alive: true,
-                    squashTimer: 0
-                });
-            }
+        function updateDisplays() {
+            currentScoreEl.textContent = gameState.score;
+            highScoreEl.textContent = gameData.highScore;
+            livesEl.textContent = gameState.lives;
         }
 
-        function initGame() {
-            currentLevel = 1;
-            score = 0;
-            lives = STARTING_LIVES;
-            isNewHighScore = false;
-            initLevel(currentLevel);
-            updateDisplays();
-        }
-
+        // ============================================
+        // GAME FLOW
+        // ============================================
         function startGame() {
             AudioSystem.unlock();
             AudioSystem.sfx.select();
             initGame();
-            state = GameState.PLAYING;
+            gameState.state = GameState.PLAYING;
             AudioSystem.music.start('bounce');
+            updateDisplays();
         }
 
-        function updateDisplays() {
-            currentScoreEl.textContent = score;
-            highScoreEl.textContent = gameData.highScore;
-            livesEl.textContent = lives;
-        }
+        function handlePlayerDeath() {
+            AudioSystem.music.stop();
+            AudioSystem.sfx.death();
 
-        // ============================================
-        // COLLISION DETECTION
-        // ============================================
-        function getTileAt(pixelX, pixelY) {
-            const tileX = Math.floor(pixelX / CONFIG.TILE_SIZE);
-            const tileY = Math.floor(pixelY / CONFIG.TILE_SIZE);
-            if (tileX < 0 || tileX >= LEVEL_WIDTH || tileY < 0 || tileY >= LEVEL_HEIGHT) {
-                return tileY >= LEVEL_HEIGHT ? TILE.PIT : TILE.EMPTY;
-            }
-            return level[tileY][tileX];
-        }
+            gameState.lives--;
+            updateDisplays();
 
-        function isSolidTile(tile) {
-            return tile === TILE.GROUND || tile === TILE.BRICK || tile === TILE.BLOCK;
-        }
-
-        function checkCollision(x, y, width, height) {
-            // Check all four corners and middle points
-            const points = [
-                { x: x + 2, y: y + 2 },           // top-left
-                { x: x + width - 2, y: y + 2 },   // top-right
-                { x: x + 2, y: y + height - 2 }, // bottom-left
-                { x: x + width - 2, y: y + height - 2 }, // bottom-right
-                { x: x + width / 2, y: y + 2 },   // top-center
-                { x: x + width / 2, y: y + height - 2 } // bottom-center
-            ];
-
-            for (const point of points) {
-                if (isSolidTile(getTileAt(point.x, point.y))) {
-                    return true;
+            if (gameState.lives > 0) {
+                // Restart current level
+                initLevel(gameState.currentLevel);
+                AudioSystem.music.start('bounce');
+                gameState.state = GameState.PLAYING;
+            } else {
+                // Game over
+                if (gameState.score > gameData.highScore) {
+                    gameData.highScore = gameState.score;
+                    gameState.isNewHighScore = gameData.gamesPlayed > 0;
                 }
+                gameData.gamesPlayed++;
+                saveGameData();
+                updateDisplays();
+
+                gameState.stateChangeTime = Date.now();
+                gameState.state = GameState.GAME_OVER;
             }
-            return false;
         }
 
-        function isOnGround(x, y, width, height) {
-            // Check if there's solid ground just below the player's feet
-            // Check 3 points along the bottom edge, 1 pixel below
-            const groundY = y + height + 1;
-            return isSolidTile(getTileAt(x + 4, groundY)) ||
-                   isSolidTile(getTileAt(x + width / 2, groundY)) ||
-                   isSolidTile(getTileAt(x + width - 4, groundY));
+        function handleLevelComplete() {
+            AudioSystem.sfx.levelComplete();
+            gameState.score += SCORE.LEVEL_COMPLETE;
+            updateDisplays();
+
+            if (gameState.currentLevel < MAX_LEVELS) {
+                // Transition to next level
+                startLevelTransition();
+            } else {
+                // Final level complete - game won!
+                AudioSystem.music.stop();
+
+                if (gameState.score > gameData.highScore) {
+                    gameData.highScore = gameState.score;
+                    gameState.isNewHighScore = gameData.gamesPlayed > 0;
+                }
+                gameData.gamesPlayed++;
+                saveGameData();
+                updateDisplays();
+
+                gameState.stateChangeTime = Date.now();
+                gameState.state = GameState.LEVEL_COMPLETE;
+            }
         }
 
         // ============================================
@@ -558,309 +223,83 @@
         function updatePlaying() {
             // Pause check
             if (GameController.justPressed('start')) {
-                pauseTime = Date.now();
-                state = GameState.PAUSED;
+                gameState.pauseTime = Date.now();
+                gameState.state = GameState.PAUSED;
                 AudioSystem.music.stop();
                 return;
             }
 
-            // Player horizontal movement
-            player.vx = 0;
-            if (GameController.direction.left) {
-                player.vx = -CONFIG.PLAYER_SPEED;
-                player.facing = -1;
-            }
-            if (GameController.direction.right) {
-                player.vx = CONFIG.PLAYER_SPEED;
-                player.facing = 1;
-            }
+            // Get input
+            const input = {
+                left: GameController.direction.left,
+                right: GameController.direction.right,
+                jump: GameController.justPressed('a')
+            };
 
-            // Prevent backtracking
-            const minPlayerX = maxCameraX + 8;
-            if (player.x + player.vx < minPlayerX) {
-                player.vx = 0;
-                player.x = minPlayerX;
-            }
+            // Update player
+            const playerResult = updatePlayer(input);
 
-            // Check if on ground before applying physics
-            player.onGround = isOnGround(player.x, player.y, player.width, player.height);
-
-            // Jumping
-            if (GameController.justPressed('a') && player.onGround) {
-                player.vy = CONFIG.PLAYER_JUMP;
-                player.onGround = false;
-                AudioSystem.sfx.select();
-            }
-
-            // Apply gravity
-            player.vy += CONFIG.GRAVITY;
-            if (player.vy > CONFIG.MAX_FALL_SPEED) {
-                player.vy = CONFIG.MAX_FALL_SPEED;
-            }
-
-            // Horizontal movement with collision
-            const newX = player.x + player.vx;
-            if (!checkCollision(newX, player.y, player.width, player.height)) {
-                player.x = newX;
-            }
-
-            // Vertical movement with collision
-            const newY = player.y + player.vy;
-
-            if (player.vy > 0) {
-                // Moving down - check for ground
-                if (checkCollision(player.x, newY, player.width, player.height)) {
-                    // Snap to tile boundary
-                    player.y = Math.floor((newY + player.height) / CONFIG.TILE_SIZE) * CONFIG.TILE_SIZE - player.height;
-                    player.vy = 0;
-                } else {
-                    player.y = newY;
+            if (playerResult) {
+                if (playerResult.death) {
+                    handlePlayerDeath();
+                    return;
                 }
-            } else if (player.vy < 0) {
-                // Moving up - check for ceiling
-                if (checkCollision(player.x, newY, player.width, player.height)) {
-                    player.y = Math.floor(newY / CONFIG.TILE_SIZE) * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE;
-                    player.vy = 0;
+                if (playerResult.goal) {
+                    handleLevelComplete();
+                    return;
+                }
+                if (playerResult.jumped) {
+                    AudioSystem.sfx.select();
+                }
+                if (playerResult.hitCeiling) {
                     AudioSystem.sfx.wallHit();
-                } else {
-                    player.y = newY;
                 }
-            }
-
-            // Check for pit death
-            if (player.y > LEVEL_HEIGHT * CONFIG.TILE_SIZE) {
-                playerDeath();
-                return;
-            }
-
-            // Check for goal
-            const playerCenterX = player.x + player.width / 2;
-            const playerCenterY = player.y + player.height / 2;
-            if (getTileAt(playerCenterX, playerCenterY) === TILE.GOAL) {
-                levelComplete();
-                return;
-            }
-
-            // Update camera (follows player, can't go back)
-            const targetCameraX = player.x - CONFIG.WIDTH / 3;
-            cameraX = Math.max(maxCameraX, Math.min(targetCameraX, (LEVEL_WIDTH - TILES_X) * CONFIG.TILE_SIZE));
-            maxCameraX = cameraX;
-
-            // Animation
-            if (Math.abs(player.vx) > 0 && player.onGround) {
-                player.animTimer++;
-                if (player.animTimer >= 8) {
-                    player.animTimer = 0;
-                    player.animFrame = (player.animFrame + 1) % 3;
-                }
-            } else if (!player.onGround) {
-                player.animFrame = 1; // Jump frame
-            } else {
-                player.animFrame = 0;
             }
 
             // Update enemies
             updateEnemies();
 
-            // Check player-enemy collisions
-            checkEnemyCollisions();
-        }
-
-        function updateEnemies() {
-            for (const enemy of enemies) {
-                if (!enemy.alive) {
-                    if (enemy.squashTimer > 0) {
-                        enemy.squashTimer--;
-                    }
-                    continue;
-                }
-
-                // Move enemy
-                const newEX = enemy.x + enemy.vx;
-
-                // Check wall collision
-                const checkY = enemy.y + enemy.height / 2;
-                const frontX = enemy.vx < 0 ? newEX : newEX + enemy.width;
-                if (isSolidTile(getTileAt(frontX, checkY))) {
-                    enemy.vx = -enemy.vx; // Reverse direction
-                } else {
-                    // Check for ledge (don't walk off platforms)
-                    const groundCheckX = enemy.vx < 0 ? newEX : newEX + enemy.width;
-                    const groundCheckY = enemy.y + enemy.height + 4;
-                    if (!isSolidTile(getTileAt(groundCheckX, groundCheckY))) {
-                        enemy.vx = -enemy.vx; // Reverse at ledge
-                    } else {
-                        enemy.x = newEX;
-                    }
-                }
-
-                // Apply gravity to enemy
-                const enemyGroundCheck = enemy.y + enemy.height + 1;
-                if (!isSolidTile(getTileAt(enemy.x + enemy.width / 2, enemyGroundCheck))) {
-                    enemy.y += 4; // Fall
+            // Check enemy collisions
+            const enemyResult = checkEnemyCollisions();
+            if (enemyResult) {
+                if (enemyResult.stomp) {
+                    gameState.score += SCORE.ENEMY_STOMP;
+                    updateDisplays();
+                    AudioSystem.sfx.hit();
+                } else if (enemyResult.death) {
+                    handlePlayerDeath();
                 }
             }
         }
 
-        function checkEnemyCollisions() {
-            for (const enemy of enemies) {
-                if (!enemy.alive) continue;
-
-                // Check collision with player
-                const playerRight = player.x + player.width;
-                const playerBottom = player.y + player.height;
-                const enemyRight = enemy.x + enemy.width;
-                const enemyBottom = enemy.y + enemy.height;
-
-                // AABB collision
-                if (player.x < enemyRight &&
-                    playerRight > enemy.x &&
-                    player.y < enemyBottom &&
-                    playerBottom > enemy.y) {
-
-                    // Check if player is stomping (falling onto enemy)
-                    const playerFeetY = playerBottom;
-                    const enemyHeadY = enemy.y + enemy.height * 0.3;
-
-                    if (player.vy > 0 && playerFeetY < enemyHeadY + 10) {
-                        // Stomp! Kill enemy
-                        enemy.alive = false;
-                        enemy.squashTimer = 20;
-                        player.vy = CONFIG.PLAYER_JUMP * 0.6; // Bounce
-                        score += 100;
-                        updateDisplays();
-                        AudioSystem.sfx.hit();
-                    } else {
-                        // Player hit from side - death
-                        playerDeath();
-                        return;
-                    }
-                }
-            }
-        }
-
-        function playerDeath() {
-            AudioSystem.music.stop();
-            AudioSystem.sfx.death();
-
-            lives--;
-            updateDisplays();
-
-            if (lives > 0) {
-                // Restart current level
-                initLevel(currentLevel);
-                AudioSystem.music.start('bounce');
-                state = GameState.PLAYING;
-            } else {
-                // Game over
-                if (score > gameData.highScore) {
-                    gameData.highScore = score;
-                    isNewHighScore = gameData.gamesPlayed > 0;
-                }
-                gameData.gamesPlayed++;
-                saveGameData();
-                updateDisplays();
-
-                stateChangeTime = Date.now();
-                state = GameState.GAME_OVER;
-            }
-        }
-
-        function levelComplete() {
-            AudioSystem.sfx.levelComplete();
-            score += 1000; // Completion bonus
-            updateDisplays();
-
-            if (currentLevel < MAX_LEVELS) {
-                // Transition to next level - auto-walk to door
-                transitionTimer = 0;
-                state = GameState.LEVEL_TRANSITION;
-            } else {
-                // Final level complete - game won!
-                AudioSystem.music.stop();
-
-                if (score > gameData.highScore) {
-                    gameData.highScore = score;
-                    isNewHighScore = gameData.gamesPlayed > 0;
-                }
-                gameData.gamesPlayed++;
-                saveGameData();
-                updateDisplays();
-
-                stateChangeTime = Date.now();
-                state = GameState.LEVEL_COMPLETE;
-            }
-        }
-
-        function updateLevelTransition() {
-            transitionTimer++;
-
-            // Auto-walk player to the right toward the door
-            player.facing = 1;
-            player.vx = CONFIG.PLAYER_SPEED * 0.7;
-
-            // Simple walking animation
-            player.animTimer++;
-            if (player.animTimer >= 10) {
-                player.animTimer = 0;
-                player.animFrame = (player.animFrame + 1) % 3;
-            }
-
-            // Move player
-            player.x += player.vx;
-
-            // Apply gravity
-            player.vy += CONFIG.GRAVITY;
-            if (player.vy > CONFIG.MAX_FALL_SPEED) {
-                player.vy = CONFIG.MAX_FALL_SPEED;
-            }
-
-            // Vertical collision
-            const newY = player.y + player.vy;
-            if (player.vy > 0) {
-                if (checkCollision(player.x, newY, player.width, player.height)) {
-                    player.y = Math.floor((newY + player.height) / CONFIG.TILE_SIZE) * CONFIG.TILE_SIZE - player.height;
-                    player.vy = 0;
-                    player.onGround = true;
-                } else {
-                    player.y = newY;
-                    player.onGround = false;
-                }
-            } else {
-                player.y = newY;
-            }
-
-            // After walking for a bit, fade to next level
-            if (transitionTimer > 90) {
-                // Start next level
-                currentLevel++;
-                initLevel(currentLevel);
-                state = GameState.PLAYING;
+        function updateLevelTransitionState() {
+            if (updateTransition()) {
+                advanceLevel();
                 AudioSystem.music.start('bounce');
             }
         }
 
         function updatePaused() {
-            if (Date.now() - pauseTime >= UNPAUSE_DELAY) {
+            if (Date.now() - gameState.pauseTime >= UNPAUSE_DELAY) {
                 if (GameController.justPressed('start')) {
-                    state = GameState.PLAYING;
+                    gameState.state = GameState.PLAYING;
                     AudioSystem.music.start('bounce');
                 }
             }
         }
 
         function updateGameOver() {
-            if (Date.now() - stateChangeTime >= STATE_CHANGE_DELAY) {
+            if (Date.now() - gameState.stateChangeTime >= STATE_CHANGE_DELAY) {
                 if (GameController.anyButtonJustPressed()) {
-                    state = GameState.TITLE;
+                    gameState.state = GameState.TITLE;
                 }
             }
         }
 
-        function updateLevelComplete() {
-            if (Date.now() - stateChangeTime >= STATE_CHANGE_DELAY) {
+        function updateLevelCompleteState() {
+            if (Date.now() - gameState.stateChangeTime >= STATE_CHANGE_DELAY) {
                 if (GameController.anyButtonJustPressed()) {
-                    state = GameState.TITLE;
+                    gameState.state = GameState.TITLE;
                 }
             }
         }
@@ -869,6 +308,8 @@
         // RENDER FUNCTIONS
         // ============================================
         function renderBackground() {
+            const cameraX = gameState.cameraX;
+
             // Sky gradient (tropical)
             const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.HEIGHT);
             gradient.addColorStop(0, CONFIG.COLORS.skyGradient);
@@ -876,11 +317,11 @@
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
 
-            // Background earth layer (behind pits) - darker distant soil
+            // Background earth layer (behind pits)
             ctx.fillStyle = '#3d2817';
             ctx.fillRect(0, CONFIG.HEIGHT - 80, CONFIG.WIDTH, 80);
 
-            // Draw clouds (parallax) - use world-based positions
+            // Draw clouds (parallax)
             const cloudSpacing = 300;
             const cloudOffset = (cameraX * 0.2) % cloudSpacing;
             const cloudWorldBase = Math.floor(cameraX * 0.2 / cloudSpacing);
@@ -890,7 +331,7 @@
                 drawCloud(baseX + 50, 50 + (Math.abs(worldIndex) % 2) * 20);
             }
 
-            // Draw distant trees (slower parallax, behind main trees)
+            // Draw distant trees (slower parallax)
             const distantTreeSpacing = 200;
             const distantOffset = (cameraX * 0.25) % distantTreeSpacing;
             ctx.globalAlpha = 0.5;
@@ -900,7 +341,7 @@
             }
             ctx.globalAlpha = 1;
 
-            // Draw jungle trees in background (parallax)
+            // Draw jungle trees (parallax)
             const treeSpacing = 180;
             const treeOffset = (cameraX * 0.4) % treeSpacing;
             const treeWorldBase = Math.floor(cameraX * 0.4 / treeSpacing);
@@ -935,11 +376,9 @@
         }
 
         function drawJungleTree(x, y, height) {
-            // Tree trunk
             ctx.fillStyle = CONFIG.COLORS.treeTrunk;
             ctx.fillRect(x - 8, y - height * 0.4, 16, height * 0.4);
 
-            // Foliage layers
             ctx.fillStyle = CONFIG.COLORS.tree;
             ctx.beginPath();
             ctx.arc(x, y - height * 0.5, height * 0.4, 0, Math.PI * 2);
@@ -962,14 +401,12 @@
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.moveTo(x, y);
-            // Wavy vine
             for (let i = 0; i < length; i += 10) {
                 const wave = Math.sin(i * 0.1) * 8;
                 ctx.lineTo(x + wave, y + i);
             }
             ctx.stroke();
 
-            // Leaves on vine
             ctx.fillStyle = CONFIG.COLORS.bush;
             for (let i = 20; i < length - 20; i += 30) {
                 const wave = Math.sin(i * 0.1) * 8;
@@ -980,13 +417,14 @@
         }
 
         function renderTiles() {
+            const cameraX = gameState.cameraX;
             const startTile = Math.floor(cameraX / CONFIG.TILE_SIZE);
             const endTile = startTile + TILES_X + 1;
 
             for (let ty = 0; ty < LEVEL_HEIGHT; ty++) {
                 for (let tx = startTile; tx < endTile && tx < LEVEL_WIDTH; tx++) {
                     if (tx < 0) continue;
-                    const tile = level[ty][tx];
+                    const tile = gameState.level[ty][tx];
                     const screenX = tx * CONFIG.TILE_SIZE - cameraX;
                     const screenY = ty * CONFIG.TILE_SIZE;
 
@@ -1012,38 +450,31 @@
             const ts = CONFIG.TILE_SIZE;
 
             if (isTop) {
-                // Top ground tile - jungle floor with vegetation
                 ctx.fillStyle = CONFIG.COLORS.ground;
                 ctx.fillRect(x, y + 6, ts, ts - 6);
 
-                // Grass/fern top
                 ctx.fillStyle = CONFIG.COLORS.bush;
                 ctx.fillRect(x, y, ts, 8);
 
-                // Grass tufts
                 ctx.fillStyle = CONFIG.COLORS.bushDark;
                 for (let i = 0; i < 3; i++) {
                     ctx.fillRect(x + i * 10 + 4, y - 2, 3, 4);
                     ctx.fillRect(x + i * 10 + 6, y - 4, 2, 6);
                 }
 
-                // Small roots/texture
                 ctx.fillStyle = CONFIG.COLORS.groundDark;
                 ctx.fillRect(x + 5, y + 10, 6, 2);
                 ctx.fillRect(x + 20, y + 14, 8, 2);
             } else {
-                // Underground/dirt tile
                 ctx.fillStyle = CONFIG.COLORS.ground;
                 ctx.fillRect(x, y, ts, ts);
 
-                // Dirt texture
                 ctx.fillStyle = CONFIG.COLORS.groundDark;
                 ctx.fillRect(x + 4, y + 6, 3, 3);
                 ctx.fillRect(x + 18, y + 12, 4, 3);
                 ctx.fillRect(x + 8, y + 22, 3, 2);
                 ctx.fillRect(x + 24, y + 4, 2, 3);
 
-                // Roots
                 ctx.fillStyle = CONFIG.COLORS.groundHighlight;
                 ctx.fillRect(x + 12, y + 8, 8, 2);
                 ctx.fillRect(x + 2, y + 18, 6, 2);
@@ -1053,11 +484,9 @@
         function drawBrickTile(x, y) {
             const ts = CONFIG.TILE_SIZE;
 
-            // Mossy stone block
             ctx.fillStyle = CONFIG.COLORS.brick;
             ctx.fillRect(x, y, ts, ts);
 
-            // Stone texture/cracks
             ctx.fillStyle = CONFIG.COLORS.brickHighlight;
             ctx.fillRect(x, y, ts, 2);
             ctx.fillRect(x, y, 2, ts);
@@ -1066,13 +495,11 @@
             ctx.fillRect(x + ts - 2, y, 2, ts);
             ctx.fillRect(x, y + ts - 2, ts, 2);
 
-            // Moss patches
             ctx.fillStyle = CONFIG.COLORS.bush;
             ctx.fillRect(x + 2, y + 2, 8, 4);
             ctx.fillRect(x + ts - 12, y + ts - 8, 10, 6);
             ctx.fillRect(x + 4, y + ts - 10, 6, 4);
 
-            // Stone crack lines
             ctx.fillStyle = CONFIG.COLORS.bushDark;
             ctx.fillRect(x + ts / 2, y + 4, 1, 10);
             ctx.fillRect(x + 6, y + ts / 2, 12, 1);
@@ -1081,21 +508,17 @@
         function drawBlockTile(x, y) {
             const ts = CONFIG.TILE_SIZE;
 
-            // Ancient rune stone
             ctx.fillStyle = CONFIG.COLORS.block;
             ctx.fillRect(x, y, ts, ts);
 
-            // Highlight edge
             ctx.fillStyle = CONFIG.COLORS.groundHighlight;
             ctx.fillRect(x + 2, y + 2, ts - 4, 2);
             ctx.fillRect(x + 2, y + 2, 2, ts - 4);
 
-            // Shadow edge
             ctx.fillStyle = CONFIG.COLORS.blockShade;
             ctx.fillRect(x + ts - 4, y + 2, 2, ts - 4);
             ctx.fillRect(x + 2, y + ts - 4, ts - 4, 2);
 
-            // Ancient rune symbol (spiral/sun pattern)
             ctx.fillStyle = CONFIG.COLORS.templeAccent;
             ctx.beginPath();
             ctx.arc(x + ts / 2, y + ts / 2, 8, 0, Math.PI * 2);
@@ -1104,7 +527,7 @@
             ctx.beginPath();
             ctx.arc(x + ts / 2, y + ts / 2, 5, 0, Math.PI * 2);
             ctx.fill();
-            // Rays
+
             ctx.fillStyle = CONFIG.COLORS.templeAccent;
             ctx.fillRect(x + ts / 2 - 1, y + 6, 2, 6);
             ctx.fillRect(x + ts / 2 - 1, y + ts - 12, 2, 6);
@@ -1115,20 +538,16 @@
         function drawGoalTile(x, y) {
             const ts = CONFIG.TILE_SIZE;
 
-            // Stone pedestal
             ctx.fillStyle = CONFIG.COLORS.temple;
             ctx.fillRect(x + 4, y + ts - 12, ts - 8, 12);
             ctx.fillRect(x + 2, y + ts - 4, ts - 4, 4);
 
-            // Pedestal highlight
             ctx.fillStyle = CONFIG.COLORS.groundHighlight;
             ctx.fillRect(x + 4, y + ts - 12, ts - 8, 2);
 
-            // Gem (diamond shape)
             const gemX = x + ts / 2;
             const gemY = y + ts - 20;
 
-            // Gem glow
             ctx.fillStyle = CONFIG.COLORS.gemShine;
             ctx.globalAlpha = 0.3 + Math.sin(Date.now() / 200) * 0.2;
             ctx.beginPath();
@@ -1136,17 +555,15 @@
             ctx.fill();
             ctx.globalAlpha = 1;
 
-            // Main gem body
             ctx.fillStyle = CONFIG.COLORS.gem;
             ctx.beginPath();
-            ctx.moveTo(gemX, gemY - 12);      // Top
-            ctx.lineTo(gemX + 10, gemY);       // Right
-            ctx.lineTo(gemX, gemY + 12);       // Bottom
-            ctx.lineTo(gemX - 10, gemY);       // Left
+            ctx.moveTo(gemX, gemY - 12);
+            ctx.lineTo(gemX + 10, gemY);
+            ctx.lineTo(gemX, gemY + 12);
+            ctx.lineTo(gemX - 10, gemY);
             ctx.closePath();
             ctx.fill();
 
-            // Gem shine
             ctx.fillStyle = CONFIG.COLORS.gemShine;
             ctx.beginPath();
             ctx.moveTo(gemX - 2, gemY - 8);
@@ -1156,7 +573,6 @@
             ctx.closePath();
             ctx.fill();
 
-            // Sparkles
             ctx.fillStyle = '#ffffff';
             const sparkle = Math.floor(Date.now() / 300) % 3;
             if (sparkle === 0) ctx.fillRect(gemX + 6, gemY - 6, 2, 2);
@@ -1165,12 +581,11 @@
         }
 
         function renderPlayer() {
-            const screenX = player.x - cameraX;
+            const screenX = player.x - gameState.cameraX;
             const screenY = player.y;
 
             ctx.save();
 
-            // Flip if facing left
             if (player.facing === -1) {
                 ctx.translate(screenX + player.width, screenY);
                 ctx.scale(-1, 1);
@@ -1178,24 +593,22 @@
                 ctx.translate(screenX, screenY);
             }
 
-            // Explorer character
-
-            // Pith helmet (safari hat)
+            // Pith helmet
             ctx.fillStyle = CONFIG.COLORS.playerShirt;
-            ctx.fillRect(4, 0, 16, 5);           // Hat top
-            ctx.fillRect(2, 5, 20, 3);           // Hat brim
+            ctx.fillRect(4, 0, 16, 5);
+            ctx.fillRect(2, 5, 20, 3);
             ctx.fillStyle = CONFIG.COLORS.player;
-            ctx.fillRect(6, 1, 12, 2);           // Hat band
+            ctx.fillRect(6, 1, 12, 2);
 
             // Head
-            ctx.fillStyle = '#deb887';           // Tan skin
+            ctx.fillStyle = '#deb887';
             ctx.fillRect(6, 8, 12, 9);
 
             // Eyes
             ctx.fillStyle = '#000000';
             ctx.fillRect(14, 11, 2, 2);
 
-            // Body (khaki shirt)
+            // Body
             ctx.fillStyle = CONFIG.COLORS.playerShirt;
             ctx.fillRect(5, 17, 14, 8);
 
@@ -1203,22 +616,18 @@
             ctx.fillStyle = CONFIG.COLORS.player;
             ctx.fillRect(5, 23, 14, 2);
 
-            // Legs (brown pants)
+            // Legs
             ctx.fillStyle = CONFIG.COLORS.player;
             if (!player.onGround) {
-                // Jumping pose - legs apart
                 ctx.fillRect(5, 25, 5, 5);
                 ctx.fillRect(14, 25, 5, 5);
             } else if (player.animFrame === 1) {
-                // Running frame 1
                 ctx.fillRect(3, 25, 5, 5);
                 ctx.fillRect(16, 25, 5, 5);
             } else if (player.animFrame === 2) {
-                // Running frame 2
                 ctx.fillRect(7, 25, 5, 5);
                 ctx.fillRect(12, 25, 5, 5);
             } else {
-                // Standing
                 ctx.fillRect(6, 25, 5, 5);
                 ctx.fillRect(13, 25, 5, 5);
             }
@@ -1227,28 +636,26 @@
         }
 
         function renderEnemies() {
-            for (const enemy of enemies) {
+            const currentEnemies = typeof getEnemies === 'function' ? getEnemies() : enemies;
+            for (const enemy of currentEnemies) {
                 if (!enemy.alive && enemy.squashTimer <= 0) continue;
 
-                const screenX = enemy.x - cameraX;
+                const screenX = enemy.x - gameState.cameraX;
                 const screenY = enemy.y;
 
                 if (screenX < -50 || screenX > CONFIG.WIDTH + 50) continue;
 
                 if (!enemy.alive) {
-                    // Squashed snake - flattened coil
                     ctx.fillStyle = CONFIG.COLORS.enemy;
                     ctx.fillRect(screenX + 4, screenY + enemy.height - 6, enemy.width - 8, 6);
                     ctx.fillStyle = CONFIG.COLORS.enemyPattern;
                     ctx.fillRect(screenX + 8, screenY + enemy.height - 5, 4, 4);
                     ctx.fillRect(screenX + 16, screenY + enemy.height - 5, 4, 4);
                 } else {
-                    // Snake body - coiled shape
                     const facing = enemy.vx < 0 ? -1 : 1;
                     const cx = screenX + enemy.width / 2;
                     const cy = screenY + enemy.height / 2;
 
-                    // Body coils (wavy)
                     ctx.fillStyle = CONFIG.COLORS.enemy;
                     const time = Date.now() / 150;
                     for (let i = 0; i < 3; i++) {
@@ -1258,29 +665,24 @@
                         ctx.fill();
                     }
 
-                    // Pattern on body
                     ctx.fillStyle = CONFIG.COLORS.enemyPattern;
                     for (let i = 0; i < 3; i++) {
                         const offset = Math.sin(time + i) * 3;
                         ctx.fillRect(cx - 8 + i * 6, cy + 2 + offset, 4, 4);
                     }
 
-                    // Head
                     ctx.fillStyle = CONFIG.COLORS.enemy;
                     const headX = facing < 0 ? screenX + 2 : screenX + enemy.width - 12;
                     ctx.beginPath();
                     ctx.ellipse(headX + 5, cy - 2, 7, 5, 0, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Eyes (menacing)
                     ctx.fillStyle = '#ffff00';
                     ctx.fillRect(headX + (facing < 0 ? 1 : 6), cy - 5, 3, 3);
 
-                    // Pupil (slit)
                     ctx.fillStyle = '#000000';
                     ctx.fillRect(headX + (facing < 0 ? 2 : 7), cy - 5, 1, 3);
 
-                    // Forked tongue (animated)
                     if (Math.floor(Date.now() / 200) % 3 === 0) {
                         ctx.fillStyle = '#ff4444';
                         const tongueX = facing < 0 ? headX - 4 : headX + 10;
@@ -1292,52 +694,12 @@
             }
         }
 
-        function renderTitle() {
-            renderBackground();
-
-            // Draw some sample tiles
-            for (let i = 0; i < 20; i++) {
-                drawGroundTile(i * CONFIG.TILE_SIZE, CONFIG.HEIGHT - CONFIG.TILE_SIZE, true);
-            }
-
-            // Darken
-            ctx.fillStyle = 'rgba(0,0,0,0.6)';
-            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
-
-            // Title
-            ctx.fillStyle = CONFIG.COLORS.bush;
-            ctx.font = 'bold 56px "Courier New", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('PLATFORMER', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 80);
-
-            // Subtitle
-            ctx.fillStyle = CONFIG.COLORS.gem;
-            ctx.font = '18px "Courier New", monospace';
-            ctx.fillText('Jungle Temple Adventure', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 40);
-
-            // Instructions
-            ctx.fillStyle = CONFIG.COLORS.textHighlight;
-            ctx.font = '16px "Courier New", monospace';
-            ctx.fillText('Press Any Button to Start', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
-
-            // Tips
-            ctx.fillStyle = CONFIG.COLORS.text;
-            ctx.font = '14px "Courier New", monospace';
-            ctx.fillText('Stomp snakes to defeat them', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
-            ctx.fillText('Reach the gem to win!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 85);
-
-            // High score
-            ctx.fillStyle = '#888';
-            ctx.font = '14px "Courier New", monospace';
-            ctx.fillText(`High Score: ${gameData.highScore}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 130);
-        }
-
         function renderTempleInterior() {
-            // Dark stone background for temple interior
+            const cameraX = gameState.cameraX;
+
             ctx.fillStyle = '#1a1410';
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
 
-            // Stone wall texture (parallax)
             const wallOffset = (cameraX * 0.1) % 80;
             ctx.fillStyle = '#2a2018';
             for (let i = -1; i < 10; i++) {
@@ -1345,20 +707,16 @@
                 ctx.fillRect(baseX, 0, 40, CONFIG.HEIGHT);
             }
 
-            // Torch glow effects
             const torchSpacing = 200;
             const torchOffset = (cameraX * 0.5) % torchSpacing;
             for (let i = -1; i < 5; i++) {
                 const baseX = i * torchSpacing - torchOffset + 100;
-                // Torch bracket
                 ctx.fillStyle = '#4a3828';
                 ctx.fillRect(baseX - 4, 80, 8, 20);
-                // Flame glow
                 ctx.fillStyle = 'rgba(255, 150, 50, 0.3)';
                 ctx.beginPath();
                 ctx.arc(baseX, 70, 40 + Math.sin(Date.now() / 200) * 5, 0, Math.PI * 2);
                 ctx.fill();
-                // Flame
                 ctx.fillStyle = '#ff6600';
                 ctx.beginPath();
                 ctx.ellipse(baseX, 70, 6, 12 + Math.sin(Date.now() / 100) * 3, 0, 0, Math.PI * 2);
@@ -1369,12 +727,10 @@
                 ctx.fill();
             }
 
-            // Ancient carvings on walls
             ctx.fillStyle = '#3a2a1a';
             const carvingOffset = (cameraX * 0.2) % 150;
             for (let i = -1; i < 6; i++) {
                 const baseX = i * 150 - carvingOffset + 50;
-                // Simple hieroglyph-like patterns
                 ctx.fillRect(baseX, 150, 20, 3);
                 ctx.fillRect(baseX + 5, 155, 10, 20);
                 ctx.fillRect(baseX + 25, 145, 15, 5);
@@ -1382,8 +738,41 @@
             }
         }
 
+        function renderTitle() {
+            renderBackground();
+
+            for (let i = 0; i < 20; i++) {
+                drawGroundTile(i * CONFIG.TILE_SIZE, CONFIG.HEIGHT - CONFIG.TILE_SIZE, true);
+            }
+
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = CONFIG.COLORS.bush;
+            ctx.font = 'bold 56px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('PLATFORMER', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 80);
+
+            ctx.fillStyle = CONFIG.COLORS.gem;
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillText('Jungle Temple Adventure', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 40);
+
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = '16px "Courier New", monospace';
+            ctx.fillText('Press Any Button to Start', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '14px "Courier New", monospace';
+            ctx.fillText('Stomp snakes to defeat them', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
+            ctx.fillText('Reach the gem to win!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 85);
+
+            ctx.fillStyle = '#888';
+            ctx.font = '14px "Courier New", monospace';
+            ctx.fillText(`High Score: ${gameData.highScore}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 130);
+        }
+
         function renderPlaying() {
-            if (currentLevel === 2) {
+            if (gameState.currentLevel === 2) {
                 renderTempleInterior();
             } else {
                 renderBackground();
@@ -1392,13 +781,12 @@
             renderEnemies();
             renderPlayer();
 
-            // Score and level display
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
             ctx.fillRect(10, 10, 180, 30);
             ctx.fillStyle = CONFIG.COLORS.text;
             ctx.font = '18px "Courier New", monospace';
             ctx.textAlign = 'left';
-            ctx.fillText(`L${currentLevel}  Score: ${score}`, 20, 32);
+            ctx.fillText(`L${gameState.currentLevel}  Score: ${gameState.score}`, 20, 32);
         }
 
         function renderLevelTransition() {
@@ -1406,12 +794,11 @@
             renderTiles();
             renderPlayer();
 
-            // "Entering Temple" text with fade effect
-            const fadeProgress = Math.min(transitionTimer / 60, 1);
+            const fadeProgress = Math.min(gameState.transitionTimer / 60, 1);
             ctx.fillStyle = `rgba(0,0,0,${fadeProgress * 0.7})`;
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
 
-            if (transitionTimer > 30) {
+            if (gameState.transitionTimer > 30) {
                 ctx.fillStyle = CONFIG.COLORS.templeAccent;
                 ctx.font = 'bold 36px "Courier New", monospace';
                 ctx.textAlign = 'center';
@@ -1436,7 +823,7 @@
         }
 
         function renderGameOver() {
-            if (currentLevel === 2) {
+            if (gameState.currentLevel === 2) {
                 renderTempleInterior();
             } else {
                 renderBackground();
@@ -1454,9 +841,9 @@
 
             ctx.fillStyle = CONFIG.COLORS.text;
             ctx.font = '24px "Courier New", monospace';
-            ctx.fillText(`Score: ${score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
+            ctx.fillText(`Score: ${gameState.score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
 
-            if (isNewHighScore) {
+            if (gameState.isNewHighScore) {
                 ctx.fillStyle = CONFIG.COLORS.textHighlight;
                 ctx.font = 'bold 28px "Courier New", monospace';
                 ctx.fillText('NEW HIGH SCORE!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
@@ -1467,8 +854,7 @@
             ctx.fillText('Press Any Button to Continue', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 110);
         }
 
-        function renderLevelComplete() {
-            // Final victory - show temple interior since we beat level 2
+        function renderLevelCompleteScreen() {
             renderTempleInterior();
             renderTiles();
             renderPlayer();
@@ -1487,9 +873,9 @@
 
             ctx.fillStyle = CONFIG.COLORS.text;
             ctx.font = '24px "Courier New", monospace';
-            ctx.fillText(`Final Score: ${score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
+            ctx.fillText(`Final Score: ${gameState.score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
 
-            if (isNewHighScore) {
+            if (gameState.isNewHighScore) {
                 ctx.fillStyle = CONFIG.COLORS.textHighlight;
                 ctx.font = 'bold 28px "Courier New", monospace';
                 ctx.fillText('NEW HIGH SCORE!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
@@ -1506,7 +892,6 @@
         const musicToggle = document.getElementById('musicToggle');
         const sfxToggle = document.getElementById('sfxToggle');
 
-        // Load audio preferences
         AudioSystem.musicEnabled = gameData.musicEnabled;
         AudioSystem.sfxEnabled = gameData.sfxEnabled;
         musicToggle.checked = gameData.musicEnabled;
@@ -1516,7 +901,7 @@
             AudioSystem.musicEnabled = e.target.checked;
             gameData.musicEnabled = e.target.checked;
             saveGameData();
-            if (state === GameState.PLAYING) {
+            if (gameState.state === GameState.PLAYING) {
                 if (e.target.checked) {
                     AudioSystem.music.start('bounce');
                 } else {
@@ -1531,7 +916,6 @@
             saveGameData();
         });
 
-        // Unlock audio
         const unlockAudio = () => {
             AudioSystem.unlock();
         };
@@ -1541,7 +925,7 @@
 
         canvas.addEventListener('click', () => {
             unlockAudio();
-            if (state === GameState.TITLE || state === GameState.GAME_OVER || state === GameState.LEVEL_COMPLETE) {
+            if (gameState.state === GameState.TITLE || gameState.state === GameState.GAME_OVER || gameState.state === GameState.LEVEL_COMPLETE) {
                 startGame();
             }
         });
@@ -1552,7 +936,7 @@
         function gameLoop() {
             GameController.poll();
 
-            switch (state) {
+            switch (gameState.state) {
                 case GameState.TITLE:
                     updateTitle();
                     renderTitle();
@@ -1570,12 +954,12 @@
                     renderGameOver();
                     break;
                 case GameState.LEVEL_TRANSITION:
-                    updateLevelTransition();
+                    updateLevelTransitionState();
                     renderLevelTransition();
                     break;
                 case GameState.LEVEL_COMPLETE:
-                    updateLevelComplete();
-                    renderLevelComplete();
+                    updateLevelCompleteState();
+                    renderLevelCompleteScreen();
                     break;
             }
 
@@ -1586,12 +970,10 @@
         // SCORE GUIDE ICONS
         // ============================================
         function drawScoreIcons() {
-            // Draw snake icon
             const snakeCanvas = document.getElementById('snakeIcon');
             const snakeCtx = snakeCanvas.getContext('2d');
             snakeCtx.clearRect(0, 0, 24, 16);
 
-            // Snake body coils
             snakeCtx.fillStyle = CONFIG.COLORS.enemy;
             snakeCtx.beginPath();
             snakeCtx.ellipse(6, 10, 4, 5, 0, 0, Math.PI * 2);
@@ -1599,40 +981,34 @@
             snakeCtx.ellipse(18, 10, 4, 5, 0, 0, Math.PI * 2);
             snakeCtx.fill();
 
-            // Snake pattern
             snakeCtx.fillStyle = CONFIG.COLORS.enemyPattern;
             snakeCtx.fillRect(4, 8, 3, 3);
             snakeCtx.fillRect(10, 8, 3, 3);
             snakeCtx.fillRect(16, 8, 3, 3);
 
-            // Snake head
             snakeCtx.fillStyle = CONFIG.COLORS.enemy;
             snakeCtx.beginPath();
             snakeCtx.ellipse(22, 6, 4, 3, 0, 0, Math.PI * 2);
             snakeCtx.fill();
 
-            // Eye
             snakeCtx.fillStyle = '#ffff00';
             snakeCtx.fillRect(21, 4, 2, 2);
             snakeCtx.fillStyle = '#000000';
             snakeCtx.fillRect(22, 4, 1, 2);
 
-            // Draw gem icon
             const gemCanvas = document.getElementById('gemIcon');
             const gemCtx = gemCanvas.getContext('2d');
             gemCtx.clearRect(0, 0, 16, 16);
 
-            // Main gem body (diamond shape)
             gemCtx.fillStyle = CONFIG.COLORS.gem;
             gemCtx.beginPath();
-            gemCtx.moveTo(8, 1);   // Top
-            gemCtx.lineTo(14, 8);  // Right
-            gemCtx.lineTo(8, 15);  // Bottom
-            gemCtx.lineTo(2, 8);   // Left
+            gemCtx.moveTo(8, 1);
+            gemCtx.lineTo(14, 8);
+            gemCtx.lineTo(8, 15);
+            gemCtx.lineTo(2, 8);
             gemCtx.closePath();
             gemCtx.fill();
 
-            // Gem shine
             gemCtx.fillStyle = CONFIG.COLORS.gemShine;
             gemCtx.beginPath();
             gemCtx.moveTo(6, 4);
