@@ -851,18 +851,22 @@
             // Draw jungle trees in background (parallax)
             const treeSpacing = 180;
             const treeOffset = (cameraX * 0.4) % treeSpacing;
+            const treeWorldBase = Math.floor(cameraX * 0.4 / treeSpacing);
             for (let i = -1; i < 5; i++) {
                 const baseX = i * treeSpacing - treeOffset;
-                const height = 55 + (i % 3) * 15;
+                const worldIndex = treeWorldBase + i;
+                const height = 55 + (Math.abs(worldIndex) % 3) * 15;
                 drawJungleTree(baseX + 90, CONFIG.HEIGHT - 64, height);
             }
 
             // Draw hanging vines
             const vineSpacing = 160;
             const vineOffset = (cameraX * 0.3) % vineSpacing;
+            const vineWorldBase = Math.floor(cameraX * 0.3 / vineSpacing);
             for (let i = -1; i < 6; i++) {
                 const baseX = i * vineSpacing - vineOffset;
-                const length = 80 + (i % 3) * 30;
+                const worldIndex = vineWorldBase + i;
+                const length = 80 + (Math.abs(worldIndex) % 3) * 30;
                 drawVine(baseX + 80, 0, length);
             }
         }
