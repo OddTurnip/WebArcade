@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platformer</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+        }
+        h1 { margin-bottom: 10px; color: #ff6b6b; }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #scoreDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+        .score-item { text-align: center; }
+        .score-label { font-size: 12px; color: #888; margin-bottom: 5px; }
+        .score-value { font-size: 24px; color: #4ecdc4; }
+        .high-score .score-value { color: #ffe66d; }
+        #controls {
+            margin-top: 15px;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+        #audioControls {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        #audioControls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #4ecdc4;
+        }
+        #scoreGuide {
+            margin-top: 10px;
+            color: #aaa;
+            font-size: 14px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+        .score-entry {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .score-entry canvas {
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <h1>Platformer</h1>
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <div id="scoreDisplay">
+        <div class="score-item">
+            <div class="score-label">Lives</div>
+            <div class="score-value" id="livesDisplay">3</div>
+        </div>
+        <div class="score-item">
+            <div class="score-label">Score</div>
+            <div class="score-value" id="currentScore">0</div>
+        </div>
+        <div class="score-item high-score">
+            <div class="score-label">High Score</div>
+            <div class="score-value" id="highScore">0</div>
+        </div>
+    </div>
+    <div id="controls">
+        <strong>Keyboard:</strong> Left/Right or A/D to move | Space/Z to jump | Esc to pause<br>
+        <strong>Controller:</strong> D-Pad / Left Stick to move | A to jump | Start to pause
+    </div>
+    <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle" checked> Music</label>
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+    <div id="scoreGuide">
+        <strong>Scoring:</strong>
+        <span class="score-entry"><canvas id="snakeIcon" width="24" height="16"></canvas> 100 pts</span>
+        <span class="score-entry"><canvas id="gemIcon" width="16" height="16"></canvas> 1000 pts</span>
+    </div>
+
+    <script src="../controller.js"></script>
+    <script src="../audio.js"></script>
+    <script src="../storage.js"></script>
+    <script src="levels.js"></script>
+    <script src="game.js"></script>
+    <script>
+        // ============================================
+        // PERSISTENCE
+        // ============================================
+        const GAME_ID = 'platformer';
+        let gameData = GameStorage.load(GAME_ID, GameStorage.defaults.arcade());
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        // ============================================
+        // CANVAS SETUP
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const currentScoreEl = document.getElementById('currentScore');
+        const highScoreEl = document.getElementById('highScore');
+        const livesEl = document.getElementById('livesDisplay');
+
+        function updateDisplays() {
+            currentScoreEl.textContent = gameState.score;
+            highScoreEl.textContent = gameData.highScore;
+            livesEl.textContent = gameState.lives;
+        }
+
+        // ============================================
+        // GAME FLOW
+        // ============================================
+        function startGame() {
+            AudioSystem.unlock();
+            AudioSystem.sfx.select();
+            initGame();
+            gameState.state = GameState.PLAYING;
+            AudioSystem.music.start('bounce');
+            updateDisplays();
+        }
+
+        function handlePlayerDeath() {
+            AudioSystem.music.stop();
+            AudioSystem.sfx.death();
+
+            gameState.lives--;
+            updateDisplays();
+
+            if (gameState.lives > 0) {
+                // Restart current level
+                initLevel(gameState.currentLevel);
+                AudioSystem.music.start('bounce');
+                gameState.state = GameState.PLAYING;
+            } else {
+                // Game over
+                if (gameState.score > gameData.highScore) {
+                    gameData.highScore = gameState.score;
+                    gameState.isNewHighScore = gameData.gamesPlayed > 0;
+                }
+                gameData.gamesPlayed++;
+                saveGameData();
+                updateDisplays();
+
+                gameState.stateChangeTime = Date.now();
+                gameState.state = GameState.GAME_OVER;
+            }
+        }
+
+        function handleLevelComplete() {
+            AudioSystem.sfx.levelComplete();
+            gameState.score += SCORE.LEVEL_COMPLETE;
+            updateDisplays();
+
+            if (gameState.currentLevel < MAX_LEVELS) {
+                // Transition to next level
+                startLevelTransition();
+            } else {
+                // Final level complete - game won!
+                AudioSystem.music.stop();
+
+                if (gameState.score > gameData.highScore) {
+                    gameData.highScore = gameState.score;
+                    gameState.isNewHighScore = gameData.gamesPlayed > 0;
+                }
+                gameData.gamesPlayed++;
+                saveGameData();
+                updateDisplays();
+
+                gameState.stateChangeTime = Date.now();
+                gameState.state = GameState.LEVEL_COMPLETE;
+            }
+        }
+
+        // ============================================
+        // UPDATE FUNCTIONS
+        // ============================================
+        function updateTitle() {
+            if (GameController.anyButtonJustPressed()) {
+                startGame();
+            }
+        }
+
+        function updatePlaying() {
+            // Pause check
+            if (GameController.justPressed('start')) {
+                gameState.pauseTime = Date.now();
+                gameState.state = GameState.PAUSED;
+                AudioSystem.music.stop();
+                return;
+            }
+
+            // Get input
+            const input = {
+                left: GameController.direction.left,
+                right: GameController.direction.right,
+                jump: GameController.justPressed('a')
+            };
+
+            // Update player
+            const playerResult = updatePlayer(input);
+
+            if (playerResult) {
+                if (playerResult.death) {
+                    handlePlayerDeath();
+                    return;
+                }
+                if (playerResult.goal) {
+                    handleLevelComplete();
+                    return;
+                }
+                if (playerResult.jumped) {
+                    AudioSystem.sfx.select();
+                }
+                if (playerResult.hitCeiling) {
+                    AudioSystem.sfx.wallHit();
+                }
+            }
+
+            // Update enemies
+            updateEnemies();
+
+            // Check enemy collisions
+            const enemyResult = checkEnemyCollisions();
+            if (enemyResult) {
+                if (enemyResult.stomp) {
+                    gameState.score += SCORE.ENEMY_STOMP;
+                    updateDisplays();
+                    AudioSystem.sfx.hit();
+                } else if (enemyResult.death) {
+                    handlePlayerDeath();
+                }
+            }
+        }
+
+        function updateLevelTransitionState() {
+            if (updateTransition()) {
+                advanceLevel();
+                AudioSystem.music.start('bounce');
+            }
+        }
+
+        function updatePaused() {
+            if (Date.now() - gameState.pauseTime >= UNPAUSE_DELAY) {
+                if (GameController.justPressed('start')) {
+                    gameState.state = GameState.PLAYING;
+                    AudioSystem.music.start('bounce');
+                }
+            }
+        }
+
+        function updateGameOver() {
+            if (Date.now() - gameState.stateChangeTime >= STATE_CHANGE_DELAY) {
+                if (GameController.anyButtonJustPressed()) {
+                    gameState.state = GameState.TITLE;
+                }
+            }
+        }
+
+        function updateLevelCompleteState() {
+            if (Date.now() - gameState.stateChangeTime >= STATE_CHANGE_DELAY) {
+                if (GameController.anyButtonJustPressed()) {
+                    gameState.state = GameState.TITLE;
+                }
+            }
+        }
+
+        // ============================================
+        // RENDER FUNCTIONS
+        // ============================================
+        function renderBackground() {
+            const cameraX = gameState.cameraX;
+
+            // Sky gradient (tropical)
+            const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.HEIGHT);
+            gradient.addColorStop(0, CONFIG.COLORS.skyGradient);
+            gradient.addColorStop(1, CONFIG.COLORS.sky);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            // Background earth layer (behind pits)
+            ctx.fillStyle = '#3d2817';
+            ctx.fillRect(0, CONFIG.HEIGHT - 80, CONFIG.WIDTH, 80);
+
+            // Draw clouds (parallax)
+            const cloudSpacing = 300;
+            const cloudOffset = (cameraX * 0.2) % cloudSpacing;
+            const cloudWorldBase = Math.floor(cameraX * 0.2 / cloudSpacing);
+            for (let i = -1; i < 4; i++) {
+                const baseX = i * cloudSpacing - cloudOffset;
+                const worldIndex = cloudWorldBase + i;
+                drawCloud(baseX + 50, 50 + (Math.abs(worldIndex) % 2) * 20);
+            }
+
+            // Draw distant trees (slower parallax)
+            const distantTreeSpacing = 200;
+            const distantOffset = (cameraX * 0.25) % distantTreeSpacing;
+            ctx.globalAlpha = 0.5;
+            for (let i = -1; i < 5; i++) {
+                const baseX = i * distantTreeSpacing - distantOffset;
+                drawJungleTree(baseX + 100, CONFIG.HEIGHT - 50, 40);
+            }
+            ctx.globalAlpha = 1;
+
+            // Draw jungle trees (parallax)
+            const treeSpacing = 180;
+            const treeOffset = (cameraX * 0.4) % treeSpacing;
+            const treeWorldBase = Math.floor(cameraX * 0.4 / treeSpacing);
+            for (let i = -1; i < 5; i++) {
+                const baseX = i * treeSpacing - treeOffset;
+                const worldIndex = treeWorldBase + i;
+                const height = 55 + (Math.abs(worldIndex) % 3) * 15;
+                drawJungleTree(baseX + 90, CONFIG.HEIGHT - 64, height);
+            }
+
+            // Draw hanging vines
+            const vineSpacing = 160;
+            const vineOffset = (cameraX * 0.3) % vineSpacing;
+            const vineWorldBase = Math.floor(cameraX * 0.3 / vineSpacing);
+            for (let i = -1; i < 6; i++) {
+                const baseX = i * vineSpacing - vineOffset;
+                const worldIndex = vineWorldBase + i;
+                const length = 80 + (Math.abs(worldIndex) % 3) * 30;
+                drawVine(baseX + 80, 0, length);
+            }
+        }
+
+        function drawCloud(x, y) {
+            ctx.fillStyle = CONFIG.COLORS.cloud;
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath();
+            ctx.arc(x, y, 18, 0, Math.PI * 2);
+            ctx.arc(x + 22, y - 4, 22, 0, Math.PI * 2);
+            ctx.arc(x + 44, y, 18, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+
+        function drawJungleTree(x, y, height) {
+            ctx.fillStyle = CONFIG.COLORS.treeTrunk;
+            ctx.fillRect(x - 8, y - height * 0.4, 16, height * 0.4);
+
+            ctx.fillStyle = CONFIG.COLORS.tree;
+            ctx.beginPath();
+            ctx.arc(x, y - height * 0.5, height * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = CONFIG.COLORS.bush;
+            ctx.beginPath();
+            ctx.arc(x - 15, y - height * 0.4, height * 0.25, 0, Math.PI * 2);
+            ctx.arc(x + 15, y - height * 0.4, height * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = CONFIG.COLORS.bushDark;
+            ctx.beginPath();
+            ctx.arc(x, y - height * 0.65, height * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawVine(x, y, length) {
+            ctx.strokeStyle = CONFIG.COLORS.vine;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            for (let i = 0; i < length; i += 10) {
+                const wave = Math.sin(i * 0.1) * 8;
+                ctx.lineTo(x + wave, y + i);
+            }
+            ctx.stroke();
+
+            ctx.fillStyle = CONFIG.COLORS.bush;
+            for (let i = 20; i < length - 20; i += 30) {
+                const wave = Math.sin(i * 0.1) * 8;
+                ctx.beginPath();
+                ctx.ellipse(x + wave + 6, y + i, 8, 4, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function renderTiles() {
+            const cameraX = gameState.cameraX;
+            const startTile = Math.floor(cameraX / CONFIG.TILE_SIZE);
+            const endTile = startTile + TILES_X + 1;
+
+            for (let ty = 0; ty < LEVEL_HEIGHT; ty++) {
+                for (let tx = startTile; tx < endTile && tx < LEVEL_WIDTH; tx++) {
+                    if (tx < 0) continue;
+                    const tile = gameState.level[ty][tx];
+                    const screenX = tx * CONFIG.TILE_SIZE - cameraX;
+                    const screenY = ty * CONFIG.TILE_SIZE;
+
+                    switch (tile) {
+                        case TILE.GROUND:
+                            drawGroundTile(screenX, screenY, ty === LEVEL_HEIGHT - 2);
+                            break;
+                        case TILE.BRICK:
+                            drawBrickTile(screenX, screenY);
+                            break;
+                        case TILE.BLOCK:
+                            drawBlockTile(screenX, screenY);
+                            break;
+                        case TILE.GOAL:
+                            drawGoalTile(screenX, screenY);
+                            break;
+                    }
+                }
+            }
+        }
+
+        function drawGroundTile(x, y, isTop) {
+            const ts = CONFIG.TILE_SIZE;
+
+            if (isTop) {
+                ctx.fillStyle = CONFIG.COLORS.ground;
+                ctx.fillRect(x, y + 6, ts, ts - 6);
+
+                ctx.fillStyle = CONFIG.COLORS.bush;
+                ctx.fillRect(x, y, ts, 8);
+
+                ctx.fillStyle = CONFIG.COLORS.bushDark;
+                for (let i = 0; i < 3; i++) {
+                    ctx.fillRect(x + i * 10 + 4, y - 2, 3, 4);
+                    ctx.fillRect(x + i * 10 + 6, y - 4, 2, 6);
+                }
+
+                ctx.fillStyle = CONFIG.COLORS.groundDark;
+                ctx.fillRect(x + 5, y + 10, 6, 2);
+                ctx.fillRect(x + 20, y + 14, 8, 2);
+            } else {
+                ctx.fillStyle = CONFIG.COLORS.ground;
+                ctx.fillRect(x, y, ts, ts);
+
+                ctx.fillStyle = CONFIG.COLORS.groundDark;
+                ctx.fillRect(x + 4, y + 6, 3, 3);
+                ctx.fillRect(x + 18, y + 12, 4, 3);
+                ctx.fillRect(x + 8, y + 22, 3, 2);
+                ctx.fillRect(x + 24, y + 4, 2, 3);
+
+                ctx.fillStyle = CONFIG.COLORS.groundHighlight;
+                ctx.fillRect(x + 12, y + 8, 8, 2);
+                ctx.fillRect(x + 2, y + 18, 6, 2);
+            }
+        }
+
+        function drawBrickTile(x, y) {
+            const ts = CONFIG.TILE_SIZE;
+
+            ctx.fillStyle = CONFIG.COLORS.brick;
+            ctx.fillRect(x, y, ts, ts);
+
+            ctx.fillStyle = CONFIG.COLORS.brickHighlight;
+            ctx.fillRect(x, y, ts, 2);
+            ctx.fillRect(x, y, 2, ts);
+
+            ctx.fillStyle = CONFIG.COLORS.bushDark;
+            ctx.fillRect(x + ts - 2, y, 2, ts);
+            ctx.fillRect(x, y + ts - 2, ts, 2);
+
+            ctx.fillStyle = CONFIG.COLORS.bush;
+            ctx.fillRect(x + 2, y + 2, 8, 4);
+            ctx.fillRect(x + ts - 12, y + ts - 8, 10, 6);
+            ctx.fillRect(x + 4, y + ts - 10, 6, 4);
+
+            ctx.fillStyle = CONFIG.COLORS.bushDark;
+            ctx.fillRect(x + ts / 2, y + 4, 1, 10);
+            ctx.fillRect(x + 6, y + ts / 2, 12, 1);
+        }
+
+        function drawBlockTile(x, y) {
+            const ts = CONFIG.TILE_SIZE;
+
+            ctx.fillStyle = CONFIG.COLORS.block;
+            ctx.fillRect(x, y, ts, ts);
+
+            ctx.fillStyle = CONFIG.COLORS.groundHighlight;
+            ctx.fillRect(x + 2, y + 2, ts - 4, 2);
+            ctx.fillRect(x + 2, y + 2, 2, ts - 4);
+
+            ctx.fillStyle = CONFIG.COLORS.blockShade;
+            ctx.fillRect(x + ts - 4, y + 2, 2, ts - 4);
+            ctx.fillRect(x + 2, y + ts - 4, ts - 4, 2);
+
+            ctx.fillStyle = CONFIG.COLORS.templeAccent;
+            ctx.beginPath();
+            ctx.arc(x + ts / 2, y + ts / 2, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = CONFIG.COLORS.block;
+            ctx.beginPath();
+            ctx.arc(x + ts / 2, y + ts / 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = CONFIG.COLORS.templeAccent;
+            ctx.fillRect(x + ts / 2 - 1, y + 6, 2, 6);
+            ctx.fillRect(x + ts / 2 - 1, y + ts - 12, 2, 6);
+            ctx.fillRect(x + 6, y + ts / 2 - 1, 6, 2);
+            ctx.fillRect(x + ts - 12, y + ts / 2 - 1, 6, 2);
+        }
+
+        function drawGoalTile(x, y) {
+            const ts = CONFIG.TILE_SIZE;
+
+            ctx.fillStyle = CONFIG.COLORS.temple;
+            ctx.fillRect(x + 4, y + ts - 12, ts - 8, 12);
+            ctx.fillRect(x + 2, y + ts - 4, ts - 4, 4);
+
+            ctx.fillStyle = CONFIG.COLORS.groundHighlight;
+            ctx.fillRect(x + 4, y + ts - 12, ts - 8, 2);
+
+            const gemX = x + ts / 2;
+            const gemY = y + ts - 20;
+
+            ctx.fillStyle = CONFIG.COLORS.gemShine;
+            ctx.globalAlpha = 0.3 + Math.sin(Date.now() / 200) * 0.2;
+            ctx.beginPath();
+            ctx.arc(gemX, gemY, 14, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            ctx.fillStyle = CONFIG.COLORS.gem;
+            ctx.beginPath();
+            ctx.moveTo(gemX, gemY - 12);
+            ctx.lineTo(gemX + 10, gemY);
+            ctx.lineTo(gemX, gemY + 12);
+            ctx.lineTo(gemX - 10, gemY);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = CONFIG.COLORS.gemShine;
+            ctx.beginPath();
+            ctx.moveTo(gemX - 2, gemY - 8);
+            ctx.lineTo(gemX + 4, gemY - 2);
+            ctx.lineTo(gemX - 2, gemY + 4);
+            ctx.lineTo(gemX - 6, gemY - 2);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            const sparkle = Math.floor(Date.now() / 300) % 3;
+            if (sparkle === 0) ctx.fillRect(gemX + 6, gemY - 6, 2, 2);
+            if (sparkle === 1) ctx.fillRect(gemX - 4, gemY + 4, 2, 2);
+            if (sparkle === 2) ctx.fillRect(gemX + 2, gemY - 10, 2, 2);
+        }
+
+        function renderPlayer() {
+            const screenX = player.x - gameState.cameraX;
+            const screenY = player.y;
+
+            ctx.save();
+
+            if (player.facing === -1) {
+                ctx.translate(screenX + player.width, screenY);
+                ctx.scale(-1, 1);
+            } else {
+                ctx.translate(screenX, screenY);
+            }
+
+            // Pith helmet
+            ctx.fillStyle = CONFIG.COLORS.playerShirt;
+            ctx.fillRect(4, 0, 16, 5);
+            ctx.fillRect(2, 5, 20, 3);
+            ctx.fillStyle = CONFIG.COLORS.player;
+            ctx.fillRect(6, 1, 12, 2);
+
+            // Head
+            ctx.fillStyle = '#deb887';
+            ctx.fillRect(6, 8, 12, 9);
+
+            // Eyes
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(14, 11, 2, 2);
+
+            // Body
+            ctx.fillStyle = CONFIG.COLORS.playerShirt;
+            ctx.fillRect(5, 17, 14, 8);
+
+            // Belt
+            ctx.fillStyle = CONFIG.COLORS.player;
+            ctx.fillRect(5, 23, 14, 2);
+
+            // Legs
+            ctx.fillStyle = CONFIG.COLORS.player;
+            if (!player.onGround) {
+                ctx.fillRect(5, 25, 5, 5);
+                ctx.fillRect(14, 25, 5, 5);
+            } else if (player.animFrame === 1) {
+                ctx.fillRect(3, 25, 5, 5);
+                ctx.fillRect(16, 25, 5, 5);
+            } else if (player.animFrame === 2) {
+                ctx.fillRect(7, 25, 5, 5);
+                ctx.fillRect(12, 25, 5, 5);
+            } else {
+                ctx.fillRect(6, 25, 5, 5);
+                ctx.fillRect(13, 25, 5, 5);
+            }
+
+            ctx.restore();
+        }
+
+        function renderEnemies() {
+            const currentEnemies = typeof getEnemies === 'function' ? getEnemies() : enemies;
+            for (const enemy of currentEnemies) {
+                if (!enemy.alive && enemy.squashTimer <= 0) continue;
+
+                const screenX = enemy.x - gameState.cameraX;
+                const screenY = enemy.y;
+
+                if (screenX < -50 || screenX > CONFIG.WIDTH + 50) continue;
+
+                if (!enemy.alive) {
+                    ctx.fillStyle = CONFIG.COLORS.enemy;
+                    ctx.fillRect(screenX + 4, screenY + enemy.height - 6, enemy.width - 8, 6);
+                    ctx.fillStyle = CONFIG.COLORS.enemyPattern;
+                    ctx.fillRect(screenX + 8, screenY + enemy.height - 5, 4, 4);
+                    ctx.fillRect(screenX + 16, screenY + enemy.height - 5, 4, 4);
+                } else {
+                    const facing = enemy.vx < 0 ? -1 : 1;
+                    const cx = screenX + enemy.width / 2;
+                    const cy = screenY + enemy.height / 2;
+
+                    ctx.fillStyle = CONFIG.COLORS.enemy;
+                    const time = Date.now() / 150;
+                    for (let i = 0; i < 3; i++) {
+                        const offset = Math.sin(time + i) * 3;
+                        ctx.beginPath();
+                        ctx.ellipse(cx - 6 + i * 6, cy + 4 + offset, 6, 8, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    ctx.fillStyle = CONFIG.COLORS.enemyPattern;
+                    for (let i = 0; i < 3; i++) {
+                        const offset = Math.sin(time + i) * 3;
+                        ctx.fillRect(cx - 8 + i * 6, cy + 2 + offset, 4, 4);
+                    }
+
+                    ctx.fillStyle = CONFIG.COLORS.enemy;
+                    const headX = facing < 0 ? screenX + 2 : screenX + enemy.width - 12;
+                    ctx.beginPath();
+                    ctx.ellipse(headX + 5, cy - 2, 7, 5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillRect(headX + (facing < 0 ? 1 : 6), cy - 5, 3, 3);
+
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(headX + (facing < 0 ? 2 : 7), cy - 5, 1, 3);
+
+                    if (Math.floor(Date.now() / 200) % 3 === 0) {
+                        ctx.fillStyle = '#ff4444';
+                        const tongueX = facing < 0 ? headX - 4 : headX + 10;
+                        ctx.fillRect(tongueX, cy - 2, 4, 1);
+                        ctx.fillRect(tongueX + (facing < 0 ? -2 : 4), cy - 3, 2, 1);
+                        ctx.fillRect(tongueX + (facing < 0 ? -2 : 4), cy - 1, 2, 1);
+                    }
+                }
+            }
+        }
+
+        function renderTempleInterior() {
+            const cameraX = gameState.cameraX;
+
+            ctx.fillStyle = '#1a1410';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            const wallOffset = (cameraX * 0.1) % 80;
+            ctx.fillStyle = '#2a2018';
+            for (let i = -1; i < 10; i++) {
+                const baseX = i * 80 - wallOffset;
+                ctx.fillRect(baseX, 0, 40, CONFIG.HEIGHT);
+            }
+
+            const torchSpacing = 200;
+            const torchOffset = (cameraX * 0.5) % torchSpacing;
+            for (let i = -1; i < 5; i++) {
+                const baseX = i * torchSpacing - torchOffset + 100;
+                ctx.fillStyle = '#4a3828';
+                ctx.fillRect(baseX - 4, 80, 8, 20);
+                ctx.fillStyle = 'rgba(255, 150, 50, 0.3)';
+                ctx.beginPath();
+                ctx.arc(baseX, 70, 40 + Math.sin(Date.now() / 200) * 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ff6600';
+                ctx.beginPath();
+                ctx.ellipse(baseX, 70, 6, 12 + Math.sin(Date.now() / 100) * 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffcc00';
+                ctx.beginPath();
+                ctx.ellipse(baseX, 72, 3, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.fillStyle = '#3a2a1a';
+            const carvingOffset = (cameraX * 0.2) % 150;
+            for (let i = -1; i < 6; i++) {
+                const baseX = i * 150 - carvingOffset + 50;
+                ctx.fillRect(baseX, 150, 20, 3);
+                ctx.fillRect(baseX + 5, 155, 10, 20);
+                ctx.fillRect(baseX + 25, 145, 15, 5);
+                ctx.fillRect(baseX + 30, 150, 5, 30);
+            }
+        }
+
+        function renderTitle() {
+            renderBackground();
+
+            for (let i = 0; i < 20; i++) {
+                drawGroundTile(i * CONFIG.TILE_SIZE, CONFIG.HEIGHT - CONFIG.TILE_SIZE, true);
+            }
+
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = CONFIG.COLORS.bush;
+            ctx.font = 'bold 56px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('PLATFORMER', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 80);
+
+            ctx.fillStyle = CONFIG.COLORS.gem;
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillText('Jungle Temple Adventure', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 40);
+
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = '16px "Courier New", monospace';
+            ctx.fillText('Press Any Button to Start', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '14px "Courier New", monospace';
+            ctx.fillText('Stomp snakes to defeat them', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
+            ctx.fillText('Reach the gem to win!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 85);
+
+            ctx.fillStyle = '#888';
+            ctx.font = '14px "Courier New", monospace';
+            ctx.fillText(`High Score: ${gameData.highScore}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 130);
+        }
+
+        function renderPlaying() {
+            if (gameState.currentLevel === 2) {
+                renderTempleInterior();
+            } else {
+                renderBackground();
+            }
+            renderTiles();
+            renderEnemies();
+            renderPlayer();
+
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(10, 10, 180, 30);
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '18px "Courier New", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`L${gameState.currentLevel}  Score: ${gameState.score}`, 20, 32);
+        }
+
+        function renderLevelTransition() {
+            renderBackground();
+            renderTiles();
+            renderPlayer();
+
+            const fadeProgress = Math.min(gameState.transitionTimer / 60, 1);
+            ctx.fillStyle = `rgba(0,0,0,${fadeProgress * 0.7})`;
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            if (gameState.transitionTimer > 30) {
+                ctx.fillStyle = CONFIG.COLORS.templeAccent;
+                ctx.font = 'bold 36px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('ENTERING THE TEMPLE...', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2);
+            }
+        }
+
+        function renderPaused() {
+            renderPlaying();
+
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('PAUSED', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '18px "Courier New", monospace';
+            ctx.fillText('Press Start to Resume', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 50);
+        }
+
+        function renderGameOver() {
+            if (gameState.currentLevel === 2) {
+                renderTempleInterior();
+            } else {
+                renderBackground();
+            }
+            renderTiles();
+            renderEnemies();
+
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = CONFIG.COLORS.player;
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 40);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '24px "Courier New", monospace';
+            ctx.fillText(`Score: ${gameState.score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
+
+            if (gameState.isNewHighScore) {
+                ctx.fillStyle = CONFIG.COLORS.textHighlight;
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.fillText('NEW HIGH SCORE!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
+            }
+
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = '16px "Courier New", monospace';
+            ctx.fillText('Press Any Button to Continue', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 110);
+        }
+
+        function renderLevelCompleteScreen() {
+            renderTempleInterior();
+            renderTiles();
+            renderPlayer();
+
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+            ctx.fillStyle = CONFIG.COLORS.gem;
+            ctx.font = 'bold 48px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('VICTORY!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 60);
+
+            ctx.fillStyle = CONFIG.COLORS.templeAccent;
+            ctx.font = '20px "Courier New", monospace';
+            ctx.fillText('You claimed the temple treasure!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 20);
+
+            ctx.fillStyle = CONFIG.COLORS.text;
+            ctx.font = '24px "Courier New", monospace';
+            ctx.fillText(`Final Score: ${gameState.score}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 20);
+
+            if (gameState.isNewHighScore) {
+                ctx.fillStyle = CONFIG.COLORS.textHighlight;
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.fillText('NEW HIGH SCORE!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
+            }
+
+            ctx.fillStyle = CONFIG.COLORS.textHighlight;
+            ctx.font = '16px "Courier New", monospace';
+            ctx.fillText('Press Any Button to Continue', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 110);
+        }
+
+        // ============================================
+        // AUDIO CONTROLS
+        // ============================================
+        const musicToggle = document.getElementById('musicToggle');
+        const sfxToggle = document.getElementById('sfxToggle');
+
+        AudioSystem.musicEnabled = gameData.musicEnabled;
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        musicToggle.checked = gameData.musicEnabled;
+        sfxToggle.checked = gameData.sfxEnabled;
+
+        musicToggle.addEventListener('change', (e) => {
+            AudioSystem.musicEnabled = e.target.checked;
+            gameData.musicEnabled = e.target.checked;
+            saveGameData();
+            if (gameState.state === GameState.PLAYING) {
+                if (e.target.checked) {
+                    AudioSystem.music.start('bounce');
+                } else {
+                    AudioSystem.music.stop();
+                }
+            }
+        });
+
+        sfxToggle.addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        const unlockAudio = () => {
+            AudioSystem.unlock();
+        };
+        document.addEventListener('keydown', unlockAudio, { once: true });
+        document.addEventListener('click', unlockAudio, { once: true });
+        document.addEventListener('touchstart', unlockAudio, { once: true });
+
+        canvas.addEventListener('click', () => {
+            unlockAudio();
+            if (gameState.state === GameState.TITLE || gameState.state === GameState.GAME_OVER || gameState.state === GameState.LEVEL_COMPLETE) {
+                startGame();
+            }
+        });
+
+        // ============================================
+        // GAME LOOP
+        // ============================================
+        function gameLoop() {
+            GameController.poll();
+
+            switch (gameState.state) {
+                case GameState.TITLE:
+                    updateTitle();
+                    renderTitle();
+                    break;
+                case GameState.PLAYING:
+                    updatePlaying();
+                    renderPlaying();
+                    break;
+                case GameState.PAUSED:
+                    updatePaused();
+                    renderPaused();
+                    break;
+                case GameState.GAME_OVER:
+                    updateGameOver();
+                    renderGameOver();
+                    break;
+                case GameState.LEVEL_TRANSITION:
+                    updateLevelTransitionState();
+                    renderLevelTransition();
+                    break;
+                case GameState.LEVEL_COMPLETE:
+                    updateLevelCompleteState();
+                    renderLevelCompleteScreen();
+                    break;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================
+        // SCORE GUIDE ICONS
+        // ============================================
+        function drawScoreIcons() {
+            const snakeCanvas = document.getElementById('snakeIcon');
+            const snakeCtx = snakeCanvas.getContext('2d');
+            snakeCtx.clearRect(0, 0, 24, 16);
+
+            snakeCtx.fillStyle = CONFIG.COLORS.enemy;
+            snakeCtx.beginPath();
+            snakeCtx.ellipse(6, 10, 4, 5, 0, 0, Math.PI * 2);
+            snakeCtx.ellipse(12, 10, 4, 5, 0, 0, Math.PI * 2);
+            snakeCtx.ellipse(18, 10, 4, 5, 0, 0, Math.PI * 2);
+            snakeCtx.fill();
+
+            snakeCtx.fillStyle = CONFIG.COLORS.enemyPattern;
+            snakeCtx.fillRect(4, 8, 3, 3);
+            snakeCtx.fillRect(10, 8, 3, 3);
+            snakeCtx.fillRect(16, 8, 3, 3);
+
+            snakeCtx.fillStyle = CONFIG.COLORS.enemy;
+            snakeCtx.beginPath();
+            snakeCtx.ellipse(22, 6, 4, 3, 0, 0, Math.PI * 2);
+            snakeCtx.fill();
+
+            snakeCtx.fillStyle = '#ffff00';
+            snakeCtx.fillRect(21, 4, 2, 2);
+            snakeCtx.fillStyle = '#000000';
+            snakeCtx.fillRect(22, 4, 1, 2);
+
+            const gemCanvas = document.getElementById('gemIcon');
+            const gemCtx = gemCanvas.getContext('2d');
+            gemCtx.clearRect(0, 0, 16, 16);
+
+            gemCtx.fillStyle = CONFIG.COLORS.gem;
+            gemCtx.beginPath();
+            gemCtx.moveTo(8, 1);
+            gemCtx.lineTo(14, 8);
+            gemCtx.lineTo(8, 15);
+            gemCtx.lineTo(2, 8);
+            gemCtx.closePath();
+            gemCtx.fill();
+
+            gemCtx.fillStyle = CONFIG.COLORS.gemShine;
+            gemCtx.beginPath();
+            gemCtx.moveTo(6, 4);
+            gemCtx.lineTo(10, 6);
+            gemCtx.lineTo(6, 10);
+            gemCtx.lineTo(4, 6);
+            gemCtx.closePath();
+            gemCtx.fill();
+        }
+
+        // ============================================
+        // START
+        // ============================================
+        console.log('Platformer initialized');
+        highScoreEl.textContent = gameData.highScore;
+        drawScoreIcons();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
