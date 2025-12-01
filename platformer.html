@@ -105,26 +105,32 @@
             PLAYER_JUMP: -12,
             ENEMY_SPEED: 1.5,
             COLORS: {
-                sky: '#5c94fc',
-                skyGradient: '#9290ff',
-                ground: '#c84c0c',
-                groundHighlight: '#fc9838',
-                groundDark: '#a02800',
-                brick: '#c84c0c',
-                brickHighlight: '#fc9838',
-                block: '#fcbcb0',
-                blockShade: '#d89880',
-                player: '#ff6b6b',
-                playerShirt: '#4ecdc4',
-                enemy: '#d8a060',
-                enemyDark: '#a07848',
-                goal: '#ffe66d',
-                goalPole: '#8b8b8b',
+                // Jungle theme
+                sky: '#87ceeb',
+                skyGradient: '#98d8c8',
+                ground: '#5d4037',
+                groundHighlight: '#8d6e63',
+                groundDark: '#3e2723',
+                brick: '#607d5b',       // Mossy stone
+                brickHighlight: '#7a9a75',
+                block: '#a1887f',        // Ancient stone
+                blockShade: '#6d4c41',
+                player: '#d2691e',       // Explorer brown/khaki
+                playerShirt: '#f5deb3',  // Khaki shirt
+                enemy: '#228b22',        // Snake green
+                enemyDark: '#006400',
+                enemyPattern: '#32cd32', // Snake pattern
+                gem: '#ff1493',          // Pink gem
+                gemShine: '#ffb6c1',
+                temple: '#8b7355',       // Temple stone
+                templeDark: '#5d4e37',
+                templeAccent: '#daa520', // Gold trim
                 cloud: '#ffffff',
-                bush: '#00a800',
-                bushDark: '#008000',
-                hill: '#00d800',
-                hillDark: '#00a800',
+                bush: '#228b22',
+                bushDark: '#006400',
+                vine: '#2e8b57',
+                tree: '#0b5345',
+                treeTrunk: '#5d4037',
                 text: '#ffffff',
                 textHighlight: '#ffe66d'
             }
@@ -213,15 +219,26 @@
                 level[block.y][block.x] = TILE.BLOCK;
             }
 
-            // Add stairs near the end
-            for (let i = 0; i < 5; i++) {
+            // Build temple at the end (stairs up, platform with gem, no way past)
+            // Temple stairs going up (left side)
+            for (let i = 0; i < 6; i++) {
                 for (let y = LEVEL_HEIGHT - 3; y >= LEVEL_HEIGHT - 3 - i; y--) {
-                    level[y][90 + i] = TILE.GROUND;
+                    level[y][88 + i] = TILE.GROUND;
                 }
             }
 
-            // Goal flag at end
-            level[LEVEL_HEIGHT - 3][97] = TILE.GOAL;
+            // Temple top platform
+            for (let x = 94; x < 100; x++) {
+                level[LEVEL_HEIGHT - 9][x] = TILE.GROUND;
+            }
+
+            // Temple walls (block the sides so player can't fall off or go past)
+            for (let y = LEVEL_HEIGHT - 8; y < LEVEL_HEIGHT - 2; y++) {
+                level[y][99] = TILE.GROUND;  // Right wall
+            }
+
+            // Goal gem at top of temple
+            level[LEVEL_HEIGHT - 10][96] = TILE.GOAL;
 
             return level;
         }
@@ -257,7 +274,9 @@
         let cameraX = 0;
         let maxCameraX = 0; // For no-backtracking
         let pauseTime = 0;
+        let stateChangeTime = 0;
         const UNPAUSE_DELAY = 250;
+        const STATE_CHANGE_DELAY = 250;
 
         // Player state
         const player = {
@@ -585,6 +604,7 @@
             saveGameData();
             updateDisplays();
 
+            stateChangeTime = Date.now();
             state = GameState.GAME_OVER;
         }
 
@@ -602,6 +622,7 @@
             saveGameData();
             updateDisplays();
 
+            stateChangeTime = Date.now();
             state = GameState.LEVEL_COMPLETE;
         }
 
@@ -615,14 +636,18 @@
         }
 
         function updateGameOver() {
-            if (GameController.anyButtonJustPressed()) {
-                state = GameState.TITLE;
+            if (Date.now() - stateChangeTime >= STATE_CHANGE_DELAY) {
+                if (GameController.anyButtonJustPressed()) {
+                    state = GameState.TITLE;
+                }
             }
         }
 
         function updateLevelComplete() {
-            if (GameController.anyButtonJustPressed()) {
-                state = GameState.TITLE;
+            if (Date.now() - stateChangeTime >= STATE_CHANGE_DELAY) {
+                if (GameController.anyButtonJustPressed()) {
+                    state = GameState.TITLE;
+                }
             }
         }
 
@@ -630,7 +655,7 @@
         // RENDER FUNCTIONS
         // ============================================
         function renderBackground() {
-            // Sky gradient
+            // Sky gradient (tropical)
             const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.HEIGHT);
             gradient.addColorStop(0, CONFIG.COLORS.skyGradient);
             gradient.addColorStop(1, CONFIG.COLORS.sky);
@@ -638,40 +663,80 @@
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
 
             // Draw clouds (parallax)
-            const cloudOffset = -cameraX * 0.3;
-            drawCloud(100 + cloudOffset % 800, 60);
-            drawCloud(350 + cloudOffset % 800, 90);
-            drawCloud(600 + cloudOffset % 800, 50);
-            drawCloud(850 + cloudOffset % 800, 80);
+            const cloudOffset = -cameraX * 0.2;
+            drawCloud(100 + ((cloudOffset % 900) + 900) % 900, 50);
+            drawCloud(400 + ((cloudOffset % 900) + 900) % 900, 70);
+            drawCloud(700 + ((cloudOffset % 900) + 900) % 900, 40);
 
-            // Draw hills (parallax)
-            const hillOffset = -cameraX * 0.5;
-            drawHill(50 + hillOffset % 600, CONFIG.HEIGHT - 64, 80);
-            drawHill(300 + hillOffset % 600, CONFIG.HEIGHT - 64, 60);
-            drawHill(500 + hillOffset % 600, CONFIG.HEIGHT - 64, 100);
+            // Draw jungle trees in background (parallax)
+            const treeOffset = -cameraX * 0.4;
+            drawJungleTree(80 + ((treeOffset % 500) + 500) % 500, CONFIG.HEIGHT - 64, 60);
+            drawJungleTree(220 + ((treeOffset % 500) + 500) % 500, CONFIG.HEIGHT - 64, 80);
+            drawJungleTree(380 + ((treeOffset % 500) + 500) % 500, CONFIG.HEIGHT - 64, 50);
+            drawJungleTree(520 + ((treeOffset % 500) + 500) % 500, CONFIG.HEIGHT - 64, 70);
+
+            // Draw hanging vines
+            const vineOffset = -cameraX * 0.3;
+            drawVine(60 + ((vineOffset % 400) + 400) % 400, 0, 120);
+            drawVine(180 + ((vineOffset % 400) + 400) % 400, 0, 90);
+            drawVine(320 + ((vineOffset % 400) + 400) % 400, 0, 140);
+            drawVine(480 + ((vineOffset % 400) + 400) % 400, 0, 100);
         }
 
         function drawCloud(x, y) {
             ctx.fillStyle = CONFIG.COLORS.cloud;
+            ctx.globalAlpha = 0.8;
             ctx.beginPath();
-            ctx.arc(x, y, 20, 0, Math.PI * 2);
-            ctx.arc(x + 25, y - 5, 25, 0, Math.PI * 2);
-            ctx.arc(x + 50, y, 20, 0, Math.PI * 2);
+            ctx.arc(x, y, 18, 0, Math.PI * 2);
+            ctx.arc(x + 22, y - 4, 22, 0, Math.PI * 2);
+            ctx.arc(x + 44, y, 18, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+
+        function drawJungleTree(x, y, height) {
+            // Tree trunk
+            ctx.fillStyle = CONFIG.COLORS.treeTrunk;
+            ctx.fillRect(x - 8, y - height * 0.4, 16, height * 0.4);
+
+            // Foliage layers
+            ctx.fillStyle = CONFIG.COLORS.tree;
+            ctx.beginPath();
+            ctx.arc(x, y - height * 0.5, height * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = CONFIG.COLORS.bush;
+            ctx.beginPath();
+            ctx.arc(x - 15, y - height * 0.4, height * 0.25, 0, Math.PI * 2);
+            ctx.arc(x + 15, y - height * 0.4, height * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = CONFIG.COLORS.bushDark;
+            ctx.beginPath();
+            ctx.arc(x, y - height * 0.65, height * 0.2, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        function drawHill(x, y, width) {
-            ctx.fillStyle = CONFIG.COLORS.hill;
+        function drawVine(x, y, length) {
+            ctx.strokeStyle = CONFIG.COLORS.vine;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(x - width, y);
-            ctx.quadraticCurveTo(x, y - width * 0.6, x + width, y);
-            ctx.fill();
-            // Darker edge
-            ctx.fillStyle = CONFIG.COLORS.hillDark;
-            ctx.beginPath();
-            ctx.moveTo(x - width, y);
-            ctx.quadraticCurveTo(x - width * 0.3, y - width * 0.4, x, y);
-            ctx.fill();
+            ctx.moveTo(x, y);
+            // Wavy vine
+            for (let i = 0; i < length; i += 10) {
+                const wave = Math.sin(i * 0.1) * 8;
+                ctx.lineTo(x + wave, y + i);
+            }
+            ctx.stroke();
+
+            // Leaves on vine
+            ctx.fillStyle = CONFIG.COLORS.bush;
+            for (let i = 20; i < length - 20; i += 30) {
+                const wave = Math.sin(i * 0.1) * 8;
+                ctx.beginPath();
+                ctx.ellipse(x + wave + 6, y + i, 8, 4, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         function renderTiles() {
@@ -707,111 +772,156 @@
             const ts = CONFIG.TILE_SIZE;
 
             if (isTop) {
-                // Top ground tile with grass
+                // Top ground tile - jungle floor with vegetation
                 ctx.fillStyle = CONFIG.COLORS.ground;
-                ctx.fillRect(x, y + 4, ts, ts - 4);
+                ctx.fillRect(x, y + 6, ts, ts - 6);
 
-                // Grass top
+                // Grass/fern top
                 ctx.fillStyle = CONFIG.COLORS.bush;
-                ctx.fillRect(x, y, ts, 6);
+                ctx.fillRect(x, y, ts, 8);
 
-                // Grass detail
+                // Grass tufts
                 ctx.fillStyle = CONFIG.COLORS.bushDark;
-                for (let i = 0; i < 4; i++) {
-                    ctx.fillRect(x + i * 8 + 2, y + 6, 4, 2);
+                for (let i = 0; i < 3; i++) {
+                    ctx.fillRect(x + i * 10 + 4, y - 2, 3, 4);
+                    ctx.fillRect(x + i * 10 + 6, y - 4, 2, 6);
                 }
+
+                // Small roots/texture
+                ctx.fillStyle = CONFIG.COLORS.groundDark;
+                ctx.fillRect(x + 5, y + 10, 6, 2);
+                ctx.fillRect(x + 20, y + 14, 8, 2);
             } else {
-                // Underground tile
+                // Underground/dirt tile
                 ctx.fillStyle = CONFIG.COLORS.ground;
                 ctx.fillRect(x, y, ts, ts);
 
-                // Brick pattern
+                // Dirt texture
                 ctx.fillStyle = CONFIG.COLORS.groundDark;
-                ctx.fillRect(x, y + ts / 2 - 1, ts, 2);
-                ctx.fillRect(x + ts / 2 - 1, y, 2, ts / 2);
-                ctx.fillRect(x + ts / 4 - 1, y + ts / 2, 2, ts / 2);
-                ctx.fillRect(x + ts * 3 / 4 - 1, y + ts / 2, 2, ts / 2);
+                ctx.fillRect(x + 4, y + 6, 3, 3);
+                ctx.fillRect(x + 18, y + 12, 4, 3);
+                ctx.fillRect(x + 8, y + 22, 3, 2);
+                ctx.fillRect(x + 24, y + 4, 2, 3);
+
+                // Roots
+                ctx.fillStyle = CONFIG.COLORS.groundHighlight;
+                ctx.fillRect(x + 12, y + 8, 8, 2);
+                ctx.fillRect(x + 2, y + 18, 6, 2);
             }
         }
 
         function drawBrickTile(x, y) {
             const ts = CONFIG.TILE_SIZE;
 
-            // Main brick color
+            // Mossy stone block
             ctx.fillStyle = CONFIG.COLORS.brick;
             ctx.fillRect(x, y, ts, ts);
 
-            // Highlight
+            // Stone texture/cracks
             ctx.fillStyle = CONFIG.COLORS.brickHighlight;
             ctx.fillRect(x, y, ts, 2);
             ctx.fillRect(x, y, 2, ts);
 
-            // Dark edges
-            ctx.fillStyle = CONFIG.COLORS.groundDark;
+            ctx.fillStyle = CONFIG.COLORS.bushDark;
             ctx.fillRect(x + ts - 2, y, 2, ts);
             ctx.fillRect(x, y + ts - 2, ts, 2);
 
-            // Brick lines
-            ctx.fillStyle = CONFIG.COLORS.groundDark;
-            ctx.fillRect(x, y + ts / 2 - 1, ts, 2);
-            ctx.fillRect(x + ts / 2 - 1, y, 2, ts / 2);
-            ctx.fillRect(x + ts / 4 - 1, y + ts / 2, 2, ts / 2);
-            ctx.fillRect(x + ts * 3 / 4 - 1, y + ts / 2, 2, ts / 2);
+            // Moss patches
+            ctx.fillStyle = CONFIG.COLORS.bush;
+            ctx.fillRect(x + 2, y + 2, 8, 4);
+            ctx.fillRect(x + ts - 12, y + ts - 8, 10, 6);
+            ctx.fillRect(x + 4, y + ts - 10, 6, 4);
+
+            // Stone crack lines
+            ctx.fillStyle = CONFIG.COLORS.bushDark;
+            ctx.fillRect(x + ts / 2, y + 4, 1, 10);
+            ctx.fillRect(x + 6, y + ts / 2, 12, 1);
         }
 
         function drawBlockTile(x, y) {
             const ts = CONFIG.TILE_SIZE;
 
-            // Main color
+            // Ancient rune stone
             ctx.fillStyle = CONFIG.COLORS.block;
             ctx.fillRect(x, y, ts, ts);
 
-            // Highlight
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(x + 2, y + 2, ts - 4, 3);
-            ctx.fillRect(x + 2, y + 2, 3, ts - 4);
+            // Highlight edge
+            ctx.fillStyle = CONFIG.COLORS.groundHighlight;
+            ctx.fillRect(x + 2, y + 2, ts - 4, 2);
+            ctx.fillRect(x + 2, y + 2, 2, ts - 4);
 
-            // Shadow
+            // Shadow edge
             ctx.fillStyle = CONFIG.COLORS.blockShade;
-            ctx.fillRect(x + ts - 5, y + 2, 3, ts - 4);
-            ctx.fillRect(x + 2, y + ts - 5, ts - 4, 3);
+            ctx.fillRect(x + ts - 4, y + 2, 2, ts - 4);
+            ctx.fillRect(x + 2, y + ts - 4, ts - 4, 2);
 
-            // Question mark or coin design
-            ctx.fillStyle = CONFIG.COLORS.groundDark;
-            ctx.fillRect(x + ts / 2 - 4, y + 8, 8, 3);
-            ctx.fillRect(x + ts / 2 + 1, y + 11, 3, 4);
-            ctx.fillRect(x + ts / 2 - 2, y + 15, 4, 3);
-            ctx.fillRect(x + ts / 2 - 2, y + 21, 4, 3);
+            // Ancient rune symbol (spiral/sun pattern)
+            ctx.fillStyle = CONFIG.COLORS.templeAccent;
+            ctx.beginPath();
+            ctx.arc(x + ts / 2, y + ts / 2, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = CONFIG.COLORS.block;
+            ctx.beginPath();
+            ctx.arc(x + ts / 2, y + ts / 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+            // Rays
+            ctx.fillStyle = CONFIG.COLORS.templeAccent;
+            ctx.fillRect(x + ts / 2 - 1, y + 6, 2, 6);
+            ctx.fillRect(x + ts / 2 - 1, y + ts - 12, 2, 6);
+            ctx.fillRect(x + 6, y + ts / 2 - 1, 6, 2);
+            ctx.fillRect(x + ts - 12, y + ts / 2 - 1, 6, 2);
         }
 
         function drawGoalTile(x, y) {
             const ts = CONFIG.TILE_SIZE;
 
-            // Flag pole
-            ctx.fillStyle = CONFIG.COLORS.goalPole;
-            ctx.fillRect(x + ts / 2 - 2, y - ts * 3, 4, ts * 4);
+            // Stone pedestal
+            ctx.fillStyle = CONFIG.COLORS.temple;
+            ctx.fillRect(x + 4, y + ts - 12, ts - 8, 12);
+            ctx.fillRect(x + 2, y + ts - 4, ts - 4, 4);
 
-            // Pole top
-            ctx.fillStyle = CONFIG.COLORS.goal;
+            // Pedestal highlight
+            ctx.fillStyle = CONFIG.COLORS.groundHighlight;
+            ctx.fillRect(x + 4, y + ts - 12, ts - 8, 2);
+
+            // Gem (diamond shape)
+            const gemX = x + ts / 2;
+            const gemY = y + ts - 20;
+
+            // Gem glow
+            ctx.fillStyle = CONFIG.COLORS.gemShine;
+            ctx.globalAlpha = 0.3 + Math.sin(Date.now() / 200) * 0.2;
             ctx.beginPath();
-            ctx.arc(x + ts / 2, y - ts * 3, 6, 0, Math.PI * 2);
+            ctx.arc(gemX, gemY, 14, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            // Main gem body
+            ctx.fillStyle = CONFIG.COLORS.gem;
+            ctx.beginPath();
+            ctx.moveTo(gemX, gemY - 12);      // Top
+            ctx.lineTo(gemX + 10, gemY);       // Right
+            ctx.lineTo(gemX, gemY + 12);       // Bottom
+            ctx.lineTo(gemX - 10, gemY);       // Left
+            ctx.closePath();
             ctx.fill();
 
-            // Flag
-            ctx.fillStyle = CONFIG.COLORS.goal;
+            // Gem shine
+            ctx.fillStyle = CONFIG.COLORS.gemShine;
             ctx.beginPath();
-            ctx.moveTo(x + ts / 2 + 2, y - ts * 3 + 8);
-            ctx.lineTo(x + ts / 2 + 24, y - ts * 3 + 18);
-            ctx.lineTo(x + ts / 2 + 2, y - ts * 3 + 28);
+            ctx.moveTo(gemX - 2, gemY - 8);
+            ctx.lineTo(gemX + 4, gemY - 2);
+            ctx.lineTo(gemX - 2, gemY + 4);
+            ctx.lineTo(gemX - 6, gemY - 2);
+            ctx.closePath();
             ctx.fill();
 
-            // Flag shine
-            ctx.fillStyle = '#fff8c0';
-            ctx.beginPath();
-            ctx.moveTo(x + ts / 2 + 4, y - ts * 3 + 12);
-            ctx.lineTo(x + ts / 2 + 16, y - ts * 3 + 18);
-            ctx.lineTo(x + ts / 2 + 4, y - ts * 3 + 24);
-            ctx.fill();
+            // Sparkles
+            ctx.fillStyle = '#ffffff';
+            const sparkle = Math.floor(Date.now() / 300) % 3;
+            if (sparkle === 0) ctx.fillRect(gemX + 6, gemY - 6, 2, 2);
+            if (sparkle === 1) ctx.fillRect(gemX - 4, gemY + 4, 2, 2);
+            if (sparkle === 2) ctx.fillRect(gemX + 2, gemY - 10, 2, 2);
         }
 
         function renderPlayer() {
@@ -824,46 +934,53 @@
             if (player.facing === -1) {
                 ctx.translate(screenX + player.width, screenY);
                 ctx.scale(-1, 1);
-                ctx.translate(0, 0);
             } else {
                 ctx.translate(screenX, screenY);
             }
 
-            // Body (shirt)
+            // Explorer character
+
+            // Pith helmet (safari hat)
             ctx.fillStyle = CONFIG.COLORS.playerShirt;
-            ctx.fillRect(4, 10, 16, 10);
+            ctx.fillRect(4, 0, 16, 5);           // Hat top
+            ctx.fillRect(2, 5, 20, 3);           // Hat brim
+            ctx.fillStyle = CONFIG.COLORS.player;
+            ctx.fillRect(6, 1, 12, 2);           // Hat band
 
             // Head
-            ctx.fillStyle = '#ffd8b0';
-            ctx.fillRect(6, 0, 12, 10);
-
-            // Hat
-            ctx.fillStyle = CONFIG.COLORS.player;
-            ctx.fillRect(4, 0, 16, 4);
-            ctx.fillRect(2, 4, 6, 3);
+            ctx.fillStyle = '#deb887';           // Tan skin
+            ctx.fillRect(6, 8, 12, 9);
 
             // Eyes
             ctx.fillStyle = '#000000';
-            ctx.fillRect(14, 4, 2, 2);
+            ctx.fillRect(14, 11, 2, 2);
 
-            // Legs
+            // Body (khaki shirt)
+            ctx.fillStyle = CONFIG.COLORS.playerShirt;
+            ctx.fillRect(5, 17, 14, 8);
+
+            // Belt
+            ctx.fillStyle = CONFIG.COLORS.player;
+            ctx.fillRect(5, 23, 14, 2);
+
+            // Legs (brown pants)
             ctx.fillStyle = CONFIG.COLORS.player;
             if (!player.onGround) {
-                // Jumping pose
-                ctx.fillRect(4, 20, 6, 10);
-                ctx.fillRect(14, 20, 6, 10);
+                // Jumping pose - legs apart
+                ctx.fillRect(5, 25, 5, 5);
+                ctx.fillRect(14, 25, 5, 5);
             } else if (player.animFrame === 1) {
                 // Running frame 1
-                ctx.fillRect(2, 20, 6, 10);
-                ctx.fillRect(16, 20, 6, 10);
+                ctx.fillRect(3, 25, 5, 5);
+                ctx.fillRect(16, 25, 5, 5);
             } else if (player.animFrame === 2) {
                 // Running frame 2
-                ctx.fillRect(6, 20, 6, 10);
-                ctx.fillRect(12, 20, 6, 10);
+                ctx.fillRect(7, 25, 5, 5);
+                ctx.fillRect(12, 25, 5, 5);
             } else {
                 // Standing
-                ctx.fillRect(5, 20, 6, 10);
-                ctx.fillRect(13, 20, 6, 10);
+                ctx.fillRect(6, 25, 5, 5);
+                ctx.fillRect(13, 25, 5, 5);
             }
 
             ctx.restore();
@@ -879,40 +996,58 @@
                 if (screenX < -50 || screenX > CONFIG.WIDTH + 50) continue;
 
                 if (!enemy.alive) {
-                    // Squashed enemy
+                    // Squashed snake - flattened coil
                     ctx.fillStyle = CONFIG.COLORS.enemy;
-                    ctx.fillRect(screenX + 2, screenY + enemy.height - 8, enemy.width - 4, 8);
+                    ctx.fillRect(screenX + 4, screenY + enemy.height - 6, enemy.width - 8, 6);
+                    ctx.fillStyle = CONFIG.COLORS.enemyPattern;
+                    ctx.fillRect(screenX + 8, screenY + enemy.height - 5, 4, 4);
+                    ctx.fillRect(screenX + 16, screenY + enemy.height - 5, 4, 4);
                 } else {
-                    // Body
+                    // Snake body - coiled shape
+                    const facing = enemy.vx < 0 ? -1 : 1;
+                    const cx = screenX + enemy.width / 2;
+                    const cy = screenY + enemy.height / 2;
+
+                    // Body coils (wavy)
                     ctx.fillStyle = CONFIG.COLORS.enemy;
+                    const time = Date.now() / 150;
+                    for (let i = 0; i < 3; i++) {
+                        const offset = Math.sin(time + i) * 3;
+                        ctx.beginPath();
+                        ctx.ellipse(cx - 6 + i * 6, cy + 4 + offset, 6, 8, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // Pattern on body
+                    ctx.fillStyle = CONFIG.COLORS.enemyPattern;
+                    for (let i = 0; i < 3; i++) {
+                        const offset = Math.sin(time + i) * 3;
+                        ctx.fillRect(cx - 8 + i * 6, cy + 2 + offset, 4, 4);
+                    }
+
+                    // Head
+                    ctx.fillStyle = CONFIG.COLORS.enemy;
+                    const headX = facing < 0 ? screenX + 2 : screenX + enemy.width - 12;
                     ctx.beginPath();
-                    ctx.ellipse(screenX + enemy.width / 2, screenY + enemy.height / 2,
-                               enemy.width / 2 - 2, enemy.height / 2 - 2, 0, 0, Math.PI * 2);
+                    ctx.ellipse(headX + 5, cy - 2, 7, 5, 0, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Darker bottom
-                    ctx.fillStyle = CONFIG.COLORS.enemyDark;
-                    ctx.beginPath();
-                    ctx.ellipse(screenX + enemy.width / 2, screenY + enemy.height - 6,
-                               enemy.width / 2 - 4, 6, 0, 0, Math.PI);
-                    ctx.fill();
+                    // Eyes (menacing)
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillRect(headX + (facing < 0 ? 1 : 6), cy - 5, 3, 3);
 
-                    // Eyes
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(screenX + 6, screenY + 6, 6, 6);
-                    ctx.fillRect(screenX + enemy.width - 12, screenY + 6, 6, 6);
-
-                    // Pupils (look in direction of movement)
+                    // Pupil (slit)
                     ctx.fillStyle = '#000000';
-                    const pupilOffset = enemy.vx < 0 ? 0 : 2;
-                    ctx.fillRect(screenX + 6 + pupilOffset, screenY + 8, 3, 3);
-                    ctx.fillRect(screenX + enemy.width - 12 + pupilOffset, screenY + 8, 3, 3);
+                    ctx.fillRect(headX + (facing < 0 ? 2 : 7), cy - 5, 1, 3);
 
-                    // Feet (animated)
-                    const footOffset = Math.floor(Date.now() / 150) % 2;
-                    ctx.fillStyle = CONFIG.COLORS.enemyDark;
-                    ctx.fillRect(screenX + 4 + footOffset * 2, screenY + enemy.height - 4, 8, 4);
-                    ctx.fillRect(screenX + enemy.width - 12 - footOffset * 2, screenY + enemy.height - 4, 8, 4);
+                    // Forked tongue (animated)
+                    if (Math.floor(Date.now() / 200) % 3 === 0) {
+                        ctx.fillStyle = '#ff4444';
+                        const tongueX = facing < 0 ? headX - 4 : headX + 10;
+                        ctx.fillRect(tongueX, cy - 2, 4, 1);
+                        ctx.fillRect(tongueX + (facing < 0 ? -2 : 4), cy - 3, 2, 1);
+                        ctx.fillRect(tongueX + (facing < 0 ? -2 : 4), cy - 1, 2, 1);
+                    }
                 }
             }
         }
@@ -930,15 +1065,15 @@
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
 
             // Title
-            ctx.fillStyle = CONFIG.COLORS.player;
+            ctx.fillStyle = CONFIG.COLORS.bush;
             ctx.font = 'bold 56px "Courier New", monospace';
             ctx.textAlign = 'center';
             ctx.fillText('PLATFORMER', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 80);
 
             // Subtitle
-            ctx.fillStyle = CONFIG.COLORS.playerShirt;
+            ctx.fillStyle = CONFIG.COLORS.gem;
             ctx.font = '18px "Courier New", monospace';
-            ctx.fillText('Run, Jump, Survive!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 40);
+            ctx.fillText('Jungle Temple Adventure', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 40);
 
             // Instructions
             ctx.fillStyle = CONFIG.COLORS.textHighlight;
@@ -948,8 +1083,8 @@
             // Tips
             ctx.fillStyle = CONFIG.COLORS.text;
             ctx.font = '14px "Courier New", monospace';
-            ctx.fillText('Jump on enemies to defeat them', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
-            ctx.fillText('Reach the flag to win!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 85);
+            ctx.fillText('Stomp snakes to defeat them', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 60);
+            ctx.fillText('Reach the gem to win!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 + 85);
 
             // High score
             ctx.fillStyle = '#888';
@@ -1024,10 +1159,10 @@
             ctx.fillStyle = 'rgba(0,0,0,0.7)';
             ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
 
-            ctx.fillStyle = CONFIG.COLORS.goal;
+            ctx.fillStyle = CONFIG.COLORS.gem;
             ctx.font = 'bold 48px "Courier New", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText('LEVEL CLEAR!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 50);
+            ctx.fillText('GEM FOUND!', CONFIG.WIDTH / 2, CONFIG.HEIGHT / 2 - 50);
 
             ctx.fillStyle = CONFIG.COLORS.text;
             ctx.font = '24px "Courier New", monospace';
