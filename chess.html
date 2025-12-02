@@ -688,6 +688,7 @@
 
             selectedPiece = { x, y };
             validMoves = getValidMoves(x, y);
+            lastMove = null; // Clear last move highlight when selecting a new piece
             AudioSystem.sfx.select();
         }
 
