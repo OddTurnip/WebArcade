@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkers - WebArcade</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+            padding: 20px;
+        }
+        h1 {
+            color: #4ecdc4;
+            margin-bottom: 20px;
+            font-size: 32px;
+        }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #statusDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+        .status-item {
+            text-align: center;
+        }
+        .status-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .status-value {
+            font-size: 24px;
+            color: #4ecdc4;
+        }
+        .status-value.red-turn {
+            color: #ff6b6b;
+        }
+        .status-value.black-turn {
+            color: #888;
+        }
+        #scoreDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+        }
+        .score-item {
+            text-align: center;
+        }
+        .score-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .score-value {
+            font-size: 20px;
+        }
+        .score-value.red-score {
+            color: #ff6b6b;
+        }
+        .score-value.black-score {
+            color: #888;
+        }
+        #audioControls {
+            margin-top: 15px;
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            color: #888;
+        }
+        #audioControls label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+        }
+        .back-link {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #4ecdc4;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        #rulesHint {
+            margin-top: 20px;
+            padding: 15px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            max-width: 480px;
+        }
+        #rulesHint h3 {
+            color: #ffe66d;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        #rulesHint ul {
+            color: #888;
+            font-size: 12px;
+            line-height: 1.6;
+            padding-left: 20px;
+            margin: 0;
+        }
+        #rulesHint li {
+            margin-bottom: 4px;
+        }
+        #rulesHint .highlight {
+            color: #4ecdc4;
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-link">&larr; Back to WebArcade</a>
+    <h1>Checkers</h1>
+
+    <canvas id="gameCanvas" width="480" height="480"></canvas>
+
+    <div id="statusDisplay">
+        <div class="status-item">
+            <div class="status-label">Current Turn</div>
+            <div class="status-value" id="turnDisplay">RED</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">Red Pieces</div>
+            <div class="status-value red-score" id="redPieces">12</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">Black Pieces</div>
+            <div class="status-value black-score" id="blackPieces">12</div>
+        </div>
+    </div>
+
+    <div id="scoreDisplay">
+        <div class="score-item">
+            <div class="score-label">Red Wins</div>
+            <div class="score-value red-score" id="redWins">0</div>
+        </div>
+        <div class="score-item">
+            <div class="score-label">Black Wins</div>
+            <div class="score-value black-score" id="blackWins">0</div>
+        </div>
+    </div>
+
+    <div id="audioControls">
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+
+    <div id="rulesHint">
+        <h3>Quick Rules</h3>
+        <ul>
+            <li><span class="highlight">Green squares</span> show pieces that can move</li>
+            <li>Regular pieces move diagonally forward only</li>
+            <li><span class="highlight">Captures are mandatory</span> - if you can jump, you must</li>
+            <li>Multiple jumps in one turn if available</li>
+            <li>Reach the opposite end to become a <span class="highlight">King</span> (moves in all directions)</li>
+            <li>Win by capturing all opponent pieces or blocking them</li>
+        </ul>
+    </div>
+
+    <script src="audio.js"></script>
+    <script src="storage.js"></script>
+    <script>
+        const GAME_ID = 'checkers';
+        const BOARD_SIZE = 8;
+        const CELL_SIZE = 60;
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const turnDisplayEl = document.getElementById('turnDisplay');
+        const redPiecesEl = document.getElementById('redPieces');
+        const blackPiecesEl = document.getElementById('blackPieces');
+        const redWinsEl = document.getElementById('redWins');
+        const blackWinsEl = document.getElementById('blackWins');
+
+        const COLORS = {
+            lightSquare: '#f0d9b5',
+            darkSquare: '#b58863',
+            red: '#cc3333',
+            redKing: '#ff4444',
+            black: '#222',
+            blackKing: '#444',
+            selected: 'rgba(78, 205, 196, 0.5)',
+            validMove: 'rgba(78, 205, 196, 0.4)',
+            canMove: 'rgba(100, 200, 100, 0.4)',
+            hover: 'rgba(255, 230, 109, 0.3)'
+        };
+
+        let gameData = GameStorage.load(GAME_ID, {
+            redWins: 0,
+            blackWins: 0,
+            sfxEnabled: true
+        });
+
+        // Board state: null = empty, { player: 'red'|'black', king: boolean }
+        let board = [];
+        let currentPlayer = 'red';
+        let selectedPiece = null;
+        let validMoves = [];
+        let mustJump = false;
+        let multiJumpPiece = null;
+        let gameOver = false;
+        let winner = null;
+        let isPlaying = true;
+        let hoverCell = { x: -1, y: -1 };
+        let gameOverTime = 0;
+        const RESTART_DELAY = 500;
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        function initBoard() {
+            board = [];
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                board[y] = [];
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    if ((x + y) % 2 === 1) {
+                        if (y < 3) {
+                            board[y][x] = { player: 'black', king: false };
+                        } else if (y > 4) {
+                            board[y][x] = { player: 'red', king: false };
+                        } else {
+                            board[y][x] = null;
+                        }
+                    } else {
+                        board[y][x] = null;
+                    }
+                }
+            }
+            currentPlayer = 'red';
+            selectedPiece = null;
+            validMoves = [];
+            mustJump = false;
+            multiJumpPiece = null;
+            gameOver = false;
+            winner = null;
+            updateTurnDisplay();
+            updatePieceCount();
+        }
+
+        function getCellFromEvent(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+            return {
+                x: Math.floor(mx / CELL_SIZE),
+                y: Math.floor(my / CELL_SIZE)
+            };
+        }
+
+        function isDarkSquare(x, y) {
+            return (x + y) % 2 === 1;
+        }
+
+        function getValidMoves(x, y) {
+            const piece = board[y][x];
+            if (!piece || piece.player !== currentPlayer) return [];
+
+            const moves = [];
+            const jumps = [];
+
+            // Direction based on player and king status
+            let directions = [];
+            if (piece.king) {
+                directions = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+            } else if (piece.player === 'red') {
+                directions = [[-1, -1], [1, -1]]; // Red moves up
+            } else {
+                directions = [[-1, 1], [1, 1]]; // Black moves down
+            }
+
+            // Check for jumps first
+            for (const [dx, dy] of directions) {
+                const jumpX = x + dx * 2;
+                const jumpY = y + dy * 2;
+                const midX = x + dx;
+                const midY = y + dy;
+
+                if (jumpX >= 0 && jumpX < BOARD_SIZE && jumpY >= 0 && jumpY < BOARD_SIZE) {
+                    const midPiece = board[midY][midX];
+                    if (midPiece && midPiece.player !== currentPlayer && board[jumpY][jumpX] === null) {
+                        jumps.push({ x: jumpX, y: jumpY, capture: { x: midX, y: midY } });
+                    }
+                }
+            }
+
+            // If jumps available, only return jumps
+            if (jumps.length > 0) {
+                return jumps;
+            }
+
+            // If must jump (during multi-jump), no regular moves
+            if (mustJump) {
+                return [];
+            }
+
+            // Regular moves
+            for (const [dx, dy] of directions) {
+                const newX = x + dx;
+                const newY = y + dy;
+
+                if (newX >= 0 && newX < BOARD_SIZE && newY >= 0 && newY < BOARD_SIZE) {
+                    if (board[newY][newX] === null) {
+                        moves.push({ x: newX, y: newY });
+                    }
+                }
+            }
+
+            return moves;
+        }
+
+        function hasAnyJumps(player) {
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    const piece = board[y][x];
+                    if (piece && piece.player === player) {
+                        const moves = getValidMoves(x, y);
+                        if (moves.some(m => m.capture)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function hasAnyMoves(player) {
+            const savedPlayer = currentPlayer;
+            const savedMustJump = mustJump;
+            currentPlayer = player;
+            mustJump = false;
+
+            let hasMoves = false;
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    const piece = board[y][x];
+                    if (piece && piece.player === player) {
+                        const moves = getValidMoves(x, y);
+                        if (moves.length > 0) {
+                            hasMoves = true;
+                            break;
+                        }
+                    }
+                }
+                if (hasMoves) break;
+            }
+
+            currentPlayer = savedPlayer;
+            mustJump = savedMustJump;
+            return hasMoves;
+        }
+
+        function countPieces(player) {
+            let count = 0;
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    if (board[y][x] && board[y][x].player === player) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        function getMovablePieces() {
+            const movable = [];
+            const jumpRequired = hasAnyJumps(currentPlayer);
+
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    const piece = board[y][x];
+                    if (piece && piece.player === currentPlayer) {
+                        const moves = getValidMoves(x, y);
+                        if (moves.length > 0) {
+                            // If jumps are required globally, only include pieces with jumps
+                            if (jumpRequired) {
+                                if (moves.some(m => m.capture)) {
+                                    movable.push({ x, y });
+                                }
+                            } else {
+                                movable.push({ x, y });
+                            }
+                        }
+                    }
+                }
+            }
+            return movable;
+        }
+
+        function selectPiece(x, y) {
+            // If in multi-jump, can only continue with the jumping piece
+            if (multiJumpPiece) {
+                if (x === multiJumpPiece.x && y === multiJumpPiece.y) {
+                    selectedPiece = { x, y };
+                    validMoves = getValidMoves(x, y);
+                }
+                return;
+            }
+
+            // Click on selected piece to unselect
+            if (selectedPiece && selectedPiece.x === x && selectedPiece.y === y) {
+                selectedPiece = null;
+                validMoves = [];
+                return;
+            }
+
+            const piece = board[y][x];
+            if (!piece || piece.player !== currentPlayer) {
+                selectedPiece = null;
+                validMoves = [];
+                return;
+            }
+
+            // If jumps are available globally, only allow selecting pieces with jumps
+            if (hasAnyJumps(currentPlayer)) {
+                const moves = getValidMoves(x, y);
+                if (!moves.some(m => m.capture)) {
+                    selectedPiece = null;
+                    validMoves = [];
+                    return;
+                }
+            }
+
+            selectedPiece = { x, y };
+            validMoves = getValidMoves(x, y);
+            AudioSystem.sfx.select();
+        }
+
+        function movePiece(toX, toY) {
+            const move = validMoves.find(m => m.x === toX && m.y === toY);
+            if (!move) return;
+
+            const fromX = selectedPiece.x;
+            const fromY = selectedPiece.y;
+            const piece = board[fromY][fromX];
+
+            // Move the piece
+            board[toY][toX] = piece;
+            board[fromY][fromX] = null;
+
+            // Handle capture
+            if (move.capture) {
+                board[move.capture.y][move.capture.x] = null;
+                AudioSystem.sfx.explosion();
+                updatePieceCount();
+
+                // Check for multi-jump
+                const newMoves = getValidMoves(toX, toY);
+                const hasMoreJumps = newMoves.some(m => m.capture);
+
+                if (hasMoreJumps) {
+                    // Continue multi-jump
+                    mustJump = true;
+                    multiJumpPiece = { x: toX, y: toY };
+                    selectedPiece = { x: toX, y: toY };
+                    validMoves = newMoves.filter(m => m.capture);
+
+                    // Check for king promotion during multi-jump
+                    if (!piece.king) {
+                        if ((piece.player === 'red' && toY === 0) ||
+                            (piece.player === 'black' && toY === BOARD_SIZE - 1)) {
+                            piece.king = true;
+                            AudioSystem.sfx.powerUp();
+                        }
+                    }
+
+                    render();
+                    return;
+                }
+            } else {
+                AudioSystem.sfx.hit();
+            }
+
+            // Check for king promotion
+            if (!piece.king) {
+                if ((piece.player === 'red' && toY === 0) ||
+                    (piece.player === 'black' && toY === BOARD_SIZE - 1)) {
+                    piece.king = true;
+                    AudioSystem.sfx.powerUp();
+                }
+            }
+
+            // End turn
+            mustJump = false;
+            multiJumpPiece = null;
+            selectedPiece = null;
+            validMoves = [];
+
+            // Check for win
+            const opponent = currentPlayer === 'red' ? 'black' : 'red';
+            if (countPieces(opponent) === 0 || !hasAnyMoves(opponent)) {
+                gameOver = true;
+                winner = currentPlayer;
+                gameOverTime = Date.now();
+
+                if (winner === 'red') {
+                    gameData.redWins++;
+                } else {
+                    gameData.blackWins++;
+                }
+                saveGameData();
+                updateScoreDisplay();
+                AudioSystem.sfx.levelComplete();
+            } else {
+                // Switch player
+                currentPlayer = opponent;
+                updateTurnDisplay();
+            }
+
+            render();
+        }
+
+        function handleClick(x, y) {
+            if (!isDarkSquare(x, y)) return;
+
+            // Check if clicking on a valid move destination
+            if (selectedPiece && validMoves.find(m => m.x === x && m.y === y)) {
+                movePiece(x, y);
+            } else {
+                selectPiece(x, y);
+                render();
+            }
+        }
+
+        function updateTurnDisplay() {
+            turnDisplayEl.textContent = currentPlayer.toUpperCase();
+            turnDisplayEl.className = 'status-value ' + currentPlayer + '-turn';
+        }
+
+        function updatePieceCount() {
+            redPiecesEl.textContent = countPieces('red');
+            blackPiecesEl.textContent = countPieces('black');
+        }
+
+        function updateScoreDisplay() {
+            redWinsEl.textContent = gameData.redWins;
+            blackWinsEl.textContent = gameData.blackWins;
+        }
+
+        function render() {
+            // Get movable pieces (only show when nothing selected and not in multi-jump)
+            const movablePieces = (!selectedPiece && !multiJumpPiece) ? getMovablePieces() : [];
+
+            // Draw board
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    const px = x * CELL_SIZE;
+                    const py = y * CELL_SIZE;
+
+                    // Square color
+                    ctx.fillStyle = isDarkSquare(x, y) ? COLORS.darkSquare : COLORS.lightSquare;
+                    ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+
+                    // Highlight movable pieces (when nothing selected)
+                    if (movablePieces.find(p => p.x === x && p.y === y)) {
+                        ctx.fillStyle = COLORS.canMove;
+                        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                    }
+
+                    // Highlight selected piece
+                    if (selectedPiece && selectedPiece.x === x && selectedPiece.y === y) {
+                        ctx.fillStyle = COLORS.selected;
+                        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                    }
+
+                    // Highlight valid moves
+                    if (validMoves.find(m => m.x === x && m.y === y)) {
+                        ctx.fillStyle = COLORS.validMove;
+                        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                    }
+
+                    // Hover highlight
+                    if (!gameOver && hoverCell.x === x && hoverCell.y === y && isDarkSquare(x, y)) {
+                        ctx.fillStyle = COLORS.hover;
+                        ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                    }
+
+                    // Draw piece
+                    const piece = board[y][x];
+                    if (piece) {
+                        drawPiece(px, py, piece);
+                    }
+                }
+            }
+
+            // Game over overlay
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = winner === 'red' ? COLORS.red : '#888';
+                ctx.font = 'bold 36px Courier New';
+                ctx.fillText(winner.toUpperCase() + ' WINS!', canvas.width / 2, canvas.height / 2 - 20);
+
+                ctx.fillStyle = '#888';
+                ctx.font = '14px Courier New';
+                ctx.fillText('Click to play again', canvas.width / 2, canvas.height / 2 + 40);
+            }
+        }
+
+        function drawPiece(px, py, piece) {
+            const centerX = px + CELL_SIZE / 2;
+            const centerY = py + CELL_SIZE / 2;
+            const radius = CELL_SIZE * 0.4;
+
+            // Main piece
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fillStyle = piece.player === 'red' ? COLORS.red : COLORS.black;
+            ctx.fill();
+            ctx.strokeStyle = piece.player === 'red' ? '#aa2222' : '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Inner highlight
+            ctx.beginPath();
+            ctx.arc(centerX - radius * 0.2, centerY - radius * 0.2, radius * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = piece.player === 'red' ? '#ff6666' : '#444';
+            ctx.fill();
+
+            // King crown
+            if (piece.king) {
+                ctx.fillStyle = '#ffd700';
+                ctx.font = 'bold 24px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('\u2654', centerX, centerY + 2);
+            }
+        }
+
+        // Event listeners
+        canvas.addEventListener('click', (e) => {
+            AudioSystem.unlock();
+
+            if (gameOver) {
+                if (Date.now() - gameOverTime >= RESTART_DELAY) {
+                    initBoard();
+                    render();
+                }
+                return;
+            }
+
+            const cell = getCellFromEvent(e);
+            if (cell.x >= 0 && cell.x < BOARD_SIZE && cell.y >= 0 && cell.y < BOARD_SIZE) {
+                handleClick(cell.x, cell.y);
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isPlaying || gameOver) return;
+
+            const cell = getCellFromEvent(e);
+            if (cell.x !== hoverCell.x || cell.y !== hoverCell.y) {
+                hoverCell = cell;
+                render();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoverCell = { x: -1, y: -1 };
+            if (isPlaying) render();
+        });
+
+        // Audio toggle
+        document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        // Initialize and start
+        updateScoreDisplay();
+        initBoard();
+        render();
+    </script>
+</body>
+</html>
