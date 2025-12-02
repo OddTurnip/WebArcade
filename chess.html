@@ -31,57 +31,16 @@
             border: 4px solid #4a4a6a;
             border-radius: 4px;
             cursor: pointer;
-            display: none;
-        }
-        #gameCanvas.visible {
-            display: block;
-        }
-        #titleScreen {
-            text-align: center;
-            padding: 60px 40px;
-            background: #2a2a4a;
-            border-radius: 8px;
-            border: 4px solid #4a4a6a;
-        }
-        #titleScreen h2 {
-            color: #4ecdc4;
-            font-size: 28px;
-            margin-bottom: 20px;
-        }
-        #titleScreen p {
-            color: #888;
-            font-size: 14px;
-            margin-bottom: 30px;
-            line-height: 1.6;
-        }
-        .start-btn {
-            padding: 15px 40px;
-            background: #4ecdc4;
-            border: none;
-            border-radius: 4px;
-            color: #1a1a2e;
-            font-family: 'Courier New', monospace;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .start-btn:hover {
-            background: #5fd9d1;
-            transform: scale(1.05);
         }
         #statusDisplay {
             margin-top: 15px;
             padding: 10px 20px;
             background: #2a2a4a;
             border-radius: 4px;
-            display: none;
+            display: flex;
             gap: 40px;
             justify-content: center;
             align-items: center;
-        }
-        #statusDisplay.visible {
-            display: flex;
         }
         .status-item {
             text-align: center;
@@ -99,8 +58,7 @@
             color: #fff;
         }
         .status-value.black-turn {
-            color: #333;
-            text-shadow: 0 0 4px #fff;
+            color: #888;
         }
         .check-indicator {
             color: #ff6b6b;
@@ -112,12 +70,9 @@
             padding: 10px 20px;
             background: #2a2a4a;
             border-radius: 4px;
-            display: none;
+            display: flex;
             gap: 30px;
             justify-content: center;
-        }
-        #scoreDisplay.visible {
-            display: flex;
         }
         .score-item {
             text-align: center;
@@ -134,8 +89,7 @@
             color: #fff;
         }
         .score-value.black-score {
-            color: #333;
-            text-shadow: 0 0 4px #fff;
+            color: #888;
         }
         .score-value.draws {
             color: #888;
@@ -173,10 +127,6 @@
             background: #2a2a4a;
             border-radius: 4px;
             max-width: 520px;
-            display: none;
-        }
-        #rulesHint.visible {
-            display: block;
         }
         #rulesHint h3 {
             color: #ffe66d;
@@ -281,15 +231,6 @@
     <a href="index.html" class="back-link">&larr; Back to WebArcade</a>
     <h1>Chess</h1>
 
-    <div id="titleScreen">
-        <h2>Chess</h2>
-        <p>Classic two-player chess!<br>
-        White moves first. Click a piece to select it,<br>
-        then click a highlighted square to move.<br>
-        Checkmate your opponent's King to win!</p>
-        <button class="start-btn" onclick="startGame()">Start Game</button>
-    </div>
-
     <canvas id="gameCanvas" width="480" height="480"></canvas>
 
     <div id="statusDisplay">
@@ -359,9 +300,6 @@
 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const titleScreen = document.getElementById('titleScreen');
-        const statusDisplay = document.getElementById('statusDisplay');
-        const scoreDisplay = document.getElementById('scoreDisplay');
         const turnDisplayEl = document.getElementById('turnDisplay');
         const checkIndicatorEl = document.getElementById('checkIndicator');
         const whiteWinsEl = document.getElementById('whiteWins');
@@ -370,7 +308,6 @@
         const promotionModal = document.getElementById('promotionModal');
         const promotionPieces = document.getElementById('promotionPieces');
         const overlay = document.getElementById('overlay');
-        const rulesHintEl = document.getElementById('rulesHint');
 
         const COLORS = {
             lightSquare: '#f0d9b5',
@@ -403,7 +340,7 @@
         let validMoves = [];
         let gameOver = false;
         let winner = null;
-        let isPlaying = false;
+        let isPlaying = true;
         let hoverCell = { x: -1, y: -1 };
         let gameOverTime = 0;
         let inCheck = false;
@@ -447,22 +384,6 @@
             enPassantTarget = null;
             pendingPromotion = null;
             updateTurnDisplay();
-        }
-
-        function startGame() {
-            AudioSystem.unlock();
-            AudioSystem.sfx.select();
-
-            initBoard();
-            isPlaying = true;
-            titleScreen.style.display = 'none';
-            canvas.classList.add('visible');
-            statusDisplay.classList.add('visible');
-            scoreDisplay.classList.add('visible');
-            rulesHintEl.classList.add('visible');
-
-            updateScoreDisplay();
-            render();
         }
 
         function getCellFromEvent(e) {
@@ -1078,8 +999,10 @@
             saveGameData();
         });
 
-        // Update score display on load
+        // Initialize and start
         updateScoreDisplay();
+        initBoard();
+        render();
     </script>
 </body>
 </html>
