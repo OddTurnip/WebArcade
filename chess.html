@@ -260,6 +260,7 @@
 
     <div id="audioControls">
         <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+        <label><input type="checkbox" id="lastMoveToggle" checked> Show Last Move</label>
     </div>
 
     <div id="rulesHint">
@@ -330,7 +331,8 @@
             whiteWins: 0,
             blackWins: 0,
             draws: 0,
-            sfxEnabled: true
+            sfxEnabled: true,
+            showLastMove: true
         });
 
         // Board state: null = empty, { player: 'white'|'black', type: 'king'|'queen'|etc, moved: boolean }
@@ -864,7 +866,7 @@
                     ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
 
                     // Last move highlight
-                    if (lastMove && ((lastMove.from.x === x && lastMove.from.y === y) ||
+                    if (gameData.showLastMove && lastMove && ((lastMove.from.x === x && lastMove.from.y === y) ||
                                      (lastMove.to.x === x && lastMove.to.y === y))) {
                         ctx.fillStyle = COLORS.lastMove;
                         ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
@@ -998,6 +1000,15 @@
             AudioSystem.sfxEnabled = e.target.checked;
             gameData.sfxEnabled = e.target.checked;
             saveGameData();
+        });
+
+        // Last move highlight toggle
+        document.getElementById('lastMoveToggle').checked = gameData.showLastMove;
+
+        document.getElementById('lastMoveToggle').addEventListener('change', (e) => {
+            gameData.showLastMove = e.target.checked;
+            saveGameData();
+            render();
         });
 
         // Initialize and start
