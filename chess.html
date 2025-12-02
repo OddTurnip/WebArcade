@@ -167,6 +167,60 @@
         .back-link:hover {
             text-decoration: underline;
         }
+        #rulesHint {
+            margin-top: 20px;
+            padding: 15px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            max-width: 520px;
+            display: none;
+        }
+        #rulesHint.visible {
+            display: block;
+        }
+        #rulesHint h3 {
+            color: #ffe66d;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .piece-legend {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #4a4a6a;
+        }
+        .piece-item {
+            text-align: center;
+            font-size: 11px;
+            color: #888;
+        }
+        .piece-symbol {
+            font-size: 28px;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+        .piece-symbol.white {
+            color: #fff;
+            text-shadow: 0 0 3px rgba(0,0,0,0.5);
+        }
+        .piece-symbol.black {
+            color: #000;
+            text-shadow: 0 0 3px rgba(255,255,255,0.3);
+        }
+        #rulesHint ul {
+            color: #888;
+            font-size: 12px;
+            line-height: 1.6;
+            padding-left: 20px;
+            margin: 0;
+        }
+        #rulesHint li {
+            margin-bottom: 4px;
+        }
+        #rulesHint .highlight {
+            color: #4ecdc4;
+        }
         #promotionModal {
             display: none;
             position: fixed;
@@ -267,6 +321,29 @@
         <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
     </div>
 
+    <div id="rulesHint">
+        <h3>Pieces</h3>
+        <div class="piece-legend">
+            <div class="piece-item"><div class="piece-symbol white">&#9812;</div>King</div>
+            <div class="piece-item"><div class="piece-symbol white">&#9813;</div>Queen</div>
+            <div class="piece-item"><div class="piece-symbol white">&#9814;</div>Rook</div>
+            <div class="piece-item"><div class="piece-symbol white">&#9815;</div>Bishop</div>
+            <div class="piece-item"><div class="piece-symbol white">&#9816;</div>Knight</div>
+            <div class="piece-item"><div class="piece-symbol white">&#9817;</div>Pawn</div>
+        </div>
+        <h3>Quick Rules</h3>
+        <ul>
+            <li><span class="highlight">King</span> moves 1 square any direction - protect it!</li>
+            <li><span class="highlight">Queen</span> moves any distance in any direction</li>
+            <li><span class="highlight">Rook</span> moves horizontally/vertically</li>
+            <li><span class="highlight">Bishop</span> moves diagonally</li>
+            <li><span class="highlight">Knight</span> moves in L-shape, can jump pieces</li>
+            <li><span class="highlight">Pawn</span> moves forward, captures diagonally</li>
+            <li><span class="highlight">Castling</span>: King + Rook swap (if neither has moved)</li>
+            <li><span class="highlight">Checkmate</span> the opponent's King to win!</li>
+        </ul>
+    </div>
+
     <div id="overlay"></div>
     <div id="promotionModal">
         <h3>Choose Promotion</h3>
@@ -293,6 +370,7 @@
         const promotionModal = document.getElementById('promotionModal');
         const promotionPieces = document.getElementById('promotionPieces');
         const overlay = document.getElementById('overlay');
+        const rulesHintEl = document.getElementById('rulesHint');
 
         const COLORS = {
             lightSquare: '#f0d9b5',
@@ -381,6 +459,7 @@
             canvas.classList.add('visible');
             statusDisplay.classList.add('visible');
             scoreDisplay.classList.add('visible');
+            rulesHintEl.classList.add('visible');
 
             updateScoreDisplay();
             render();
@@ -672,6 +751,13 @@
         }
 
         function selectPiece(x, y) {
+            // Click on selected piece to unselect
+            if (selectedPiece && selectedPiece.x === x && selectedPiece.y === y) {
+                selectedPiece = null;
+                validMoves = [];
+                return;
+            }
+
             const piece = board[y][x];
             if (!piece || piece.player !== currentPlayer) {
                 selectedPiece = null;
