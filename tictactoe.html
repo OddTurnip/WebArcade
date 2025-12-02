@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe - WebArcade</title>
+    <link rel="icon" type="image/x-icon" href="https://oddturnip.com/favicon_turnip.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+            padding: 20px;
+        }
+        h1 {
+            color: #4ecdc4;
+            margin-bottom: 20px;
+            font-size: 32px;
+        }
+        #gameCanvas {
+            border: 4px solid #4a4a6a;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+        }
+        #gameCanvas.visible {
+            display: block;
+        }
+        #titleScreen {
+            text-align: center;
+            padding: 60px 40px;
+            background: #2a2a4a;
+            border-radius: 8px;
+            border: 4px solid #4a4a6a;
+        }
+        #titleScreen h2 {
+            color: #4ecdc4;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+        #titleScreen p {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        .start-btn {
+            padding: 15px 40px;
+            background: #4ecdc4;
+            border: none;
+            border-radius: 4px;
+            color: #1a1a2e;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .start-btn:hover {
+            background: #5fd9d1;
+            transform: scale(1.05);
+        }
+        #statusDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: none;
+            gap: 40px;
+            justify-content: center;
+        }
+        #statusDisplay.visible {
+            display: flex;
+        }
+        .status-item {
+            text-align: center;
+        }
+        .status-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .status-value {
+            font-size: 24px;
+            color: #4ecdc4;
+        }
+        .status-value.x-turn {
+            color: #ff6b6b;
+        }
+        .status-value.o-turn {
+            color: #ffe66d;
+        }
+        #scoreDisplay {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            display: none;
+            gap: 30px;
+            justify-content: center;
+        }
+        #scoreDisplay.visible {
+            display: flex;
+        }
+        .score-item {
+            text-align: center;
+        }
+        .score-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .score-value {
+            font-size: 20px;
+        }
+        .score-value.x-score {
+            color: #ff6b6b;
+        }
+        .score-value.o-score {
+            color: #ffe66d;
+        }
+        .score-value.draws {
+            color: #888;
+        }
+        #audioControls {
+            margin-top: 15px;
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            color: #888;
+        }
+        #audioControls label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        #audioControls input[type="checkbox"] {
+            cursor: pointer;
+        }
+        .back-link {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #4ecdc4;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-link">&larr; Back to WebArcade</a>
+    <h1>Tic-Tac-Toe</h1>
+
+    <div id="titleScreen">
+        <h2>Tic-Tac-Toe</h2>
+        <p>Classic two-player game!<br>
+        X goes first. Get three in a row to win.<br>
+        Click any cell to place your mark.</p>
+        <button class="start-btn" onclick="startGame()">Start Game</button>
+    </div>
+
+    <canvas id="gameCanvas" width="300" height="300"></canvas>
+
+    <div id="statusDisplay">
+        <div class="status-item">
+            <div class="status-label">Current Turn</div>
+            <div class="status-value" id="turnDisplay">X</div>
+        </div>
+    </div>
+
+    <div id="scoreDisplay">
+        <div class="score-item">
+            <div class="score-label">X Wins</div>
+            <div class="score-value x-score" id="xWins">0</div>
+        </div>
+        <div class="score-item">
+            <div class="score-label">Draws</div>
+            <div class="score-value draws" id="draws">0</div>
+        </div>
+        <div class="score-item">
+            <div class="score-label">O Wins</div>
+            <div class="score-value o-score" id="oWins">0</div>
+        </div>
+    </div>
+
+    <div id="audioControls">
+        <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+    </div>
+
+    <script src="audio.js"></script>
+    <script src="storage.js"></script>
+    <script>
+        const GAME_ID = 'tictactoe';
+        const CELL_SIZE = 100;
+        const GRID_SIZE = 3;
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const titleScreen = document.getElementById('titleScreen');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const turnDisplayEl = document.getElementById('turnDisplay');
+        const xWinsEl = document.getElementById('xWins');
+        const oWinsEl = document.getElementById('oWins');
+        const drawsEl = document.getElementById('draws');
+
+        const COLORS = {
+            background: '#1a1a2e',
+            grid: '#4a4a6a',
+            x: '#ff6b6b',
+            o: '#ffe66d',
+            hover: 'rgba(78, 205, 196, 0.2)',
+            winLine: '#4ecdc4'
+        };
+
+        let gameData = GameStorage.load(GAME_ID, {
+            xWins: 0,
+            oWins: 0,
+            draws: 0,
+            sfxEnabled: true
+        });
+
+        let grid = [];
+        let currentPlayer = 'x';
+        let gameOver = false;
+        let winner = null;
+        let winningCells = [];
+        let isPlaying = false;
+        let hoverCell = { x: -1, y: -1 };
+        let gameOverTime = 0;
+        const RESTART_DELAY = 500;
+
+        function saveGameData() {
+            GameStorage.save(GAME_ID, gameData);
+        }
+
+        function initGame() {
+            grid = Array(GRID_SIZE * GRID_SIZE).fill(null);
+            currentPlayer = 'x';
+            gameOver = false;
+            winner = null;
+            winningCells = [];
+            updateTurnDisplay();
+        }
+
+        function startGame() {
+            AudioSystem.unlock();
+            AudioSystem.sfx.select();
+
+            initGame();
+            isPlaying = true;
+            titleScreen.style.display = 'none';
+            canvas.classList.add('visible');
+            statusDisplay.classList.add('visible');
+            scoreDisplay.classList.add('visible');
+
+            updateScoreDisplay();
+            render();
+        }
+
+        function getCellFromEvent(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+            return {
+                x: Math.floor(mx / CELL_SIZE),
+                y: Math.floor(my / CELL_SIZE)
+            };
+        }
+
+        function getIndex(x, y) {
+            return y * GRID_SIZE + x;
+        }
+
+        function checkWin() {
+            const lines = [
+                // Rows
+                [0, 1, 2],
+                [3, 4, 5],
+                [6, 7, 8],
+                // Columns
+                [0, 3, 6],
+                [1, 4, 7],
+                [2, 5, 8],
+                // Diagonals
+                [0, 4, 8],
+                [2, 4, 6]
+            ];
+
+            for (const line of lines) {
+                const [a, b, c] = line;
+                if (grid[a] && grid[a] === grid[b] && grid[a] === grid[c]) {
+                    return {
+                        winner: grid[a],
+                        cells: line.map(i => ({ x: i % GRID_SIZE, y: Math.floor(i / GRID_SIZE) }))
+                    };
+                }
+            }
+            return null;
+        }
+
+        function checkDraw() {
+            return grid.every(cell => cell !== null);
+        }
+
+        function handleClick(x, y) {
+            const index = getIndex(x, y);
+
+            if (grid[index] !== null) return;
+
+            grid[index] = currentPlayer;
+            AudioSystem.sfx.hit();
+
+            const result = checkWin();
+            if (result) {
+                gameOver = true;
+                winner = result.winner;
+                winningCells = result.cells;
+                gameOverTime = Date.now();
+
+                if (winner === 'x') {
+                    gameData.xWins++;
+                } else {
+                    gameData.oWins++;
+                }
+                saveGameData();
+                updateScoreDisplay();
+                AudioSystem.sfx.levelComplete();
+            } else if (checkDraw()) {
+                gameOver = true;
+                winner = null;
+                gameOverTime = Date.now();
+                gameData.draws++;
+                saveGameData();
+                updateScoreDisplay();
+                AudioSystem.sfx.death();
+            } else {
+                currentPlayer = currentPlayer === 'x' ? 'o' : 'x';
+                updateTurnDisplay();
+            }
+
+            render();
+        }
+
+        function updateTurnDisplay() {
+            turnDisplayEl.textContent = currentPlayer.toUpperCase();
+            turnDisplayEl.className = 'status-value ' + currentPlayer + '-turn';
+        }
+
+        function updateScoreDisplay() {
+            xWinsEl.textContent = gameData.xWins;
+            oWinsEl.textContent = gameData.oWins;
+            drawsEl.textContent = gameData.draws;
+        }
+
+        function render() {
+            // Clear
+            ctx.fillStyle = COLORS.background;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw hover highlight
+            if (!gameOver && hoverCell.x >= 0 && hoverCell.y >= 0) {
+                const index = getIndex(hoverCell.x, hoverCell.y);
+                if (grid[index] === null) {
+                    ctx.fillStyle = COLORS.hover;
+                    ctx.fillRect(
+                        hoverCell.x * CELL_SIZE,
+                        hoverCell.y * CELL_SIZE,
+                        CELL_SIZE,
+                        CELL_SIZE
+                    );
+                }
+            }
+
+            // Draw grid lines
+            ctx.strokeStyle = COLORS.grid;
+            ctx.lineWidth = 4;
+
+            // Vertical lines
+            for (let i = 1; i < GRID_SIZE; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * CELL_SIZE, 0);
+                ctx.lineTo(i * CELL_SIZE, canvas.height);
+                ctx.stroke();
+            }
+
+            // Horizontal lines
+            for (let i = 1; i < GRID_SIZE; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i * CELL_SIZE);
+                ctx.lineTo(canvas.width, i * CELL_SIZE);
+                ctx.stroke();
+            }
+
+            // Draw X's and O's
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const index = getIndex(x, y);
+                    const cell = grid[index];
+
+                    if (cell === 'x') {
+                        drawX(x, y);
+                    } else if (cell === 'o') {
+                        drawO(x, y);
+                    }
+                }
+            }
+
+            // Draw winning line
+            if (gameOver && winningCells.length > 0) {
+                ctx.strokeStyle = COLORS.winLine;
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+
+                const start = winningCells[0];
+                const end = winningCells[2];
+
+                ctx.beginPath();
+                ctx.moveTo(
+                    start.x * CELL_SIZE + CELL_SIZE / 2,
+                    start.y * CELL_SIZE + CELL_SIZE / 2
+                );
+                ctx.lineTo(
+                    end.x * CELL_SIZE + CELL_SIZE / 2,
+                    end.y * CELL_SIZE + CELL_SIZE / 2
+                );
+                ctx.stroke();
+            }
+
+            // Draw game over overlay
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                if (winner) {
+                    ctx.fillStyle = winner === 'x' ? COLORS.x : COLORS.o;
+                    ctx.font = 'bold 48px Courier New';
+                    ctx.fillText(winner.toUpperCase() + ' WINS!', canvas.width / 2, canvas.height / 2 - 20);
+                } else {
+                    ctx.fillStyle = '#888';
+                    ctx.font = 'bold 48px Courier New';
+                    ctx.fillText('DRAW!', canvas.width / 2, canvas.height / 2 - 20);
+                }
+
+                ctx.fillStyle = '#888';
+                ctx.font = '14px Courier New';
+                ctx.fillText('Click to play again', canvas.width / 2, canvas.height / 2 + 40);
+            }
+        }
+
+        function drawX(cellX, cellY) {
+            const padding = 20;
+            const x = cellX * CELL_SIZE;
+            const y = cellY * CELL_SIZE;
+
+            ctx.strokeStyle = COLORS.x;
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(x + padding, y + padding);
+            ctx.lineTo(x + CELL_SIZE - padding, y + CELL_SIZE - padding);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x + CELL_SIZE - padding, y + padding);
+            ctx.lineTo(x + padding, y + CELL_SIZE - padding);
+            ctx.stroke();
+        }
+
+        function drawO(cellX, cellY) {
+            const x = cellX * CELL_SIZE + CELL_SIZE / 2;
+            const y = cellY * CELL_SIZE + CELL_SIZE / 2;
+            const radius = CELL_SIZE / 2 - 20;
+
+            ctx.strokeStyle = COLORS.o;
+            ctx.lineWidth = 8;
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Event listeners
+        canvas.addEventListener('click', (e) => {
+            AudioSystem.unlock();
+
+            if (gameOver) {
+                if (Date.now() - gameOverTime >= RESTART_DELAY) {
+                    initGame();
+                    render();
+                }
+                return;
+            }
+
+            const cell = getCellFromEvent(e);
+            if (cell.x >= 0 && cell.x < GRID_SIZE && cell.y >= 0 && cell.y < GRID_SIZE) {
+                handleClick(cell.x, cell.y);
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isPlaying || gameOver) return;
+
+            const cell = getCellFromEvent(e);
+            if (cell.x !== hoverCell.x || cell.y !== hoverCell.y) {
+                hoverCell = cell;
+                render();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoverCell = { x: -1, y: -1 };
+            if (isPlaying) render();
+        });
+
+        // Audio toggle
+        document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+        AudioSystem.sfxEnabled = gameData.sfxEnabled;
+
+        document.getElementById('sfxToggle').addEventListener('change', (e) => {
+            AudioSystem.sfxEnabled = e.target.checked;
+            gameData.sfxEnabled = e.target.checked;
+            saveGameData();
+        });
+
+        // Update score display on load
+        updateScoreDisplay();
+    </script>
+</body>
+</html>
