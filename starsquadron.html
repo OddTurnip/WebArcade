@@ -432,16 +432,16 @@
             const butterflies = enemies.filter(e => e.type === EnemyType.BUTTERFLY);
             const grunts = enemies.filter(e => e.type === EnemyType.GRUNT);
 
-            // Wave 1: First row of grunts from right
-            groups.push({ enemies: grunts.slice(0, 5), side: 'right', delay: 0 });
-            // Wave 2: Second row of grunts from left
-            groups.push({ enemies: grunts.slice(5, 10), side: 'left', delay: 2000 });
-            // Wave 3: First row of butterflies from right
-            groups.push({ enemies: butterflies.slice(0, 5), side: 'right', delay: 4000 });
-            // Wave 4: Second row of butterflies from left
-            groups.push({ enemies: butterflies.slice(5, 10), side: 'left', delay: 6000 });
-            // Wave 5: Bosses from top center
-            groups.push({ enemies: bosses, side: 'top', delay: 8000 });
+            // Row 3 grunts (first 10) from top-right
+            groups.push({ enemies: grunts.slice(0, 10), side: 'right', delay: 0 });
+            // Row 4 grunts (next 10) from top-left
+            groups.push({ enemies: grunts.slice(10, 20), side: 'left', delay: 2500 });
+            // Row 1 butterflies from top-right
+            groups.push({ enemies: butterflies.slice(0, 10), side: 'right', delay: 5000 });
+            // Row 2 butterflies from top-left
+            groups.push({ enemies: butterflies.slice(10, 20), side: 'left', delay: 7500 });
+            // Bosses from top center
+            groups.push({ enemies: bosses, side: 'top', delay: 10000 });
 
             // Create shared path for each group - all enemies follow same path as snake
             groups.forEach(group => {
@@ -451,8 +451,8 @@
                     // All enemies start at same time but with offset along the path
                     enemy.entryDelay = group.delay;
                     enemy.entryPath = sharedPath;
-                    enemy.entryOffset = idx * 0.08; // Spacing along the snake
-                    enemy.peelOffT = 0.75; // When to start peeling off to formation
+                    enemy.entryOffset = idx * 0.06; // Spacing along the snake
+                    enemy.peelOffT = 0.70; // When to start peeling off to formation
                     enemy.entryT = -enemy.entryOffset; // Start behind in the snake
                     entryQueue.push({ enemy, delay: group.delay });
                 });
@@ -851,27 +851,29 @@
             enemy.state = EnemyState.DIVING;
             activeDivers++;
 
-            // Create dive path - sweeping attack with loops like real Galaga
-            const targetX = player.x + CONFIG.PLAYER_WIDTH / 2;
+            // Create dive path - fixed sweeping pattern like real Galaga (not homing)
             const startX = enemy.x;
             const startY = enemy.y;
 
-            // Determine attack pattern based on enemy position
-            const fromLeft = startX < CONFIG.WIDTH / 2;
+            // Determine swoop direction based on enemy's formation position
+            const fromLeft = enemy.formationCol < CONFIG.FORMATION_COLS / 2;
             const loopDir = fromLeft ? 1 : -1;
 
-            // Galaga-style: loop down, sweep across, then exit bottom
+            // Fixed exit point based on formation column (spread across screen)
+            const exitX = 80 + (enemy.formationCol / CONFIG.FORMATION_COLS) * (CONFIG.WIDTH - 160);
+
+            // Galaga-style: swoop down with a loop, then exit bottom
             enemy.divePath = [
                 { x: startX, y: startY },
-                // First curve down
-                { x: startX + loopDir * 60, y: startY + 80 },
+                // Curve outward and down
+                { x: startX + loopDir * 100, y: startY + 60 },
                 // Loop around
-                { x: startX + loopDir * 120, y: CONFIG.HEIGHT * 0.4 },
-                { x: startX + loopDir * 80, y: CONFIG.HEIGHT * 0.55 },
-                // Sweep toward player
-                { x: targetX + loopDir * 50, y: CONFIG.HEIGHT * 0.65 },
-                // Exit at bottom
-                { x: targetX, y: CONFIG.HEIGHT + 50 }
+                { x: startX + loopDir * 140, y: CONFIG.HEIGHT * 0.35 },
+                { x: startX + loopDir * 100, y: CONFIG.HEIGHT * 0.5 },
+                // Swoop back across
+                { x: startX - loopDir * 40, y: CONFIG.HEIGHT * 0.65 },
+                // Exit toward bottom
+                { x: exitX, y: CONFIG.HEIGHT + 50 }
             ];
             enemy.diveT = 0;
 
