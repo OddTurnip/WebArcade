@@ -160,8 +160,8 @@
             // Enemies
             ENEMY_WIDTH: 28,
             ENEMY_HEIGHT: 24,
-            DIVE_SPEED: 1.2,
-            ENTRY_SPEED: 1.5,
+            DIVE_SPEED: 0.6,
+            ENTRY_SPEED: 1.0,
 
             // Boss (Commander)
             BOSS_WIDTH: 32,
@@ -424,7 +424,7 @@
         }
 
         function createEntryPatterns() {
-            // Galaga-style entry: enemies fly in groups with curved paths
+            // Galaga-style entry: enemies fly in snake formation, then peel off to positions
             const groups = [];
 
             // Group enemies by type for wave-style entry
@@ -432,72 +432,74 @@
             const butterflies = enemies.filter(e => e.type === EnemyType.BUTTERFLY);
             const grunts = enemies.filter(e => e.type === EnemyType.GRUNT);
 
-            // Wave 1: Top grunts from right
+            // Wave 1: First row of grunts from right
             groups.push({ enemies: grunts.slice(0, 5), side: 'right', delay: 0 });
-            // Wave 2: Bottom grunts from left
-            groups.push({ enemies: grunts.slice(5, 10), side: 'left', delay: 1200 });
-            // Wave 3: Butterflies from right
-            groups.push({ enemies: butterflies.slice(0, 5), side: 'right', delay: 2400 });
-            // Wave 4: More butterflies from left
-            groups.push({ enemies: butterflies.slice(5, 10), side: 'left', delay: 3600 });
-            // Wave 5: Bosses from top
-            groups.push({ enemies: bosses, side: 'top', delay: 4800 });
+            // Wave 2: Second row of grunts from left
+            groups.push({ enemies: grunts.slice(5, 10), side: 'left', delay: 2000 });
+            // Wave 3: First row of butterflies from right
+            groups.push({ enemies: butterflies.slice(0, 5), side: 'right', delay: 4000 });
+            // Wave 4: Second row of butterflies from left
+            groups.push({ enemies: butterflies.slice(5, 10), side: 'left', delay: 6000 });
+            // Wave 5: Bosses from top center
+            groups.push({ enemies: bosses, side: 'top', delay: 8000 });
 
+            // Create shared path for each group - all enemies follow same path as snake
             groups.forEach(group => {
+                const sharedPath = createGroupEntryPath(group.side);
+
                 group.enemies.forEach((enemy, idx) => {
-                    const entryDelay = group.delay + idx * 150;
-                    enemy.entryDelay = entryDelay;
-                    enemy.entryPath = createEntryPath(enemy, group.side, idx);
-                    entryQueue.push({ enemy, delay: entryDelay });
+                    // All enemies start at same time but with offset along the path
+                    enemy.entryDelay = group.delay;
+                    enemy.entryPath = sharedPath;
+                    enemy.entryOffset = idx * 0.08; // Spacing along the snake
+                    enemy.peelOffT = 0.75; // When to start peeling off to formation
+                    enemy.entryT = -enemy.entryOffset; // Start behind in the snake
+                    entryQueue.push({ enemy, delay: group.delay });
                 });
             });
 
             entryQueue.sort((a, b) => a.delay - b.delay);
         }
 
-        function createEntryPath(enemy, side, index) {
-            // Create bezier curve control points for entry animation
-            const targetX = enemy.formationX;
-            const targetY = enemy.formationY;
-
+        function createGroupEntryPath(side) {
+            // Create a shared path that all enemies in the group follow as a snake
             let points;
 
             if (side === 'right') {
-                // Swoop in from right side - wide arc down then up to position
-                const startX = CONFIG.WIDTH + 50;
-                const startY = -30 + index * 15;
+                // Swoop in from top-right, loop down and around
                 points = [
-                    { x: startX, y: startY },
-                    { x: CONFIG.WIDTH * 0.75, y: CONFIG.HEIGHT * 0.15 },
-                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.45 },
-                    { x: CONFIG.WIDTH * 0.25, y: CONFIG.HEIGHT * 0.55 },
-                    { x: CONFIG.WIDTH * 0.15, y: CONFIG.HEIGHT * 0.35 },
-                    { x: targetX, y: targetY }
+                    { x: CONFIG.WIDTH + 50, y: -50 },
+                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.1 },
+                    { x: CONFIG.WIDTH * 0.6, y: CONFIG.HEIGHT * 0.3 },
+                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.5 },
+                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.6 },
+                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.5 },
+                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.3 },
+                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.15 }  // End near formation area
                 ];
             } else if (side === 'left') {
-                // Swoop in from left side - mirror of right
-                const startX = -50;
-                const startY = -30 + index * 15;
+                // Mirror from left side
                 points = [
-                    { x: startX, y: startY },
-                    { x: CONFIG.WIDTH * 0.25, y: CONFIG.HEIGHT * 0.15 },
-                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.45 },
-                    { x: CONFIG.WIDTH * 0.75, y: CONFIG.HEIGHT * 0.55 },
-                    { x: CONFIG.WIDTH * 0.85, y: CONFIG.HEIGHT * 0.35 },
-                    { x: targetX, y: targetY }
+                    { x: -50, y: -50 },
+                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.1 },
+                    { x: CONFIG.WIDTH * 0.4, y: CONFIG.HEIGHT * 0.3 },
+                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.5 },
+                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.6 },
+                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.5 },
+                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.3 },
+                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.15 }
                 ];
             } else {
-                // Top entry (bosses) - dramatic loop from top
-                const startX = CONFIG.WIDTH / 2;
-                const startY = -50;
-                const loopDir = index % 2 === 0 ? 1 : -1;
+                // Top entry for bosses - dramatic diving loop
                 points = [
-                    { x: startX, y: startY },
-                    { x: startX + loopDir * 150, y: CONFIG.HEIGHT * 0.25 },
-                    { x: startX + loopDir * 200, y: CONFIG.HEIGHT * 0.5 },
-                    { x: startX + loopDir * 100, y: CONFIG.HEIGHT * 0.6 },
-                    { x: startX - loopDir * 50, y: CONFIG.HEIGHT * 0.4 },
-                    { x: targetX, y: targetY }
+                    { x: CONFIG.WIDTH * 0.5, y: -50 },
+                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.15 },
+                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.4 },
+                    { x: CONFIG.WIDTH * 0.6, y: CONFIG.HEIGHT * 0.6 },
+                    { x: CONFIG.WIDTH * 0.4, y: CONFIG.HEIGHT * 0.6 },
+                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.4 },
+                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.15 },
+                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.1 }
                 ];
             }
 
@@ -706,10 +708,9 @@
         function updateEnemyEntry(deltaTime) {
             entryTimer += deltaTime;
 
-            // Start new entries
+            // Start new entries - mark groups as active when their delay is reached
             while (entryQueue.length > 0 && entryQueue[0].delay <= entryTimer) {
-                const entry = entryQueue.shift();
-                entry.enemy.entryT = 0;
+                entryQueue.shift();
             }
 
             // Update entering enemies
@@ -717,17 +718,36 @@
             for (const enemy of enemies) {
                 if (enemy.state === EnemyState.ENTERING && enemy.entryPath) {
                     if (enemy.entryDelay <= entryTimer) {
-                        enemy.entryT += deltaTime * 0.002 * CONFIG.ENTRY_SPEED;
+                        // Advance along the path
+                        enemy.entryT += deltaTime * 0.001 * CONFIG.ENTRY_SPEED;
+
+                        // Calculate effective t (clamped to 0-1 for path lookup)
+                        const effectiveT = Math.max(0, Math.min(1, enemy.entryT));
 
                         if (enemy.entryT >= 1) {
-                            enemy.entryT = 1;
+                            // Reached end of entry - now in formation
                             if (!enemy.isChallenge) {
                                 enemy.state = EnemyState.IN_FORMATION;
                                 enemy.x = enemy.formationX;
                                 enemy.y = enemy.formationY;
                             }
+                        } else if (enemy.entryT < 0) {
+                            // Still waiting to appear (behind in snake)
+                            enemy.x = -100;
+                            enemy.y = -100;
+                            allInFormation = false;
+                        } else if (effectiveT >= enemy.peelOffT) {
+                            // Peeling off from snake to formation position
+                            const peelProgress = (effectiveT - enemy.peelOffT) / (1 - enemy.peelOffT);
+                            const pathPos = bezierPoint(enemy.entryPath, enemy.peelOffT);
+
+                            // Lerp from path position to formation position
+                            enemy.x = pathPos.x + (enemy.formationX - pathPos.x) * peelProgress;
+                            enemy.y = pathPos.y + (enemy.formationY - pathPos.y) * peelProgress;
+                            allInFormation = false;
                         } else {
-                            const pos = bezierPoint(enemy.entryPath, enemy.entryT);
+                            // Following the snake path
+                            const pos = bezierPoint(enemy.entryPath, effectiveT);
                             enemy.x = pos.x;
                             enemy.y = pos.y;
                             allInFormation = false;
