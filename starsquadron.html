@@ -365,7 +365,8 @@
             formationOffsetY = 0;
 
             // Check if challenge stage (every 3rd stage after stage 3)
-            isChallengeStage = stage >= 3 && (stage - 3) % 3 === 0;
+            // Challenging stages are 3, 6, 9, 12... (every 3rd stage)
+            isChallengeStage = stage % 3 === 0;
             challengeEnemiesTotal = 0;
             challengeEnemiesHit = 0;
 
@@ -427,27 +428,27 @@
         }
 
         function createEntryPatterns() {
-            // Galaga-style entry: pattern alternates by stage
-            // Odd stages: two snakes from center, spiral opposite directions
-            // Even stages: two snakes from sides, running parallel
+            // Galaga-style entry: pattern cycles every 3 stages
+            // Stages 1, 4, 7...: two snakes from center, spiral opposite directions
+            // Stages 2, 5, 8...: two snakes from sides, running parallel
+            // Stages 3, 6, 9...: challenging stage (handled elsewhere)
             const groups = [];
 
             const bosses = enemies.filter(e => e.type === EnemyType.BOSS);
             const butterflies = enemies.filter(e => e.type === EnemyType.BUTTERFLY);
             const grunts = enemies.filter(e => e.type === EnemyType.GRUNT);
 
-            const isOddStage = stage % 2 === 1;
+            const stagePattern = stage % 3; // 1 = center spirals, 2 = from sides, 0 = challenging
 
-            if (isOddStage) {
-                // Odd stages: Two snakes from center, spiraling outward in opposite directions
-                // First snake spirals clockwise, second counter-clockwise
+            if (stagePattern === 1) {
+                // Stages 1, 4, 7...: Two snakes from center, spiraling outward in opposite directions
                 groups.push({ enemies: grunts.slice(0, 10), side: 'center-cw', delay: 0 });
                 groups.push({ enemies: grunts.slice(10, 20), side: 'center-ccw', delay: 0 });
                 groups.push({ enemies: butterflies.slice(0, 10), side: 'center-cw', delay: 3000 });
                 groups.push({ enemies: butterflies.slice(10, 20), side: 'center-ccw', delay: 3000 });
                 groups.push({ enemies: bosses, side: 'center-cw', delay: 6000 });
             } else {
-                // Even stages: Two snakes from alternating sides, running parallel
+                // Stages 2, 5, 8...: Two snakes from alternating sides, running parallel
                 groups.push({ enemies: grunts.slice(0, 10), side: 'right', delay: 0 });
                 groups.push({ enemies: grunts.slice(10, 20), side: 'left', delay: 0 });
                 groups.push({ enemies: butterflies.slice(0, 10), side: 'right', delay: 3000 });
