@@ -448,11 +448,14 @@
                 groups.push({ enemies: butterflies.slice(10, 20), side: 'center-ccw', delay: 3000 });
                 groups.push({ enemies: bosses, side: 'center-cw', delay: 6000 });
             } else {
-                // Stages 2, 5, 8...: Two snakes from alternating sides, running parallel
-                groups.push({ enemies: grunts.slice(0, 10), side: 'right', delay: 0 });
-                groups.push({ enemies: grunts.slice(10, 20), side: 'left', delay: 0 });
-                groups.push({ enemies: butterflies.slice(0, 10), side: 'right', delay: 3000 });
-                groups.push({ enemies: butterflies.slice(10, 20), side: 'left', delay: 3000 });
+                // Stages 2, 5, 8...: Two snakes from same side, running parallel
+                // First wave: grunts + butterflies from right (parallel paths)
+                groups.push({ enemies: grunts.slice(0, 10), side: 'right-upper', delay: 0 });
+                groups.push({ enemies: butterflies.slice(0, 10), side: 'right-lower', delay: 0 });
+                // Second wave: grunts + butterflies from left (parallel paths)
+                groups.push({ enemies: grunts.slice(10, 20), side: 'left-upper', delay: 3000 });
+                groups.push({ enemies: butterflies.slice(10, 20), side: 'left-lower', delay: 3000 });
+                // Bosses from top
                 groups.push({ enemies: bosses, side: 'top', delay: 6000 });
             }
 
@@ -503,27 +506,49 @@
                     { x: cx + 50, y: CONFIG.HEIGHT * 0.2 },
                     { x: cx, y: CONFIG.HEIGHT * 0.12 }
                 ];
-            } else if (side === 'right') {
-                // Swoop in from top-right
+            } else if (side === 'right-upper') {
+                // Enter from right, about 2/3 down, upper of the parallel pair
+                const entryY = CONFIG.HEIGHT * 0.65;
                 points = [
-                    { x: CONFIG.WIDTH + 50, y: -50 },
-                    { x: CONFIG.WIDTH * 0.75, y: CONFIG.HEIGHT * 0.1 },
-                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.35 },
-                    { x: CONFIG.WIDTH * 0.25, y: CONFIG.HEIGHT * 0.55 },
-                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.5 },
-                    { x: CONFIG.WIDTH * 0.35, y: CONFIG.HEIGHT * 0.3 },
+                    { x: CONFIG.WIDTH + 50, y: entryY - 20 },
+                    { x: CONFIG.WIDTH * 0.7, y: entryY - 30 },
+                    { x: CONFIG.WIDTH * 0.4, y: CONFIG.HEIGHT * 0.5 },
+                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.35 },
+                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.2 },
                     { x: cx, y: CONFIG.HEIGHT * 0.12 }
                 ];
-            } else if (side === 'left') {
-                // Swoop in from top-left (mirror)
+            } else if (side === 'right-lower') {
+                // Enter from right, about 2/3 down, lower of the parallel pair
+                const entryY = CONFIG.HEIGHT * 0.65;
                 points = [
-                    { x: -50, y: -50 },
-                    { x: CONFIG.WIDTH * 0.25, y: CONFIG.HEIGHT * 0.1 },
-                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.35 },
-                    { x: CONFIG.WIDTH * 0.75, y: CONFIG.HEIGHT * 0.55 },
-                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.5 },
-                    { x: CONFIG.WIDTH * 0.65, y: CONFIG.HEIGHT * 0.3 },
+                    { x: CONFIG.WIDTH + 50, y: entryY + 20 },
+                    { x: CONFIG.WIDTH * 0.7, y: entryY + 10 },
+                    { x: CONFIG.WIDTH * 0.4, y: CONFIG.HEIGHT * 0.55 },
+                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.4 },
+                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.22 },
+                    { x: cx, y: CONFIG.HEIGHT * 0.14 }
+                ];
+            } else if (side === 'left-upper') {
+                // Enter from left, about 2/3 down, upper of the parallel pair
+                const entryY = CONFIG.HEIGHT * 0.65;
+                points = [
+                    { x: -50, y: entryY - 20 },
+                    { x: CONFIG.WIDTH * 0.3, y: entryY - 30 },
+                    { x: CONFIG.WIDTH * 0.6, y: CONFIG.HEIGHT * 0.5 },
+                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.35 },
+                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.2 },
                     { x: cx, y: CONFIG.HEIGHT * 0.12 }
+                ];
+            } else if (side === 'left-lower') {
+                // Enter from left, about 2/3 down, lower of the parallel pair
+                const entryY = CONFIG.HEIGHT * 0.65;
+                points = [
+                    { x: -50, y: entryY + 20 },
+                    { x: CONFIG.WIDTH * 0.3, y: entryY + 10 },
+                    { x: CONFIG.WIDTH * 0.6, y: CONFIG.HEIGHT * 0.55 },
+                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.4 },
+                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.22 },
+                    { x: cx, y: CONFIG.HEIGHT * 0.14 }
                 ];
             } else {
                 // Top entry for bosses - dramatic diving loop
