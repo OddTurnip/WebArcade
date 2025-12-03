@@ -160,8 +160,8 @@
             // Enemies
             ENEMY_WIDTH: 28,
             ENEMY_HEIGHT: 24,
-            DIVE_SPEED: 3,
-            ENTRY_SPEED: 4,
+            DIVE_SPEED: 1.2,
+            ENTRY_SPEED: 1.5,
 
             // Boss (Commander)
             BOSS_WIDTH: 32,
@@ -435,17 +435,17 @@
             // Wave 1: Top grunts from right
             groups.push({ enemies: grunts.slice(0, 5), side: 'right', delay: 0 });
             // Wave 2: Bottom grunts from left
-            groups.push({ enemies: grunts.slice(5, 10), side: 'left', delay: 800 });
+            groups.push({ enemies: grunts.slice(5, 10), side: 'left', delay: 1200 });
             // Wave 3: Butterflies from right
-            groups.push({ enemies: butterflies.slice(0, 5), side: 'right', delay: 1600 });
+            groups.push({ enemies: butterflies.slice(0, 5), side: 'right', delay: 2400 });
             // Wave 4: More butterflies from left
-            groups.push({ enemies: butterflies.slice(5, 10), side: 'left', delay: 2400 });
+            groups.push({ enemies: butterflies.slice(5, 10), side: 'left', delay: 3600 });
             // Wave 5: Bosses from top
-            groups.push({ enemies: bosses, side: 'top', delay: 3200 });
+            groups.push({ enemies: bosses, side: 'top', delay: 4800 });
 
             groups.forEach(group => {
                 group.enemies.forEach((enemy, idx) => {
-                    const entryDelay = group.delay + idx * 100;
+                    const entryDelay = group.delay + idx * 150;
                     enemy.entryDelay = entryDelay;
                     enemy.entryPath = createEntryPath(enemy, group.side, idx);
                     entryQueue.push({ enemy, delay: entryDelay });
@@ -463,33 +463,40 @@
             let points;
 
             if (side === 'right') {
-                // Swoop in from right side
+                // Swoop in from right side - wide arc down then up to position
                 const startX = CONFIG.WIDTH + 50;
-                const startY = 100 + index * 20;
+                const startY = -30 + index * 15;
                 points = [
                     { x: startX, y: startY },
-                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.5 },
-                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.3 },
+                    { x: CONFIG.WIDTH * 0.75, y: CONFIG.HEIGHT * 0.15 },
+                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.45 },
+                    { x: CONFIG.WIDTH * 0.25, y: CONFIG.HEIGHT * 0.55 },
+                    { x: CONFIG.WIDTH * 0.15, y: CONFIG.HEIGHT * 0.35 },
                     { x: targetX, y: targetY }
                 ];
             } else if (side === 'left') {
-                // Swoop in from left side
+                // Swoop in from left side - mirror of right
                 const startX = -50;
-                const startY = 100 + index * 20;
+                const startY = -30 + index * 15;
                 points = [
                     { x: startX, y: startY },
-                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.5 },
-                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.3 },
+                    { x: CONFIG.WIDTH * 0.25, y: CONFIG.HEIGHT * 0.15 },
+                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.45 },
+                    { x: CONFIG.WIDTH * 0.75, y: CONFIG.HEIGHT * 0.55 },
+                    { x: CONFIG.WIDTH * 0.85, y: CONFIG.HEIGHT * 0.35 },
                     { x: targetX, y: targetY }
                 ];
             } else {
-                // Top entry (bosses) - dramatic swoop
-                const startX = CONFIG.WIDTH / 2 + (index - 2) * 60;
+                // Top entry (bosses) - dramatic loop from top
+                const startX = CONFIG.WIDTH / 2;
                 const startY = -50;
+                const loopDir = index % 2 === 0 ? 1 : -1;
                 points = [
                     { x: startX, y: startY },
-                    { x: startX + 100, y: CONFIG.HEIGHT * 0.4 },
-                    { x: targetX - 50, y: CONFIG.HEIGHT * 0.3 },
+                    { x: startX + loopDir * 150, y: CONFIG.HEIGHT * 0.25 },
+                    { x: startX + loopDir * 200, y: CONFIG.HEIGHT * 0.5 },
+                    { x: startX + loopDir * 100, y: CONFIG.HEIGHT * 0.6 },
+                    { x: startX - loopDir * 50, y: CONFIG.HEIGHT * 0.4 },
                     { x: targetX, y: targetY }
                 ];
             }
@@ -824,18 +831,26 @@
             enemy.state = EnemyState.DIVING;
             activeDivers++;
 
-            // Create dive path - swooping attack toward player
+            // Create dive path - sweeping attack with loops like real Galaga
             const targetX = player.x + CONFIG.PLAYER_WIDTH / 2;
             const startX = enemy.x;
             const startY = enemy.y;
 
-            // Curve based on which side player is on
-            const curveDir = targetX > CONFIG.WIDTH / 2 ? -1 : 1;
+            // Determine attack pattern based on enemy position
+            const fromLeft = startX < CONFIG.WIDTH / 2;
+            const loopDir = fromLeft ? 1 : -1;
 
+            // Galaga-style: loop down, sweep across, then exit bottom
             enemy.divePath = [
                 { x: startX, y: startY },
-                { x: startX + curveDir * 80, y: startY + 100 },
-                { x: targetX + curveDir * 40, y: CONFIG.HEIGHT * 0.6 },
+                // First curve down
+                { x: startX + loopDir * 60, y: startY + 80 },
+                // Loop around
+                { x: startX + loopDir * 120, y: CONFIG.HEIGHT * 0.4 },
+                { x: startX + loopDir * 80, y: CONFIG.HEIGHT * 0.55 },
+                // Sweep toward player
+                { x: targetX + loopDir * 50, y: CONFIG.HEIGHT * 0.65 },
+                // Exit at bottom
                 { x: targetX, y: CONFIG.HEIGHT + 50 }
             ];
             enemy.diveT = 0;
