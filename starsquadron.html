@@ -292,6 +292,9 @@
         let entryTimer = 0;
         let entriesComplete = false;
 
+        // Formation zoom
+        let formationScale = 1;
+
         // Diving
         let diveTimer = 0;
         let activeDivers = 0;
@@ -424,36 +427,44 @@
         }
 
         function createEntryPatterns() {
-            // Galaga-style entry: enemies fly in snake formation, then peel off to positions
+            // Galaga-style entry: pattern alternates by stage
+            // Odd stages: two snakes from center, spiral opposite directions
+            // Even stages: two snakes from sides, running parallel
             const groups = [];
 
-            // Group enemies by type for wave-style entry
             const bosses = enemies.filter(e => e.type === EnemyType.BOSS);
             const butterflies = enemies.filter(e => e.type === EnemyType.BUTTERFLY);
             const grunts = enemies.filter(e => e.type === EnemyType.GRUNT);
 
-            // Row 3 grunts (first 10) from top-right
-            groups.push({ enemies: grunts.slice(0, 10), side: 'right', delay: 0 });
-            // Row 4 grunts (next 10) from top-left
-            groups.push({ enemies: grunts.slice(10, 20), side: 'left', delay: 2500 });
-            // Row 1 butterflies from top-right
-            groups.push({ enemies: butterflies.slice(0, 10), side: 'right', delay: 5000 });
-            // Row 2 butterflies from top-left
-            groups.push({ enemies: butterflies.slice(10, 20), side: 'left', delay: 7500 });
-            // Bosses from top center
-            groups.push({ enemies: bosses, side: 'top', delay: 10000 });
+            const isOddStage = stage % 2 === 1;
 
-            // Create shared path for each group - all enemies follow same path as snake
+            if (isOddStage) {
+                // Odd stages: Two snakes from center, spiraling outward in opposite directions
+                // First snake spirals clockwise, second counter-clockwise
+                groups.push({ enemies: grunts.slice(0, 10), side: 'center-cw', delay: 0 });
+                groups.push({ enemies: grunts.slice(10, 20), side: 'center-ccw', delay: 0 });
+                groups.push({ enemies: butterflies.slice(0, 10), side: 'center-cw', delay: 3000 });
+                groups.push({ enemies: butterflies.slice(10, 20), side: 'center-ccw', delay: 3000 });
+                groups.push({ enemies: bosses, side: 'center-cw', delay: 6000 });
+            } else {
+                // Even stages: Two snakes from alternating sides, running parallel
+                groups.push({ enemies: grunts.slice(0, 10), side: 'right', delay: 0 });
+                groups.push({ enemies: grunts.slice(10, 20), side: 'left', delay: 0 });
+                groups.push({ enemies: butterflies.slice(0, 10), side: 'right', delay: 3000 });
+                groups.push({ enemies: butterflies.slice(10, 20), side: 'left', delay: 3000 });
+                groups.push({ enemies: bosses, side: 'top', delay: 6000 });
+            }
+
+            // Create shared path for each group
             groups.forEach(group => {
                 const sharedPath = createGroupEntryPath(group.side);
 
                 group.enemies.forEach((enemy, idx) => {
-                    // All enemies start at same time but with offset along the path
                     enemy.entryDelay = group.delay;
                     enemy.entryPath = sharedPath;
-                    enemy.entryOffset = idx * 0.06; // Spacing along the snake
-                    enemy.peelOffT = 0.70; // When to start peeling off to formation
-                    enemy.entryT = -enemy.entryOffset; // Start behind in the snake
+                    enemy.entryOffset = idx * 0.05;
+                    enemy.peelOffT = 0.75;
+                    enemy.entryT = -enemy.entryOffset;
                     entryQueue.push({ enemy, delay: group.delay });
                 });
             });
@@ -462,44 +473,67 @@
         }
 
         function createGroupEntryPath(side) {
-            // Create a shared path that all enemies in the group follow as a snake
+            // Create paths for different entry patterns
             let points;
+            const cx = CONFIG.WIDTH / 2;
+            const cy = CONFIG.HEIGHT / 2;
 
-            if (side === 'right') {
-                // Swoop in from top-right, loop down and around
+            if (side === 'center-cw') {
+                // Clockwise spiral from top center
+                points = [
+                    { x: cx, y: -50 },
+                    { x: cx + 150, y: CONFIG.HEIGHT * 0.15 },
+                    { x: cx + 200, y: CONFIG.HEIGHT * 0.4 },
+                    { x: cx + 100, y: CONFIG.HEIGHT * 0.6 },
+                    { x: cx - 50, y: CONFIG.HEIGHT * 0.55 },
+                    { x: cx - 120, y: CONFIG.HEIGHT * 0.35 },
+                    { x: cx - 50, y: CONFIG.HEIGHT * 0.2 },
+                    { x: cx, y: CONFIG.HEIGHT * 0.12 }
+                ];
+            } else if (side === 'center-ccw') {
+                // Counter-clockwise spiral from top center (mirror)
+                points = [
+                    { x: cx, y: -50 },
+                    { x: cx - 150, y: CONFIG.HEIGHT * 0.15 },
+                    { x: cx - 200, y: CONFIG.HEIGHT * 0.4 },
+                    { x: cx - 100, y: CONFIG.HEIGHT * 0.6 },
+                    { x: cx + 50, y: CONFIG.HEIGHT * 0.55 },
+                    { x: cx + 120, y: CONFIG.HEIGHT * 0.35 },
+                    { x: cx + 50, y: CONFIG.HEIGHT * 0.2 },
+                    { x: cx, y: CONFIG.HEIGHT * 0.12 }
+                ];
+            } else if (side === 'right') {
+                // Swoop in from top-right
                 points = [
                     { x: CONFIG.WIDTH + 50, y: -50 },
-                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.1 },
-                    { x: CONFIG.WIDTH * 0.6, y: CONFIG.HEIGHT * 0.3 },
-                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.5 },
-                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.6 },
-                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.5 },
-                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.3 },
-                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.15 }  // End near formation area
+                    { x: CONFIG.WIDTH * 0.75, y: CONFIG.HEIGHT * 0.1 },
+                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.35 },
+                    { x: CONFIG.WIDTH * 0.25, y: CONFIG.HEIGHT * 0.55 },
+                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.5 },
+                    { x: CONFIG.WIDTH * 0.35, y: CONFIG.HEIGHT * 0.3 },
+                    { x: cx, y: CONFIG.HEIGHT * 0.12 }
                 ];
             } else if (side === 'left') {
-                // Mirror from left side
+                // Swoop in from top-left (mirror)
                 points = [
                     { x: -50, y: -50 },
-                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.1 },
-                    { x: CONFIG.WIDTH * 0.4, y: CONFIG.HEIGHT * 0.3 },
-                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.5 },
-                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.6 },
-                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.5 },
-                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.3 },
-                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.15 }
+                    { x: CONFIG.WIDTH * 0.25, y: CONFIG.HEIGHT * 0.1 },
+                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.35 },
+                    { x: CONFIG.WIDTH * 0.75, y: CONFIG.HEIGHT * 0.55 },
+                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.5 },
+                    { x: CONFIG.WIDTH * 0.65, y: CONFIG.HEIGHT * 0.3 },
+                    { x: cx, y: CONFIG.HEIGHT * 0.12 }
                 ];
             } else {
                 // Top entry for bosses - dramatic diving loop
                 points = [
-                    { x: CONFIG.WIDTH * 0.5, y: -50 },
-                    { x: CONFIG.WIDTH * 0.7, y: CONFIG.HEIGHT * 0.15 },
-                    { x: CONFIG.WIDTH * 0.8, y: CONFIG.HEIGHT * 0.4 },
-                    { x: CONFIG.WIDTH * 0.6, y: CONFIG.HEIGHT * 0.6 },
-                    { x: CONFIG.WIDTH * 0.4, y: CONFIG.HEIGHT * 0.6 },
-                    { x: CONFIG.WIDTH * 0.2, y: CONFIG.HEIGHT * 0.4 },
-                    { x: CONFIG.WIDTH * 0.3, y: CONFIG.HEIGHT * 0.15 },
-                    { x: CONFIG.WIDTH * 0.5, y: CONFIG.HEIGHT * 0.1 }
+                    { x: cx, y: -50 },
+                    { x: cx + 120, y: CONFIG.HEIGHT * 0.2 },
+                    { x: cx + 150, y: CONFIG.HEIGHT * 0.45 },
+                    { x: cx, y: CONFIG.HEIGHT * 0.6 },
+                    { x: cx - 150, y: CONFIG.HEIGHT * 0.45 },
+                    { x: cx - 120, y: CONFIG.HEIGHT * 0.2 },
+                    { x: cx, y: CONFIG.HEIGHT * 0.08 }
                 ];
             }
 
@@ -698,11 +732,9 @@
         function updateFormation(deltaTime) {
             formationTime += deltaTime;
 
-            // Sway side to side
-            formationOffsetX = Math.sin(formationTime * CONFIG.FORMATION_SWAY_SPEED) * CONFIG.FORMATION_SWAY_AMOUNT;
-
-            // Breathe (expand/contract)
-            formationOffsetY = Math.sin(formationTime * CONFIG.FORMATION_BREATHE_SPEED) * CONFIG.FORMATION_BREATHE_AMOUNT;
+            // Zoom in/out effect (scale factor) - like Galaga's "breathing" formation
+            // Scale oscillates between 0.95 and 1.05
+            formationScale = 1 + Math.sin(formationTime * CONFIG.FORMATION_BREATHE_SPEED) * 0.05;
         }
 
         function updateEnemyEntry(deltaTime) {
@@ -786,9 +818,11 @@
             for (const enemy of enemies) {
                 switch (enemy.state) {
                     case EnemyState.IN_FORMATION:
-                        // Follow formation with sway/breathe
-                        enemy.x = enemy.formationX + formationOffsetX;
-                        enemy.y = enemy.formationY + formationOffsetY * (enemy.formationRow * 0.2);
+                        // Zoom in/out from formation center
+                        const centerX = CONFIG.WIDTH / 2;
+                        const centerY = CONFIG.FORMATION_TOP + CONFIG.FORMATION_ROWS * CONFIG.FORMATION_SPACING_Y / 2;
+                        enemy.x = centerX + (enemy.formationX - centerX) * formationScale;
+                        enemy.y = centerY + (enemy.formationY - centerY) * formationScale;
                         break;
 
                     case EnemyState.DIVING:
