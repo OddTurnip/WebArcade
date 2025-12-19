@@ -389,7 +389,6 @@
     </div>
 
     <div class="controls">
-        <button class="button secondary-button" onclick="toggleMoveNumbers()">Move Numbers</button>
         <button class="button secondary-button" id="undoButton" onclick="undoMove()">Undo</button>
         <button class="button danger-button" id="passButton" onclick="passMove()">Pass</button>
         <button class="button primary-button" id="confirmDeadButton" onclick="confirmDeadStones()" style="display: none;">Confirm Dead</button>
@@ -414,7 +413,9 @@
     </div>
 
     <div id="audioControls">
+        <label><input type="checkbox" id="musicToggle"> Music</label>
         <label><input type="checkbox" id="sfxToggle" checked> Sound Effects</label>
+        <label><input type="checkbox" id="moveNumbersToggle"> Move Numbers</label>
     </div>
 
     <div id="rulesHint">
@@ -436,6 +437,7 @@
         const GAME_ID = 'go';
 
         let gameData = GameStorage.load(GAME_ID, {
+            musicEnabled: false,
             sfxEnabled: true,
             lastBoardSize: 19,
             showMoveNumbers: false
@@ -1046,6 +1048,9 @@
             gameData.showMoveNumbers = showMoveNumbers;
             saveGameData();
 
+            // Sync checkbox state
+            document.getElementById('moveNumbersToggle').checked = showMoveNumbers;
+
             AudioSystem.sfx.select();
 
             for (let row = 0; row < boardSize; row++) {
@@ -1233,6 +1238,14 @@
 
         function changeBoardSize() {
             const newSize = parseInt(document.getElementById('boardSize').value);
+
+            if (moveNumber > 0) {
+                if (!confirm('Changing board size will start a new game. Continue?')) {
+                    document.getElementById('boardSize').value = boardSize;
+                    return;
+                }
+            }
+
             boardSize = newSize;
 
             gameData.lastBoardSize = boardSize;
@@ -1278,9 +1291,23 @@
             updateButtons();
         }
 
-        // Audio toggle
+        // Audio and settings toggles
+        document.getElementById('musicToggle').checked = gameData.musicEnabled;
         document.getElementById('sfxToggle').checked = gameData.sfxEnabled;
+        document.getElementById('moveNumbersToggle').checked = gameData.showMoveNumbers;
         AudioSystem.sfxEnabled = gameData.sfxEnabled;
+        AudioSystem.musicEnabled = gameData.musicEnabled;
+
+        document.getElementById('musicToggle').addEventListener('change', (e) => {
+            AudioSystem.musicEnabled = e.target.checked;
+            gameData.musicEnabled = e.target.checked;
+            saveGameData();
+            if (e.target.checked) {
+                AudioSystem.music.start('go');
+            } else {
+                AudioSystem.music.stop();
+            }
+        });
 
         document.getElementById('sfxToggle').addEventListener('change', (e) => {
             AudioSystem.sfxEnabled = e.target.checked;
@@ -1288,7 +1315,18 @@
             saveGameData();
         });
 
+        document.getElementById('moveNumbersToggle').addEventListener('change', (e) => {
+            // Set to opposite so toggle flips it to match checkbox
+            showMoveNumbers = !e.target.checked;
+            toggleMoveNumbers();
+        });
+
         initializeGame();
+
+        // Start music if enabled
+        if (gameData.musicEnabled) {
+            AudioSystem.music.start('go');
+        }
     </script>
 </body>
 </html>
