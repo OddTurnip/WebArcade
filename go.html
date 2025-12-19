@@ -331,6 +331,65 @@
             margin-top: 10px;
             font-size: 16px;
         }
+        .score-popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .score-popup {
+            background: #2a2a4a;
+            border: 3px solid #4ecdc4;
+            border-radius: 8px;
+            padding: 25px 35px;
+            position: relative;
+            text-align: center;
+            min-width: 320px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        .score-popup-close {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .score-popup-close:hover {
+            color: #fff;
+        }
+        .score-popup h2 {
+            color: #ffe66d;
+            margin: 0 0 15px 0;
+            font-size: 20px;
+        }
+        .score-popup .popup-scores {
+            margin: 15px 0;
+            font-size: 14px;
+            color: #ccc;
+        }
+        .score-popup .popup-winner {
+            color: #4ecdc4;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .score-popup .popup-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
         #audioControls {
             margin-top: 15px;
             display: flex;
@@ -441,6 +500,22 @@
         <div class="score-item">Black: <span id="blackScore">0</span> (Territory: <span id="blackTerritory">0</span> + Captures: <span id="blackCapturesF">0</span>)</div>
         <div class="score-item">White: <span id="whiteScore">0</span> (Territory: <span id="whiteTerritory">0</span> + Captures: <span id="whiteCapturesF">0</span> + Komi: 6.5)</div>
         <div class="winner" id="winner"></div>
+    </div>
+
+    <div class="score-popup-overlay" id="scorePopup">
+        <div class="score-popup">
+            <button class="score-popup-close" onclick="closeScorePopup()">&times;</button>
+            <h2>Game Over</h2>
+            <div class="popup-scores">
+                <div>Black: <span id="popupBlackScore">0</span></div>
+                <div>White: <span id="popupWhiteScore">0</span></div>
+            </div>
+            <div class="popup-winner" id="popupWinner"></div>
+            <div class="popup-buttons">
+                <button class="button secondary-button" onclick="closeScorePopup()">Dismiss</button>
+                <button class="button primary-button" onclick="closeScorePopup(); newGame();">New Game</button>
+            </div>
+        </div>
     </div>
 
     <div id="audioControls">
@@ -1063,6 +1138,23 @@
             document.getElementById('scoreTitle').textContent = 'Final Scores';
 
             calculateFinalScores();
+            showScorePopup();
+        }
+
+        function showScorePopup() {
+            const blackScore = document.getElementById('blackScore').textContent;
+            const whiteScore = document.getElementById('whiteScore').textContent;
+            const winnerText = document.getElementById('winner').textContent;
+
+            document.getElementById('popupBlackScore').textContent = blackScore;
+            document.getElementById('popupWhiteScore').textContent = whiteScore;
+            document.getElementById('popupWinner').textContent = winnerText;
+
+            document.getElementById('scorePopup').style.display = 'flex';
+        }
+
+        function closeScorePopup() {
+            document.getElementById('scorePopup').style.display = 'none';
         }
 
         function updateLastMoveIndicator(row, col) {
@@ -1274,6 +1366,7 @@
             document.getElementById('gameOver').style.display = 'none';
             document.getElementById('finalScores').style.display = 'none';
             document.getElementById('confirmDeadButton').style.display = 'none';
+            document.getElementById('scorePopup').style.display = 'none';
 
             AudioSystem.sfx.select();
             updateButtons();
@@ -1318,6 +1411,7 @@
             document.getElementById('gameOver').style.display = 'none';
             document.getElementById('finalScores').style.display = 'none';
             document.getElementById('confirmDeadButton').style.display = 'none';
+            document.getElementById('scorePopup').style.display = 'none';
 
             createBoard();
             updateButtons();
