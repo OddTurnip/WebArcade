@@ -576,6 +576,42 @@ const AudioSystem = {
             gain.connect(AudioSystem.sfxGain);
             osc.start();
             osc.stop(ctx.currentTime + 0.08);
+        },
+
+        /**
+         * Go stone placement sound - wooden clack
+         */
+        stonePlace() {
+            if (!AudioSystem.sfxEnabled) return;
+            AudioSystem.ensureContext();
+            const ctx = AudioSystem.ctx;
+            const now = ctx.currentTime;
+
+            // Wood block resonance - the hollow "tock" of wood
+            const wood = ctx.createOscillator();
+            const woodGain = ctx.createGain();
+            wood.type = 'sine';
+            wood.frequency.setValueAtTime(650, now);
+            wood.frequency.exponentialRampToValueAtTime(550, now + 0.08);
+            woodGain.gain.setValueAtTime(0.4, now);
+            woodGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+            wood.connect(woodGain);
+            woodGain.connect(AudioSystem.sfxGain);
+            wood.start(now);
+            wood.stop(now + 0.08);
+
+            // Click transient - the initial contact
+            const click = ctx.createOscillator();
+            const clickGain = ctx.createGain();
+            click.type = 'square';
+            click.frequency.setValueAtTime(1800, now);
+            click.frequency.exponentialRampToValueAtTime(900, now + 0.015);
+            clickGain.gain.setValueAtTime(0.15, now);
+            clickGain.gain.exponentialRampToValueAtTime(0.01, now + 0.02);
+            click.connect(clickGain);
+            clickGain.connect(AudioSystem.sfxGain);
+            click.start(now);
+            click.stop(now + 0.02);
         }
     },
 
@@ -1153,6 +1189,82 @@ const AudioSystem = {
                         175, 0, 262, 0, 175, 0, 0, 0, 220, 0, 0, 0, 0, 0, 0, 0,  // F sparse
                         196, 0, 262, 0, 196, 0, 0, 0, 247, 0, 0, 0, 0, 0, 0, 0,  // C sparse
                         220, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0         // Am fade
+                    ]
+                },
+
+                // Go/Chinese Garden style - pentatonic melody (64 beats at 60 BPM)
+                // Structure: Pentatonic scale (A C D E G), starts active then breathes
+                'go': {
+                    beats: 64,
+                    bassDiv: 2,
+                    melodyDiv: 0.5,
+                    arpDiv: 0.5,
+                    bassType: 'sine',
+                    bass: [
+                        // Section 1: Gentle movement from the start
+                        110, 0, 0, 0, 82, 0, 0, 0,    // A, E
+                        131, 0, 0, 0, 98, 0, 0, 0,    // C, G
+                        110, 0, 82, 0, 110, 0, 0, 0,  // A, E, A
+                        131, 0, 98, 0, 131, 0, 0, 0,  // C, G, C
+                        // Section 2: Active
+                        110, 0, 82, 0, 110, 0, 0, 0,   // A, E, A
+                        131, 0, 98, 0, 131, 0, 0, 0,   // C, G, C
+                        73, 0, 82, 0, 98, 0, 0, 0,     // D, E, G
+                        110, 0, 0, 0, 82, 0, 0, 0,     // A, E
+                        // Section 3: Peak energy
+                        110, 0, 82, 0, 98, 0, 110, 0,  // A, E, G, A
+                        131, 0, 98, 0, 82, 0, 110, 0,  // C, G, E, A
+                        73, 0, 82, 0, 98, 0, 110, 0,   // D, E, G, A
+                        131, 0, 110, 0, 98, 0, 82, 0,  // C, A, G, E
+                        // Section 4: Gentle resolution
+                        110, 0, 0, 0, 82, 0, 0, 0,   // A, E
+                        131, 0, 0, 0, 0, 0, 0, 0,    // C
+                        110, 0, 82, 0, 0, 0, 0, 0,   // A, E
+                        110, 0, 0, 0, 0, 0, 0, 0     // A resolve
+                    ],
+                    melody: [
+                        // Section 1: Melodic from the start
+                        660, 0, 784, 0, 660, 0, 0, 0, 523, 0, 0, 0, 0, 0, 0, 0,  // E-G-E-C
+                        587, 0, 0, 0, 523, 0, 0, 0, 440, 0, 0, 0, 0, 0, 0, 0,    // D-C-A
+                        660, 0, 0, 0, 784, 0, 660, 0, 523, 0, 0, 0, 0, 0, 0, 0,  // E, G-E-C
+                        523, 0, 587, 0, 523, 0, 0, 0, 440, 0, 0, 0, 0, 0, 0, 0,  // C-D-C-A
+                        // Section 2: More movement
+                        440, 0, 523, 0, 587, 0, 660, 0, 523, 0, 0, 0, 440, 0, 0, 0,  // A-C-D-E-C-A
+                        660, 0, 784, 0, 660, 0, 523, 0, 440, 0, 0, 0, 0, 0, 0, 0,    // E-G-E-C-A
+                        587, 0, 660, 0, 784, 0, 660, 0, 587, 0, 523, 0, 0, 0, 0, 0,  // D-E-G-E-D-C
+                        440, 0, 523, 0, 440, 0, 0, 0, 392, 0, 440, 0, 0, 0, 0, 0,    // A-C-A, G-A
+                        // Section 3: Flowing melody
+                        440, 0, 523, 0, 587, 0, 660, 0, 784, 0, 660, 0, 587, 0, 523, 0,  // ascending/descending
+                        660, 0, 0, 0, 523, 0, 0, 0, 440, 0, 0, 0, 392, 0, 0, 0,  // E-C-A-G descend
+                        440, 0, 523, 0, 587, 0, 660, 0, 784, 0, 880, 0, 784, 0, 660, 0,  // rising phrase
+                        660, 0, 587, 0, 523, 0, 440, 0, 392, 0, 440, 0, 0, 0, 0, 0,    // falling to rest
+                        // Section 4: Gentle ending
+                        660, 0, 0, 0, 523, 0, 0, 0, 440, 0, 0, 0, 0, 0, 0, 0,  // E-C-A
+                        587, 0, 523, 0, 440, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // D-C-A
+                        523, 0, 0, 0, 440, 0, 0, 0, 392, 0, 440, 0, 0, 0, 0, 0,  // C-A-G-A
+                        440, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0     // A final
+                    ],
+                    arp: [
+                        // Section 1: Chimes from the start
+                        880, 0, 1047, 0, 880, 0, 0, 0, 784, 0, 0, 0, 0, 0, 0, 0,  // A5-C6-A5, G5
+                        1047, 0, 0, 0, 880, 0, 0, 0, 784, 0, 0, 0, 0, 0, 0, 0,    // C6, A5, G5
+                        880, 0, 0, 0, 1047, 0, 0, 0, 1175, 0, 0, 0, 0, 0, 0, 0,   // A5, C6, D6
+                        1047, 0, 880, 0, 784, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    // C6-A5-G5
+                        // Section 2: More active chimes
+                        880, 0, 1047, 0, 880, 0, 784, 0, 660, 0, 0, 0, 0, 0, 0, 0,
+                        1047, 0, 880, 0, 784, 0, 660, 0, 784, 0, 0, 0, 0, 0, 0, 0,
+                        880, 0, 1047, 0, 1175, 0, 1047, 0, 880, 0, 0, 0, 0, 0, 0, 0,
+                        1047, 0, 880, 0, 784, 0, 880, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        // Section 3: Active shimmer
+                        880, 1047, 880, 0, 784, 880, 784, 0, 660, 784, 660, 0, 784, 0, 0, 0,
+                        880, 0, 1047, 0, 880, 0, 784, 0, 660, 0, 784, 0, 880, 0, 0, 0,
+                        784, 0, 880, 0, 1047, 0, 880, 0, 784, 0, 660, 0, 784, 0, 0, 0,
+                        880, 0, 784, 0, 660, 0, 784, 0, 880, 0, 0, 0, 0, 0, 0, 0,
+                        // Section 4: Gentle fade
+                        1047, 0, 0, 0, 880, 0, 0, 0, 784, 0, 0, 0, 0, 0, 0, 0,
+                        880, 0, 0, 0, 784, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        880, 0, 784, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        880, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
                     ]
                 }
             };
