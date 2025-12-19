@@ -576,6 +576,55 @@ const AudioSystem = {
             gain.connect(AudioSystem.sfxGain);
             osc.start();
             osc.stop(ctx.currentTime + 0.08);
+        },
+
+        /**
+         * Go stone placement sound (click on wooden board)
+         */
+        stonePlace() {
+            if (!AudioSystem.sfxEnabled) return;
+            AudioSystem.ensureContext();
+            const ctx = AudioSystem.ctx;
+
+            // High click - the initial stone contact
+            const clickOsc = ctx.createOscillator();
+            const clickGain = ctx.createGain();
+            clickOsc.type = 'sine';
+            clickOsc.frequency.setValueAtTime(1800, ctx.currentTime);
+            clickOsc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.015);
+            clickGain.gain.setValueAtTime(0.3, ctx.currentTime);
+            clickGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.03);
+            clickOsc.connect(clickGain);
+            clickGain.connect(AudioSystem.sfxGain);
+            clickOsc.start();
+            clickOsc.stop(ctx.currentTime + 0.03);
+
+            // Low thunk - the wooden board resonance
+            const thunkOsc = ctx.createOscillator();
+            const thunkGain = ctx.createGain();
+            thunkOsc.type = 'triangle';
+            thunkOsc.frequency.setValueAtTime(180, ctx.currentTime);
+            thunkOsc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.08);
+            thunkGain.gain.setValueAtTime(0.25, ctx.currentTime);
+            thunkGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+            thunkOsc.connect(thunkGain);
+            thunkGain.connect(AudioSystem.sfxGain);
+            thunkOsc.start();
+            thunkOsc.stop(ctx.currentTime + 0.1);
+
+            // Mid-range body - stone settling
+            const bodyOsc = ctx.createOscillator();
+            const bodyGain = ctx.createGain();
+            bodyOsc.type = 'sine';
+            bodyOsc.frequency.setValueAtTime(400, ctx.currentTime + 0.01);
+            bodyOsc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.06);
+            bodyGain.gain.setValueAtTime(0, ctx.currentTime);
+            bodyGain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.01);
+            bodyGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+            bodyOsc.connect(bodyGain);
+            bodyGain.connect(AudioSystem.sfxGain);
+            bodyOsc.start();
+            bodyOsc.stop(ctx.currentTime + 0.08);
         }
     },
 
