@@ -160,27 +160,89 @@
         .move-number-last {
             color: #ff6b6b !important;
         }
-        #statusDisplay {
+        #statusBar {
             margin-top: 15px;
-            padding: 10px 20px;
+            padding: 8px 12px;
             background: #2a2a4a;
             border-radius: 4px;
             display: flex;
-            gap: 30px;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
+            gap: 8px;
+            min-width: 400px;
         }
-        .status-item {
+        .status-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .player-info {
             text-align: center;
+            padding: 4px 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
         }
-        .status-label {
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 5px;
+        .player-info.active {
+            background: #3a3a5a;
+            box-shadow: 0 0 8px rgba(78, 205, 196, 0.3);
         }
-        .status-value {
-            font-size: 20px;
+        .player-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .player-info.active .player-label {
             color: #4ecdc4;
+        }
+        .player-captures {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .black-captures {
+            color: #888;
+        }
+        .white-captures {
+            color: #fff;
+        }
+        .turn-indicator {
+            text-align: center;
+            padding: 4px 16px;
+        }
+        .turn-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .turn-value {
+            font-size: 16px;
+            color: #4ecdc4;
+            font-weight: bold;
+        }
+        .status-button {
+            padding: 6px 12px;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .status-button:disabled {
+            background-color: #3a3a5a;
+            color: #666;
+            cursor: not-allowed;
+        }
+        .status-button.undo {
+            background-color: #4a4a6a;
+        }
+        .status-button.undo:hover:not(:disabled) {
+            background-color: #5a5a7a;
+        }
+        .status-button.pass {
+            background-color: #ff6b6b;
+        }
+        .status-button.pass:hover:not(:disabled) {
+            background-color: #ff5252;
         }
         .board-size-selector {
             margin-bottom: 15px;
@@ -243,32 +305,6 @@
             background-color: #3a3a5a;
             color: #666;
             cursor: not-allowed;
-        }
-        #scoreDisplay {
-            margin-top: 15px;
-            padding: 10px 20px;
-            background: #2a2a4a;
-            border-radius: 4px;
-            display: flex;
-            gap: 30px;
-            justify-content: center;
-        }
-        .score-item {
-            text-align: center;
-        }
-        .score-label {
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 5px;
-        }
-        .score-value {
-            font-size: 20px;
-        }
-        .score-value.black-score {
-            color: #888;
-        }
-        .score-value.white-score {
-            color: #fff;
         }
         .game-over {
             margin-top: 15px;
@@ -345,7 +381,6 @@
 </head>
 <body>
     <a href="index.html" class="back-link">&larr; Back to WebArcade</a>
-    <h1>Go</h1>
 
     <div class="board-size-selector">
         <label for="boardSize">Board:</label>
@@ -370,28 +405,29 @@
 
     <div class="go-board" id="goBoard"></div>
 
-    <div id="statusDisplay">
-        <div class="status-item">
-            <div class="status-label">Current Turn</div>
-            <div class="status-value" id="currentTurn">BLACK</div>
+    <div id="statusBar">
+        <div class="status-section">
+            <button class="status-button undo" id="undoButton" onclick="undoMove()">Undo</button>
+            <div class="player-info active" id="blackInfo">
+                <div class="player-label">Black</div>
+                <div class="player-captures black-captures" id="blackCaptures">0</div>
+            </div>
         </div>
-    </div>
-
-    <div id="scoreDisplay">
-        <div class="score-item">
-            <div class="score-label">Black Captures</div>
-            <div class="score-value black-score" id="blackCaptures">0</div>
+        <div class="turn-indicator">
+            <div class="turn-label">Turn</div>
+            <div class="turn-value" id="currentTurn">BLACK</div>
         </div>
-        <div class="score-item">
-            <div class="score-label">White Captures</div>
-            <div class="score-value white-score" id="whiteCaptures">0</div>
+        <div class="status-section">
+            <div class="player-info" id="whiteInfo">
+                <div class="player-label">White</div>
+                <div class="player-captures white-captures" id="whiteCaptures">0</div>
+            </div>
+            <button class="status-button pass" id="passButton" onclick="passMove()">Pass</button>
         </div>
     </div>
 
     <div class="controls">
-        <button class="button secondary-button" id="undoButton" onclick="undoMove()">Undo</button>
-        <button class="button danger-button" id="passButton" onclick="passMove()">Pass</button>
-        <button class="button primary-button" id="confirmDeadButton" onclick="confirmDeadStones()" style="display: none;">Confirm Dead</button>
+        <button class="button primary-button" id="confirmDeadButton" onclick="confirmDeadStones()" style="display: none;">Confirm Dead Stones</button>
     </div>
 
     <div class="controls">
@@ -883,6 +919,17 @@
 
             undoButton.disabled = moveHistory.length === 0;
             passButton.disabled = gameOver;
+
+            // Update player highlighting
+            const blackInfo = document.getElementById('blackInfo');
+            const whiteInfo = document.getElementById('whiteInfo');
+            if (currentPlayer === 'black') {
+                blackInfo.classList.add('active');
+                whiteInfo.classList.remove('active');
+            } else {
+                blackInfo.classList.remove('active');
+                whiteInfo.classList.add('active');
+            }
         }
 
         function clearTerritoryMarkers() {
