@@ -579,38 +579,51 @@ const AudioSystem = {
         },
 
         /**
-         * Go stone placement sound - sharp clack
+         * Go stone placement sound - crisp clack
          */
         stonePlace() {
             if (!AudioSystem.sfxEnabled) return;
             AudioSystem.ensureContext();
             const ctx = AudioSystem.ctx;
 
-            // Sharp attack click - very short, high frequency
-            const clickOsc = ctx.createOscillator();
-            const clickGain = ctx.createGain();
-            clickOsc.type = 'square';
-            clickOsc.frequency.setValueAtTime(2500, ctx.currentTime);
-            clickOsc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.008);
-            clickGain.gain.setValueAtTime(0.25, ctx.currentTime);
-            clickGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.015);
-            clickOsc.connect(clickGain);
-            clickGain.connect(AudioSystem.sfxGain);
-            clickOsc.start();
-            clickOsc.stop(ctx.currentTime + 0.015);
+            // Primary click - very high freq, instant attack
+            const click1 = ctx.createOscillator();
+            const click1Gain = ctx.createGain();
+            click1.type = 'square';
+            click1.frequency.setValueAtTime(4000, ctx.currentTime);
+            click1.frequency.exponentialRampToValueAtTime(2000, ctx.currentTime + 0.005);
+            click1Gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            click1Gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.008);
+            click1.connect(click1Gain);
+            click1Gain.connect(AudioSystem.sfxGain);
+            click1.start();
+            click1.stop(ctx.currentTime + 0.008);
 
-            // Wood tap - short, mid-high resonance
-            const tapOsc = ctx.createOscillator();
-            const tapGain = ctx.createGain();
-            tapOsc.type = 'triangle';
-            tapOsc.frequency.setValueAtTime(800, ctx.currentTime);
-            tapOsc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.025);
-            tapGain.gain.setValueAtTime(0.2, ctx.currentTime);
-            tapGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.04);
-            tapOsc.connect(tapGain);
-            tapGain.connect(AudioSystem.sfxGain);
-            tapOsc.start();
-            tapOsc.stop(ctx.currentTime + 0.04);
+            // Secondary click - adds texture
+            const click2 = ctx.createOscillator();
+            const click2Gain = ctx.createGain();
+            click2.type = 'sawtooth';
+            click2.frequency.setValueAtTime(3000, ctx.currentTime);
+            click2.frequency.exponentialRampToValueAtTime(1500, ctx.currentTime + 0.006);
+            click2Gain.gain.setValueAtTime(0.12, ctx.currentTime);
+            click2Gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.01);
+            click2.connect(click2Gain);
+            click2Gain.connect(AudioSystem.sfxGain);
+            click2.start();
+            click2.stop(ctx.currentTime + 0.01);
+
+            // Pop transient - the satisfying snap
+            const pop = ctx.createOscillator();
+            const popGain = ctx.createGain();
+            pop.type = 'sine';
+            pop.frequency.setValueAtTime(1200, ctx.currentTime);
+            pop.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.015);
+            popGain.gain.setValueAtTime(0.2, ctx.currentTime);
+            popGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02);
+            pop.connect(popGain);
+            popGain.connect(AudioSystem.sfxGain);
+            pop.start();
+            pop.stop(ctx.currentTime + 0.02);
         }
     },
 
