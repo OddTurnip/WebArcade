@@ -586,13 +586,13 @@ const AudioSystem = {
             AudioSystem.ensureContext();
             const ctx = AudioSystem.ctx;
 
-            // Primary click - very high freq, instant attack
+            // Primary click - square wave is the main clack (boosted)
             const click1 = ctx.createOscillator();
             const click1Gain = ctx.createGain();
             click1.type = 'square';
             click1.frequency.setValueAtTime(4000, ctx.currentTime);
             click1.frequency.exponentialRampToValueAtTime(2000, ctx.currentTime + 0.005);
-            click1Gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            click1Gain.gain.setValueAtTime(0.4, ctx.currentTime);
             click1Gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.008);
             click1.connect(click1Gain);
             click1Gain.connect(AudioSystem.sfxGain);
@@ -605,7 +605,7 @@ const AudioSystem = {
             click2.type = 'sawtooth';
             click2.frequency.setValueAtTime(3000, ctx.currentTime);
             click2.frequency.exponentialRampToValueAtTime(1500, ctx.currentTime + 0.006);
-            click2Gain.gain.setValueAtTime(0.12, ctx.currentTime);
+            click2Gain.gain.setValueAtTime(0.2, ctx.currentTime);
             click2Gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.01);
             click2.connect(click2Gain);
             click2Gain.connect(AudioSystem.sfxGain);
@@ -618,7 +618,7 @@ const AudioSystem = {
             pop.type = 'sine';
             pop.frequency.setValueAtTime(1200, ctx.currentTime);
             pop.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.015);
-            popGain.gain.setValueAtTime(0.2, ctx.currentTime);
+            popGain.gain.setValueAtTime(0.35, ctx.currentTime);
             popGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02);
             pop.connect(popGain);
             popGain.connect(AudioSystem.sfxGain);

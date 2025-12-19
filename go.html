@@ -766,6 +766,9 @@
             const enemyColor = currentPlayer === 'black' ? 'white' : 'black';
             const capturedStones = checkCaptures(row, col, enemyColor);
 
+            // Always play stone placement sound
+            AudioSystem.sfx.stonePlace();
+
             if (capturedStones.length > 0) {
                 AudioSystem.sfx.explosion();
                 if (currentPlayer === 'black') {
@@ -775,8 +778,6 @@
                     whiteCaptures += capturedStones.length;
                     document.getElementById('whiteCaptures').textContent = whiteCaptures;
                 }
-            } else {
-                AudioSystem.sfx.stonePlace();
             }
 
             let newKoPosition = null;
