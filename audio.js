@@ -579,7 +579,7 @@ const AudioSystem = {
         },
 
         /**
-         * Go stone placement sound - crisp clack
+         * Go stone placement sound - wooden clack
          */
         stonePlace() {
             if (!AudioSystem.sfxEnabled) return;
@@ -587,31 +587,31 @@ const AudioSystem = {
             const ctx = AudioSystem.ctx;
             const now = ctx.currentTime;
 
-            // Sharp click - high frequency square wave for the "clack"
-            const click = ctx.createOscillator();
-            const clickGain = ctx.createGain();
-            click.type = 'square';
-            click.frequency.setValueAtTime(3500, now);
-            click.frequency.exponentialRampToValueAtTime(1500, now + 0.03);
-            clickGain.gain.setValueAtTime(0.25, now);
-            clickGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-            click.connect(clickGain);
-            clickGain.connect(AudioSystem.sfxGain);
-            click.start(now);
-            click.stop(now + 0.05);
+            // Clack - mid-frequency for wooden board impact
+            const clack = ctx.createOscillator();
+            const clackGain = ctx.createGain();
+            clack.type = 'triangle';
+            clack.frequency.setValueAtTime(1200, now);
+            clack.frequency.exponentialRampToValueAtTime(400, now + 0.025);
+            clackGain.gain.setValueAtTime(0.35, now);
+            clackGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+            clack.connect(clackGain);
+            clackGain.connect(AudioSystem.sfxGain);
+            clack.start(now);
+            clack.stop(now + 0.05);
 
-            // Body thunk - adds weight to the click
-            const thunk = ctx.createOscillator();
-            const thunkGain = ctx.createGain();
-            thunk.type = 'triangle';
-            thunk.frequency.setValueAtTime(800, now);
-            thunk.frequency.exponentialRampToValueAtTime(200, now + 0.04);
-            thunkGain.gain.setValueAtTime(0.2, now);
-            thunkGain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
-            thunk.connect(thunkGain);
-            thunkGain.connect(AudioSystem.sfxGain);
-            thunk.start(now);
-            thunk.stop(now + 0.06);
+            // Thud - low body for stone weight
+            const thud = ctx.createOscillator();
+            const thudGain = ctx.createGain();
+            thud.type = 'sine';
+            thud.frequency.setValueAtTime(300, now);
+            thud.frequency.exponentialRampToValueAtTime(100, now + 0.04);
+            thudGain.gain.setValueAtTime(0.3, now);
+            thudGain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+            thud.connect(thudGain);
+            thudGain.connect(AudioSystem.sfxGain);
+            thud.start(now);
+            thud.stop(now + 0.06);
         }
     },
 
