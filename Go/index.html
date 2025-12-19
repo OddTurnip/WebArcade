@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Board</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #2c3e50;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            color: #333;
+            margin: 0 0 20px 0;
+            font-size: 2.5em;
+        }
+        .go-board {
+            background-color: #deb887;
+            border: 3px solid #8b4513;
+            border-radius: 8px;
+            padding: 55px 55px 55px 55px;
+            display: inline-block;
+            position: relative;
+        }
+        .coordinate-label {
+            position: absolute;
+            font-size: 12px;
+            font-weight: bold;
+            color: #5b3a14;
+            width: 20px;
+            text-align: center;
+        }
+        .coord-top {
+            top: 20px;
+        }
+        .coord-bottom {
+            bottom: 20px;
+        }
+        .coord-left {
+            left: 10px;
+            text-align: right;
+            width: 25px;
+        }
+        .coord-right {
+            right: 10px;
+            text-align: left;
+            width: 25px;
+        }
+        svg {
+            display: block;
+        }
+        .board-lines {
+            stroke: #000;
+            stroke-width: 1;
+            shape-rendering: crispEdges;
+        }
+        .star-point {
+            fill: #000;
+        }
+        .intersection-button {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .stone {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 1px solid #333;
+            position: relative;
+        }
+        .black-stone {
+            background: radial-gradient(circle at 30% 30%, #666, #000);
+        }
+        .white-stone {
+            background: radial-gradient(circle at 30% 30%, #fff, #ddd);
+        }
+        .territory-marker {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            opacity: 0.7;
+        }
+        .black-territory {
+            background-color: #333;
+        }
+        .white-territory {
+            background-color: #f0f0f0;
+            border: 1px solid #999;
+        }
+        .dead-stone {
+            opacity: 0.5;
+        }
+        .dead-stone::after {
+            content: '✕';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: red;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .stone-marking-mode {
+            cursor: pointer;
+        }
+        .last-move-indicator {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: red;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        .move-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        .move-number-black {
+            color: white;
+        }
+        .move-number-white {
+            color: black;
+        }
+        .move-number-last {
+            color: red !important;
+        }
+        .turn-indicator {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #333;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        .button {
+            padding: 10px 20px;
+            font-size: 1em;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin: 0 5px;
+        }
+        .undo-button {
+            background-color: #3498db;
+        }
+        .undo-button:hover {
+            background-color: #2980b9;
+        }
+        .pass-button {
+            background-color: #e74c3c;
+        }
+        .pass-button:hover {
+            background-color: #c0392b;
+        }
+        .button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .game-over {
+            margin-top: 20px;
+            font-size: 1.5em;
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .score-display {
+            margin-top: 20px;
+            font-size: 1.1em;
+            color: #333;
+        }
+        .score-item {
+            margin: 5px 0;
+        }
+        .final-scores {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+        }
+        .winner {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .board-size-selector {
+            margin-bottom: 20px;
+        }
+        .board-size-selector label {
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .board-size-selector select {
+            padding: 5px 10px;
+            font-size: 1em;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="boardTitle">Go Board</h1>
+        <div class="board-size-selector">
+            <label for="boardSize">Board Size:</label>
+            <select id="boardSize" onchange="changeBoardSize()">
+                <option value="9">9×9</option>
+                <option value="13">13×13</option>
+                <option value="19" selected>19×19</option>
+            </select>
+            <label for="handicap" style="margin-left: 20px;">Handicap:</label>
+            <select id="handicap" onchange="setHandicap()">
+                <option value="0" selected>None</option>
+                <option value="2">2 stones</option>
+                <option value="3">3 stones</option>
+                <option value="4">4 stones</option>
+                <option value="5">5 stones</option>
+                <option value="6">6 stones</option>
+                <option value="7">7 stones</option>
+                <option value="8">8 stones</option>
+                <option value="9">9 stones</option>
+            </select>
+        </div>
+        <div class="go-board" id="goBoard">
+        </div>
+        <div class="turn-indicator">
+            Current turn: <span id="currentTurn">Black</span>
+        </div>
+        <div class="controls">
+            <button class="button undo-button" onclick="toggleMoveNumbers()">Toggle Move Numbers</button>
+            <button class="button undo-button" id="undoButton" onclick="undoMove()">Undo Move</button>
+            <button class="button pass-button" id="passButton" onclick="passMove()">Pass</button>
+            <button class="button undo-button" id="confirmDeadButton" onclick="confirmDeadStones()" style="display: none;">Confirm Dead Stones</button>
+        </div>
+        <div class="controls">
+            <button class="button undo-button" onclick="newGame()">New Game</button>
+            <button class="button undo-button" onclick="saveGame()">Save Game</button>
+            <button class="button pass-button" onclick="document.getElementById('loadInput').click()">Load Game</button>
+            <input type="file" id="loadInput" accept=".json" style="display: none;" onchange="loadGame(event)">
+        </div>
+        <div class="score-display">
+            <div class="score-item">Black Captures: <span id="blackCaptures">0</span></div>
+            <div class="score-item">White Captures: <span id="whiteCaptures">0</span></div>
+        </div>
+        <div class="game-over" id="gameOver" style="display: none;">
+            Game Over! Both players have passed.
+        </div>
+        <div class="final-scores" id="finalScores" style="display: none;">
+            <h3 id="scoreTitle">Preliminary Scores</h3>
+            <div class="score-item">Black: <span id="blackScore">0</span> (Territory: <span id="blackTerritory">0</span> + Captures: <span id="blackCapturesF">0</span>)</div>
+            <div class="score-item">White: <span id="whiteScore">0</span> (Territory: <span id="whiteTerritory">0</span> + Captures: <span id="whiteCapturesF">0</span> + Komi: 6.5)</div>
+            <div class="winner" id="winner"></div>
+        </div>
+    </div>
+
+    <script>
+        let boardSize = 19;
+        let currentPlayer = 'black';
+        let board = Array(19).fill().map(() => Array(19).fill(null));
+        let buttons = Array(19).fill().map(() => Array(19).fill(null));
+        let koPosition = null;
+        let moveHistory = [];
+        let consecutivePasses = 0;
+        let gameOver = false;
+        let blackCaptures = 0;
+        let whiteCaptures = 0;
+        const KOMI = 6.5; // Standard komi for white
+        let deadStones = new Set();
+        let deadStonesConfirmed = false;
+        let showMoveNumbers = false;
+        let lastMove = null;
+        let moveNumber = 0;
+        let boardMoveNumbers = Array(19).fill().map(() => Array(19).fill(0));
+        let handicapStones = 0;
+
+        function handleButtonClick(row, col) {
+            if (gameOver && !deadStonesConfirmed && board[row][col] !== null) {
+                toggleDeadStone(row, col);
+            } else if (!gameOver) {
+                placeStone(row, col);
+            }
+        }
+
+        function createBoard() {
+            const boardElement = document.getElementById('goBoard');
+            
+            // Clear existing board content
+            boardElement.innerHTML = '';
+            
+            const boardPixelSize = (boardSize - 1) * 30;
+            
+            // Create SVG with grid lines
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', boardPixelSize + 1);
+            svg.setAttribute('height', boardPixelSize + 1);
+            
+            // Create grid lines group
+            const linesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            linesGroup.setAttribute('class', 'board-lines');
+            
+            // Horizontal lines
+            for (let i = 0; i < boardSize; i++) {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', '0');
+                line.setAttribute('y1', i * 30);
+                line.setAttribute('x2', (boardSize - 1) * 30);
+                line.setAttribute('y2', i * 30);
+                linesGroup.appendChild(line);
+            }
+            
+            // Vertical lines
+            for (let i = 0; i < boardSize; i++) {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', i * 30);
+                line.setAttribute('y1', '0');
+                line.setAttribute('x2', i * 30);
+                line.setAttribute('y2', (boardSize - 1) * 30);
+                linesGroup.appendChild(line);
+            }
+            
+            svg.appendChild(linesGroup);
+            
+            // Add star points
+            const starGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            starGroup.setAttribute('class', 'star-point');
+            
+            const starPoints = getStarPoints(boardSize);
+            for (const [row, col] of starPoints) {
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', col * 30);
+                circle.setAttribute('cy', row * 30);
+                circle.setAttribute('r', '4');
+                starGroup.appendChild(circle);
+            }
+            
+            svg.appendChild(starGroup);
+            boardElement.appendChild(svg);
+            
+            // Add coordinate labels
+            const letters = 'ABCDEFGHJKLMNOPQRST'; // Note: 'I' is skipped in Go notation
+            
+            // Top and bottom coordinates
+            for (let col = 0; col < boardSize; col++) {
+                // Top
+                const topLabel = document.createElement('div');
+                topLabel.className = 'coordinate-label coord-top';
+                topLabel.style.left = `${col * 30 + 45}px`;
+                topLabel.textContent = letters[col];
+                boardElement.appendChild(topLabel);
+                
+                // Bottom
+                const bottomLabel = document.createElement('div');
+                bottomLabel.className = 'coordinate-label coord-bottom';
+                bottomLabel.style.left = `${col * 30 + 45}px`;
+                bottomLabel.textContent = letters[col];
+                boardElement.appendChild(bottomLabel);
+            }
+            
+            // Left and right coordinates
+            for (let row = 0; row < boardSize; row++) {
+                // Left
+                const leftLabel = document.createElement('div');
+                leftLabel.className = 'coordinate-label coord-left';
+                leftLabel.style.top = `${row * 30 + 50}px`;
+                leftLabel.textContent = boardSize - row;
+                boardElement.appendChild(leftLabel);
+                
+                // Right
+                const rightLabel = document.createElement('div');
+                rightLabel.className = 'coordinate-label coord-right';
+                rightLabel.style.top = `${row * 30 + 50}px`;
+                rightLabel.textContent = boardSize - row;
+                boardElement.appendChild(rightLabel);
+            }
+            
+            // Create buttons for intersections
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize; col++) {
+                    const button = document.createElement('button');
+                    button.className = 'intersection-button';
+                    button.style.left = `${col * 30 + 40}px`;
+                    button.style.top = `${row * 30 + 40}px`;
+                    button.dataset.row = row;
+                    button.dataset.col = col;
+                    
+                    button.addEventListener('click', () => handleButtonClick(row, col));
+                    boardElement.appendChild(button);
+                    buttons[row][col] = button;
+                }
+            }
+        }
+
+        function getStarPoints(size) {
+            if (size === 9) {
+                return [[2, 2], [2, 6], [4, 4], [6, 2], [6, 6]];
+            } else if (size === 13) {
+                return [[3, 3], [3, 9], [6, 6], [9, 3], [9, 9]];
+            } else if (size === 19) {
+                return [
+                    [3, 3], [3, 9], [3, 15],
+                    [9, 3], [9, 9], [9, 15],
+                    [15, 3], [15, 9], [15, 15]
+                ];
+            }
+            return [];
+        }
+
+        function getHandicapPositions(size, handicap) {
+            if (handicap === 0) return [];
+            
+            if (size === 9) {
+                const positions = [[2, 6], [6, 2], [6, 6], [2, 2], [4, 4], [2, 4], [6, 4], [4, 2], [4, 6]];
+                return positions.slice(0, handicap);
+            } else if (size === 13) {
+                const positions = [[3, 9], [9, 3], [9, 9], [3, 3], [6, 6], [3, 6], [9, 6], [6, 3], [6, 9]];
+                return positions.slice(0, handicap);
+            } else if (size === 19) {
+                const positions = [
+                    [3, 15], [15, 3], [15, 15], [3, 3], [9, 9], 
+                    [3, 9], [15, 9], [9, 3], [9, 15]
+                ];
+                return positions.slice(0, handicap);
+            }
+            return [];
+        }
+
+        function setHandicap() {
+            if (moveNumber > 0) {
+                if (confirm('Cannot set handicap after moves have been played. Start a new game?')) {
+                    newGame();
+                } else {
+                    // Reset handicap selector to current value
+                    document.getElementById('handicap').value = handicapStones;
+                }
+                return;
+            }
+            
+            // If no moves have been played, just apply the handicap
+            newGame();
+        }
+
+        function getNeighbors(row, col) {
+            const neighbors = [];
+            if (row > 0) neighbors.push([row - 1, col]);
+            if (row < boardSize - 1) neighbors.push([row + 1, col]);
+            if (col > 0) neighbors.push([row, col - 1]);
+            if (col < boardSize - 1) neighbors.push([row, col + 1]);
+            return neighbors;
+        }
+
+        function getGroup(row, col, color, visited = new Set()) {
+            const key = `${row},${col}`;
+            if (visited.has(key)) return [];
+            if (board[row][col] !== color) return [];
+            
+            visited.add(key);
+            const group = [[row, col]];
+            
+            for (const [nRow, nCol] of getNeighbors(row, col)) {
+                if (board[nRow][nCol] === color) {
+                    group.push(...getGroup(nRow, nCol, color, visited));
+                }
+            }
+            
+            return group;
+        }
+
+        function hasLiberties(group) {
+            for (const [row, col] of group) {
+                for (const [nRow, nCol] of getNeighbors(row, col)) {
+                    if (board[nRow][nCol] === null) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function removeGroup(group) {
+            for (const [row, col] of group) {
+                board[row][col] = null;
+                const button = buttons[row][col];
+                while (button.firstChild) {
+                    button.removeChild(button.firstChild);
+                }
+            }
+        }
+
+        function checkCaptures(lastMoveRow, lastMoveCol, enemyColor) {
+            const capturedGroups = [];
+            const checked = new Set();
+            let capturedStones = [];
+            
+            for (const [nRow, nCol] of getNeighbors(lastMoveRow, lastMoveCol)) {
+                const key = `${nRow},${nCol}`;
+                if (board[nRow][nCol] === enemyColor && !checked.has(key)) {
+                    const group = getGroup(nRow, nCol, enemyColor);
+                    if (group.length > 0 && !hasLiberties(group)) {
+                        capturedGroups.push(group);
+                        capturedStones.push(...group);
+                    }
+                    group.forEach(([r, c]) => checked.add(`${r},${c}`));
+                }
+            }
+            
+            for (const group of capturedGroups) {
+                removeGroup(group);
+            }
+            
+            return capturedStones;
+        }
+
+        function saveGameState() {
+            return {
+                boardSize: boardSize,
+                handicapStones: handicapStones,
+                board: board.map(row => [...row]),
+                currentPlayer: currentPlayer,
+                koPosition: koPosition ? {...koPosition} : null,
+                consecutivePasses: consecutivePasses,
+                gameOver: gameOver,
+                blackCaptures: blackCaptures,
+                whiteCaptures: whiteCaptures,
+                lastMove: lastMove ? {...lastMove} : null,
+                moveNumber: moveNumber,
+                boardMoveNumbers: boardMoveNumbers.map(row => [...row])
+            };
+        }
+
+        function placeStone(row, col) {
+            if (board[row][col] !== null) return;
+            
+            // Don't allow moves after game is over
+            if (gameOver) {
+                alert('Game is over! Both players have passed.');
+                return;
+            }
+            
+            // Check for ko rule violation
+            if (koPosition && koPosition.row === row && koPosition.col === col) {
+                alert('Invalid move: Ko rule violation! Cannot immediately recapture.');
+                return;
+            }
+            
+            // Save state before making the move
+            const gameState = saveGameState();
+            
+            board[row][col] = currentPlayer;
+            moveNumber++;
+            boardMoveNumbers[row][col] = moveNumber;
+            
+            const button = buttons[row][col];
+            const stone = document.createElement('div');
+            stone.className = `stone ${currentPlayer}-stone`;
+            button.appendChild(stone);
+            
+            // Add move number if enabled
+            if (showMoveNumbers) {
+                const moveNumDiv = document.createElement('div');
+                moveNumDiv.className = `move-number move-number-${currentPlayer}`;
+                moveNumDiv.textContent = moveNumber;
+                button.appendChild(moveNumDiv);
+            }
+            
+            // Update last move indicator
+            updateLastMoveIndicator(row, col);
+            
+            const enemyColor = currentPlayer === 'black' ? 'white' : 'black';
+            const capturedStones = checkCaptures(row, col, enemyColor);
+            
+            // Update capture counts
+            if (capturedStones.length > 0) {
+                if (currentPlayer === 'black') {
+                    blackCaptures += capturedStones.length;
+                    document.getElementById('blackCaptures').textContent = blackCaptures;
+                } else {
+                    whiteCaptures += capturedStones.length;
+                    document.getElementById('whiteCaptures').textContent = whiteCaptures;
+                }
+            }
+            
+            // Check for potential ko situation
+            let newKoPosition = null;
+            if (capturedStones.length === 1) {
+                const [capRow, capCol] = capturedStones[0];
+                const myGroup = getGroup(row, col, currentPlayer);
+                
+                // Ko occurs when: single stone captures single stone, and capturing stone would be capturable
+                if (myGroup.length === 1) {
+                    // Check if the captured position would immediately recapture our stone
+                    const wouldRecapture = getNeighbors(capRow, capCol).every(([nRow, nCol]) => {
+                        return board[nRow][nCol] === currentPlayer || (nRow === row && nCol === col);
+                    });
+                    
+                    if (wouldRecapture) {
+                        newKoPosition = { row: capRow, col: capCol };
+                    }
+                }
+            }
+            
+            if (capturedStones.length === 0) {
+                const myGroup = getGroup(row, col, currentPlayer);
+                if (!hasLiberties(myGroup)) {
+                    removeGroup(myGroup);
+                    alert('Invalid move: suicide is not allowed!');
+                    koPosition = null;
+                    return;
+                }
+            }
+            
+            // Save the move to history
+            moveHistory.push({
+                ...gameState,
+                move: { row, col }
+            });
+            
+            // Reset consecutive passes when a stone is placed
+            consecutivePasses = 0;
+            
+            koPosition = newKoPosition;
+            currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+            document.getElementById('currentTurn').textContent = 
+                currentPlayer === 'black' ? 'Black' : 'White';
+            
+            // Update button states
+            updateButtons();
+        }
+
+        function restoreBoard(savedBoard) {
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize; col++) {
+                    board[row][col] = savedBoard[row][col];
+                    const button = buttons[row][col];
+                    
+                    // Clear existing content
+                    while (button.firstChild) {
+                        button.removeChild(button.firstChild);
+                    }
+                    
+                    // Add stone if present in saved state
+                    if (board[row][col] !== null) {
+                        const stone = document.createElement('div');
+                        stone.className = `stone ${board[row][col]}-stone`;
+                        button.appendChild(stone);
+                        
+                        // Add move number if enabled
+                        if (showMoveNumbers && boardMoveNumbers[row][col] > 0) {
+                            const moveNumDiv = document.createElement('div');
+                            moveNumDiv.className = `move-number move-number-${board[row][col]}`;
+                            moveNumDiv.textContent = boardMoveNumbers[row][col];
+                            button.appendChild(moveNumDiv);
+                        }
+                    }
+                }
+            }
+        }
+
+        function undoMove() {
+            if (moveHistory.length === 0) return;
+            
+            const previousState = moveHistory.pop();
+            
+            // Restore game state
+            restoreBoard(previousState.board);
+            currentPlayer = previousState.currentPlayer;
+            koPosition = previousState.koPosition;
+            consecutivePasses = previousState.consecutivePasses;
+            gameOver = previousState.gameOver;
+            blackCaptures = previousState.blackCaptures;
+            whiteCaptures = previousState.whiteCaptures;
+            lastMove = previousState.lastMove;
+            moveNumber = previousState.moveNumber;
+            boardMoveNumbers = previousState.boardMoveNumbers;
+            
+            // Update UI
+            document.getElementById('currentTurn').textContent = 
+                currentPlayer === 'black' ? 'Black' : 'White';
+            document.getElementById('blackCaptures').textContent = blackCaptures;
+            document.getElementById('whiteCaptures').textContent = whiteCaptures;
+            
+            // Hide/show game over message and scores
+            document.getElementById('gameOver').style.display = gameOver ? 'block' : 'none';
+            document.getElementById('finalScores').style.display = 'none';
+            document.getElementById('confirmDeadButton').style.display = 'none';
+            
+            // Clear territory markers and dead stone marks when undoing
+            clearTerritoryMarkers();
+            deadStones.clear();
+            deadStonesConfirmed = false;
+            document.getElementById('scoreTitle').textContent = 'Preliminary Scores';
+            
+            // Restore last move indicator
+            if (lastMove) {
+                updateLastMoveIndicator(lastMove.row, lastMove.col);
+            }
+            
+            updateButtons();
+        }
+
+        function passMove() {
+            if (gameOver) {
+                alert('Game is over! Both players have passed.');
+                return;
+            }
+            
+            // Save state before pass
+            const gameState = saveGameState();
+            moveHistory.push({
+                ...gameState,
+                move: { pass: true }
+            });
+            
+            consecutivePasses++;
+            
+            // Check if both players have passed
+            if (consecutivePasses >= 2) {
+                gameOver = true;
+                document.getElementById('gameOver').style.display = 'block';
+                document.getElementById('confirmDeadButton').style.display = 'inline-block';
+                calculateFinalScores();
+            }
+            
+            // Switch players
+            currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+            document.getElementById('currentTurn').textContent = 
+                currentPlayer === 'black' ? 'Black' : 'White';
+            
+            updateButtons();
+        }
+
+        function updateButtons() {
+            const undoButton = document.getElementById('undoButton');
+            const passButton = document.getElementById('passButton');
+            
+            undoButton.disabled = moveHistory.length === 0;
+            passButton.disabled = gameOver;
+        }
+
+        function clearTerritoryMarkers() {
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize; col++) {
+                    const button = buttons[row][col];
+                    // Remove any territory markers
+                    const markers = button.querySelectorAll('.territory-marker');
+                    markers.forEach(marker => marker.remove());
+                }
+            }
+        }
+
+        function calculateTerritory() {
+            const territory = { black: 0, white: 0 };
+            const checked = Array(boardSize).fill().map(() => Array(boardSize).fill(false));
+            
+            // Clear any existing territory markers first
+            clearTerritoryMarkers();
+            
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize; col++) {
+                    if (board[row][col] === null && !checked[row][col]) {
+                        const emptyRegion = [];
+                        const surroundingColors = new Set();
+                        
+                        // Find all connected empty points and what colors surround them
+                        function floodFill(r, c) {
+                            if (r < 0 || r >= boardSize || c < 0 || c >= boardSize || checked[r][c]) return;
+                            
+                            if (board[r][c] === null) {
+                                checked[r][c] = true;
+                                emptyRegion.push([r, c]);
+                                
+                                // Check all neighbors
+                                floodFill(r - 1, c);
+                                floodFill(r + 1, c);
+                                floodFill(r, c - 1);
+                                floodFill(r, c + 1);
+                            } else {
+                                // Found a stone, record its color
+                                surroundingColors.add(board[r][c]);
+                            }
+                        }
+                        
+                        floodFill(row, col);
+                        
+                        // If region is surrounded by only one color, it's territory for that color
+                        if (surroundingColors.size === 1) {
+                            const owner = surroundingColors.values().next().value;
+                            territory[owner] += emptyRegion.length;
+                            
+                            // Add visual markers for territory
+                            for (const [r, c] of emptyRegion) {
+                                const button = buttons[r][c];
+                                const marker = document.createElement('div');
+                                marker.className = `territory-marker ${owner}-territory`;
+                                button.appendChild(marker);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return territory;
+        }
+
+        function calculateFinalScores() {
+            const territory = calculateTerritory();
+            
+            // Calculate final scores
+            const blackScore = territory.black + blackCaptures;
+            const whiteScore = territory.white + whiteCaptures + KOMI;
+            
+            // Update score display
+            document.getElementById('blackTerritory').textContent = territory.black;
+            document.getElementById('whiteTerritory').textContent = territory.white;
+            document.getElementById('blackCapturesF').textContent = blackCaptures;
+            document.getElementById('whiteCapturesF').textContent = whiteCaptures;
+            document.getElementById('blackScore').textContent = blackScore;
+            document.getElementById('whiteScore').textContent = whiteScore.toFixed(1);
+            
+            // Determine winner
+            let winnerText;
+            if (blackScore > whiteScore) {
+                winnerText = `Black wins by ${(blackScore - whiteScore).toFixed(1)} points!`;
+            } else if (whiteScore > blackScore) {
+                winnerText = `White wins by ${(whiteScore - blackScore).toFixed(1)} points!`;
+            } else {
+                winnerText = 'The game is a tie!';
+            }
+            
+            document.getElementById('winner').textContent = winnerText;
+            document.getElementById('finalScores').style.display = 'block';
+        }
+
+        function toggleDeadStone(row, col) {
+            const key = `${row},${col}`;
+            const group = getGroup(row, col, board[row][col]);
+            
+            // Toggle all stones in the group
+            for (const [r, c] of group) {
+                const stoneKey = `${r},${c}`;
+                const button = buttons[r][c];
+                const stone = button.querySelector('.stone');
+                
+                if (deadStones.has(stoneKey)) {
+                    deadStones.delete(stoneKey);
+                    stone.classList.remove('dead-stone');
+                } else {
+                    deadStones.add(stoneKey);
+                    stone.classList.add('dead-stone');
+                }
+            }
+            
+            // Recalculate scores with dead stones marked
+            calculateFinalScores();
+        }
+
+        function confirmDeadStones() {
+            // Remove dead stones from the board and add to captures
+            for (const key of deadStones) {
+                const [row, col] = key.split(',').map(Number);
+                const color = board[row][col];
+                
+                if (color === 'black') {
+                    whiteCaptures++;
+                } else {
+                    blackCaptures++;
+                }
+                
+                // Remove the stone from board
+                board[row][col] = null;
+                const button = buttons[row][col];
+                while (button.firstChild) {
+                    button.removeChild(button.firstChild);
+                }
+            }
+            
+            // Update capture display
+            document.getElementById('blackCaptures').textContent = blackCaptures;
+            document.getElementById('whiteCaptures').textContent = whiteCaptures;
+            
+            // Clear dead stones set
+            deadStones.clear();
+            deadStonesConfirmed = true;
+            
+            // Hide confirm button
+            document.getElementById('confirmDeadButton').style.display = 'none';
+            
+            // Update title to Final Scores
+            document.getElementById('scoreTitle').textContent = 'Final Scores';
+            
+            // Recalculate final scores
+            calculateFinalScores();
+        }
+
+        function updateLastMoveIndicator(row, col) {
+            // Remove previous last move indicator/styling
+            if (lastMove) {
+                const prevIndicator = buttons[lastMove.row][lastMove.col].querySelector('.last-move-indicator');
+                if (prevIndicator) prevIndicator.remove();
+                
+                const prevMoveNum = buttons[lastMove.row][lastMove.col].querySelector('.move-number');
+                if (prevMoveNum) prevMoveNum.classList.remove('move-number-last');
+            }
+            
+            // If move numbers are shown, make the last move number red
+            const moveNumDiv = buttons[row][col].querySelector('.move-number');
+            if (moveNumDiv && showMoveNumbers) {
+                moveNumDiv.classList.add('move-number-last');
+            } else if (!showMoveNumbers) {
+                // Only add the dot indicator if move numbers are NOT shown
+                const indicator = document.createElement('div');
+                indicator.className = 'last-move-indicator';
+                buttons[row][col].appendChild(indicator);
+            }
+            
+            lastMove = { row, col };
+        }
+
+        function toggleMoveNumbers() {
+            showMoveNumbers = !showMoveNumbers;
+            
+            // Update all stones with move numbers
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize; col++) {
+                    if (board[row][col] !== null && boardMoveNumbers[row][col] > 0) {
+                        const button = buttons[row][col];
+                        const existingNum = button.querySelector('.move-number');
+                        
+                        if (showMoveNumbers && !existingNum) {
+                            const moveNumDiv = document.createElement('div');
+                            moveNumDiv.className = `move-number move-number-${board[row][col]}`;
+                            moveNumDiv.textContent = boardMoveNumbers[row][col];
+                            // Check if this is the last move
+                            if (lastMove && lastMove.row === row && lastMove.col === col) {
+                                moveNumDiv.classList.add('move-number-last');
+                            }
+                            button.appendChild(moveNumDiv);
+                        } else if (!showMoveNumbers && existingNum) {
+                            existingNum.remove();
+                        }
+                    }
+                }
+            }
+            
+            // Update last move indicator based on current mode
+            if (lastMove) {
+                if (showMoveNumbers) {
+                    // Remove dot indicator if it exists
+                    const indicator = buttons[lastMove.row][lastMove.col].querySelector('.last-move-indicator');
+                    if (indicator) indicator.remove();
+                    
+                    // Make move number red
+                    const moveNum = buttons[lastMove.row][lastMove.col].querySelector('.move-number');
+                    if (moveNum) moveNum.classList.add('move-number-last');
+                } else {
+                    // Add dot indicator if it doesn't exist
+                    const existingIndicator = buttons[lastMove.row][lastMove.col].querySelector('.last-move-indicator');
+                    if (!existingIndicator) {
+                        const indicator = document.createElement('div');
+                        indicator.className = 'last-move-indicator';
+                        buttons[lastMove.row][lastMove.col].appendChild(indicator);
+                    }
+                }
+            }
+        }
+
+        function saveGame() {
+            const gameState = {
+                boardSize: boardSize,
+                handicapStones: handicapStones,
+                board: board,
+                currentPlayer: currentPlayer,
+                koPosition: koPosition,
+                moveHistory: moveHistory,
+                consecutivePasses: consecutivePasses,
+                gameOver: gameOver,
+                blackCaptures: blackCaptures,
+                whiteCaptures: whiteCaptures,
+                deadStones: Array.from(deadStones),
+                deadStonesConfirmed: deadStonesConfirmed,
+                lastMove: lastMove,
+                moveNumber: moveNumber,
+                boardMoveNumbers: boardMoveNumbers
+            };
+            
+            const json = JSON.stringify(gameState, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `go-game-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function loadGame(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const gameState = JSON.parse(e.target.result);
+                    
+                    // Restore board size first
+                    boardSize = gameState.boardSize || 19;
+                    document.getElementById('boardSize').value = boardSize;
+                    document.getElementById('boardTitle').textContent = `${boardSize}×${boardSize} Go Board`;
+                    
+                    // Restore handicap
+                    handicapStones = gameState.handicapStones || 0;
+                    document.getElementById('handicap').value = handicapStones;
+                    
+                    // Restore game state
+                    board = gameState.board;
+                    buttons = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
+                    currentPlayer = gameState.currentPlayer;
+                    koPosition = gameState.koPosition;
+                    moveHistory = gameState.moveHistory;
+                    consecutivePasses = gameState.consecutivePasses;
+                    gameOver = gameState.gameOver;
+                    blackCaptures = gameState.blackCaptures;
+                    whiteCaptures = gameState.whiteCaptures;
+                    deadStones = new Set(gameState.deadStones || []);
+                    deadStonesConfirmed = gameState.deadStonesConfirmed || false;
+                    lastMove = gameState.lastMove;
+                    moveNumber = gameState.moveNumber || 0;
+                    boardMoveNumbers = gameState.boardMoveNumbers || Array(boardSize).fill().map(() => Array(boardSize).fill(0));
+                    
+                    // Rebuild the board display
+                    restoreBoard(board);
+                    
+                    // Restore last move indicator
+                    if (lastMove) {
+                        updateLastMoveIndicator(lastMove.row, lastMove.col);
+                    }
+                    
+                    // Update UI
+                    document.getElementById('currentTurn').textContent = 
+                        currentPlayer === 'black' ? 'Black' : 'White';
+                    document.getElementById('blackCaptures').textContent = blackCaptures;
+                    document.getElementById('whiteCaptures').textContent = whiteCaptures;
+                    document.getElementById('gameOver').style.display = gameOver ? 'block' : 'none';
+                    document.getElementById('confirmDeadButton').style.display = 
+                        gameOver && !deadStonesConfirmed ? 'inline-block' : 'none';
+                    
+                    if (gameOver) {
+                        calculateFinalScores();
+                        document.getElementById('scoreTitle').textContent = 
+                            deadStonesConfirmed ? 'Final Scores' : 'Preliminary Scores';
+                    }
+                    
+                    updateButtons();
+                    
+                    // Reset file input
+                    event.target.value = '';
+                } catch (error) {
+                    alert('Error loading game file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function newGame() {
+            // Reset game state but keep board size and handicap settings
+            board = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
+            boardMoveNumbers = Array(boardSize).fill().map(() => Array(boardSize).fill(0));
+            koPosition = null;
+            moveHistory = [];
+            consecutivePasses = 0;
+            gameOver = false;
+            blackCaptures = 0;
+            whiteCaptures = 0;
+            deadStones = new Set();
+            deadStonesConfirmed = false;
+            lastMove = null;
+            moveNumber = 0;
+            
+            // Clear the board visually
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize; col++) {
+                    const button = buttons[row][col];
+                    while (button.firstChild) {
+                        button.removeChild(button.firstChild);
+                    }
+                }
+            }
+            
+            // Apply current handicap setting
+            const handicap = parseInt(document.getElementById('handicap').value);
+            handicapStones = handicap;
+            
+            if (handicap > 0) {
+                const positions = getHandicapPositions(boardSize, handicap);
+                for (const [row, col] of positions) {
+                    board[row][col] = 'black';
+                    const button = buttons[row][col];
+                    const stone = document.createElement('div');
+                    stone.className = 'stone black-stone';
+                    button.appendChild(stone);
+                }
+                currentPlayer = 'white';
+                document.getElementById('currentTurn').textContent = 'White';
+            } else {
+                currentPlayer = 'black';
+                document.getElementById('currentTurn').textContent = 'Black';
+            }
+            
+            // Update UI
+            document.getElementById('blackCaptures').textContent = '0';
+            document.getElementById('whiteCaptures').textContent = '0';
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('finalScores').style.display = 'none';
+            document.getElementById('confirmDeadButton').style.display = 'none';
+            
+            updateButtons();
+        }
+
+        function changeBoardSize() {
+            const newSize = parseInt(document.getElementById('boardSize').value);
+            boardSize = newSize;
+            
+            // Reset handicap
+            handicapStones = 0;
+            document.getElementById('handicap').value = '0';
+            
+            // Reset game state
+            board = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
+            buttons = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
+            boardMoveNumbers = Array(boardSize).fill().map(() => Array(boardSize).fill(0));
+            koPosition = null;
+            moveHistory = [];
+            consecutivePasses = 0;
+            gameOver = false;
+            blackCaptures = 0;
+            whiteCaptures = 0;
+            deadStones = new Set();
+            deadStonesConfirmed = false;
+            lastMove = null;
+            moveNumber = 0;
+            currentPlayer = 'black';
+            
+            // Update UI
+            document.getElementById('boardTitle').textContent = `${boardSize}×${boardSize} Go Board`;
+            document.getElementById('currentTurn').textContent = 'Black';
+            document.getElementById('blackCaptures').textContent = '0';
+            document.getElementById('whiteCaptures').textContent = '0';
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('finalScores').style.display = 'none';
+            document.getElementById('confirmDeadButton').style.display = 'none';
+            
+            // Recreate board
+            createBoard();
+            updateButtons();
+        }
+        
+        function initializeGame() {
+            boardSize = parseInt(document.getElementById('boardSize').value);
+            board = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
+            buttons = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
+            boardMoveNumbers = Array(boardSize).fill().map(() => Array(boardSize).fill(0));
+            document.getElementById('boardTitle').textContent = `${boardSize}×${boardSize} Go Board`;
+            createBoard();
+            updateButtons();
+        }
+
+        initializeGame();
+    </script>
+</body>
+</html>
