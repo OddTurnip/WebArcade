@@ -396,6 +396,7 @@
             <option value="8">8 stones</option>
             <option value="9">9 stones</option>
         </select>
+        <button class="button primary-button" onclick="newGame()" style="margin-left: 15px;">Restart</button>
     </div>
 
     <div class="go-board" id="goBoard"></div>
@@ -426,7 +427,6 @@
     </div>
 
     <div class="controls">
-        <button class="button primary-button" onclick="newGame()">New Game</button>
         <button class="button secondary-button" onclick="saveGame()">Save Game</button>
         <button class="button secondary-button" onclick="document.getElementById('loadInput').click()">Load Game</button>
         <input type="file" id="loadInput" accept=".json" style="display: none;" onchange="loadGame(event)">
