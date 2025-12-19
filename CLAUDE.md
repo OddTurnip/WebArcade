@@ -37,6 +37,10 @@ WebArcade/
 │       ├── history-panel.js
 │       ├── render.js        # Canvas rendering
 │       └── input.js         # Event handlers
+├── tictactoe.html       # Game: Tic-Tac-Toe (two-player)
+├── checkers.html        # Game: Checkers (two-player)
+├── chess.html           # Game: Chess (two-player)
+├── go.html              # Game: Go (two-player, 9x9/13x13/19x19)
 ├── pool.html            # Game: Pool (8-ball billiards)
 ├── grid.js              # Hex and triangle grid geometry library
 ├── sapper.js            # Shared game logic for square-grid Sapper games
@@ -107,13 +111,14 @@ AudioSystem.sfx.rotate()      // Piece rotated (tetris)
 AudioSystem.sfx.drop()        // Hard drop (tetris)
 AudioSystem.sfx.lock()        // Piece locked (tetris)
 AudioSystem.sfx.lineClear(n)  // Lines cleared (1-4, 4 = special)
+AudioSystem.sfx.stonePlace()  // Go stone placed on board
 ```
 
 **Music:**
 ```javascript
 AudioSystem.music.start('bounce')    // Start music track
 AudioSystem.music.stop()             // Stop music
-// Available tracks: 'breakout', 'bounce', 'tetris', 'invaders', 'snake'
+// Available tracks: 'breakout', 'bounce', 'tetris', 'invaders', 'snake', '4x', 'go'
 ```
 
 **Audio Unlock:** Call `AudioSystem.unlock()` on first user interaction.
