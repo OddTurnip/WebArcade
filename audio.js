@@ -585,45 +585,33 @@ const AudioSystem = {
             if (!AudioSystem.sfxEnabled) return;
             AudioSystem.ensureContext();
             const ctx = AudioSystem.ctx;
+            const now = ctx.currentTime;
 
-            // Primary click - square wave is the main clack (boosted)
-            const click1 = ctx.createOscillator();
-            const click1Gain = ctx.createGain();
-            click1.type = 'square';
-            click1.frequency.setValueAtTime(4000, ctx.currentTime);
-            click1.frequency.exponentialRampToValueAtTime(2000, ctx.currentTime + 0.005);
-            click1Gain.gain.setValueAtTime(0.4, ctx.currentTime);
-            click1Gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.008);
-            click1.connect(click1Gain);
-            click1Gain.connect(AudioSystem.sfxGain);
-            click1.start();
-            click1.stop(ctx.currentTime + 0.008);
+            // Sharp click - high frequency square wave for the "clack"
+            const click = ctx.createOscillator();
+            const clickGain = ctx.createGain();
+            click.type = 'square';
+            click.frequency.setValueAtTime(3500, now);
+            click.frequency.exponentialRampToValueAtTime(1500, now + 0.03);
+            clickGain.gain.setValueAtTime(0.25, now);
+            clickGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+            click.connect(clickGain);
+            clickGain.connect(AudioSystem.sfxGain);
+            click.start(now);
+            click.stop(now + 0.05);
 
-            // Secondary click - adds texture
-            const click2 = ctx.createOscillator();
-            const click2Gain = ctx.createGain();
-            click2.type = 'sawtooth';
-            click2.frequency.setValueAtTime(3000, ctx.currentTime);
-            click2.frequency.exponentialRampToValueAtTime(1500, ctx.currentTime + 0.006);
-            click2Gain.gain.setValueAtTime(0.2, ctx.currentTime);
-            click2Gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.01);
-            click2.connect(click2Gain);
-            click2Gain.connect(AudioSystem.sfxGain);
-            click2.start();
-            click2.stop(ctx.currentTime + 0.01);
-
-            // Pop transient - the satisfying snap
-            const pop = ctx.createOscillator();
-            const popGain = ctx.createGain();
-            pop.type = 'sine';
-            pop.frequency.setValueAtTime(1200, ctx.currentTime);
-            pop.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.015);
-            popGain.gain.setValueAtTime(0.35, ctx.currentTime);
-            popGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02);
-            pop.connect(popGain);
-            popGain.connect(AudioSystem.sfxGain);
-            pop.start();
-            pop.stop(ctx.currentTime + 0.02);
+            // Body thunk - adds weight to the click
+            const thunk = ctx.createOscillator();
+            const thunkGain = ctx.createGain();
+            thunk.type = 'triangle';
+            thunk.frequency.setValueAtTime(800, now);
+            thunk.frequency.exponentialRampToValueAtTime(200, now + 0.04);
+            thunkGain.gain.setValueAtTime(0.2, now);
+            thunkGain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+            thunk.connect(thunkGain);
+            thunkGain.connect(AudioSystem.sfxGain);
+            thunk.start(now);
+            thunk.stop(now + 0.06);
         }
     },
 
