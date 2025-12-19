@@ -587,31 +587,31 @@ const AudioSystem = {
             const ctx = AudioSystem.ctx;
             const now = ctx.currentTime;
 
-            // Clack - mid-frequency for wooden board impact
-            const clack = ctx.createOscillator();
-            const clackGain = ctx.createGain();
-            clack.type = 'triangle';
-            clack.frequency.setValueAtTime(1200, now);
-            clack.frequency.exponentialRampToValueAtTime(400, now + 0.025);
-            clackGain.gain.setValueAtTime(0.35, now);
-            clackGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-            clack.connect(clackGain);
-            clackGain.connect(AudioSystem.sfxGain);
-            clack.start(now);
-            clack.stop(now + 0.05);
+            // Wood block resonance - the hollow "tock" of wood
+            const wood = ctx.createOscillator();
+            const woodGain = ctx.createGain();
+            wood.type = 'sine';
+            wood.frequency.setValueAtTime(650, now);
+            wood.frequency.exponentialRampToValueAtTime(550, now + 0.08);
+            woodGain.gain.setValueAtTime(0.4, now);
+            woodGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+            wood.connect(woodGain);
+            woodGain.connect(AudioSystem.sfxGain);
+            wood.start(now);
+            wood.stop(now + 0.08);
 
-            // Thud - low body for stone weight
-            const thud = ctx.createOscillator();
-            const thudGain = ctx.createGain();
-            thud.type = 'sine';
-            thud.frequency.setValueAtTime(300, now);
-            thud.frequency.exponentialRampToValueAtTime(100, now + 0.04);
-            thudGain.gain.setValueAtTime(0.3, now);
-            thudGain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
-            thud.connect(thudGain);
-            thudGain.connect(AudioSystem.sfxGain);
-            thud.start(now);
-            thud.stop(now + 0.06);
+            // Click transient - the initial contact
+            const click = ctx.createOscillator();
+            const clickGain = ctx.createGain();
+            click.type = 'square';
+            click.frequency.setValueAtTime(1800, now);
+            click.frequency.exponentialRampToValueAtTime(900, now + 0.015);
+            clickGain.gain.setValueAtTime(0.15, now);
+            clickGain.gain.exponentialRampToValueAtTime(0.01, now + 0.02);
+            click.connect(clickGain);
+            clickGain.connect(AudioSystem.sfxGain);
+            click.start(now);
+            click.stop(now + 0.02);
         }
     },
 
