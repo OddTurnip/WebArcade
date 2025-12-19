@@ -1019,16 +1019,28 @@
 
             clearTerritoryMarkers();
 
+            // Helper to check if a cell is effectively empty (null or marked dead)
+            function isEffectivelyEmpty(r, c) {
+                if (board[r][c] === null) return true;
+                return deadStones.has(`${r},${c}`);
+            }
+
+            // Helper to get effective color (null if dead stone)
+            function getEffectiveColor(r, c) {
+                if (deadStones.has(`${r},${c}`)) return null;
+                return board[r][c];
+            }
+
             for (let row = 0; row < boardSize; row++) {
                 for (let col = 0; col < boardSize; col++) {
-                    if (board[row][col] === null && !checked[row][col]) {
+                    if (isEffectivelyEmpty(row, col) && !checked[row][col]) {
                         const emptyRegion = [];
                         const surroundingColors = new Set();
 
                         function floodFill(r, c) {
                             if (r < 0 || r >= boardSize || c < 0 || c >= boardSize || checked[r][c]) return;
 
-                            if (board[r][c] === null) {
+                            if (isEffectivelyEmpty(r, c)) {
                                 checked[r][c] = true;
                                 emptyRegion.push([r, c]);
                                 floodFill(r - 1, c);
@@ -1036,7 +1048,8 @@
                                 floodFill(r, c - 1);
                                 floodFill(r, c + 1);
                             } else {
-                                surroundingColors.add(board[r][c]);
+                                const color = getEffectiveColor(r, c);
+                                if (color) surroundingColors.add(color);
                             }
                         }
 
